@@ -190,6 +190,26 @@ export class AdminController {
     return this.admin.listAuditLogs({ targetType, limit: limit ? Number(limit) : undefined });
   }
 
+  /** 取引一覧 (全ウォレット横断)。指示書13章の「取引一覧」画面。 */
+  @Get("transactions")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR", "AUDITOR")
+  async listTransactions(
+    @Query("accountCode") accountCode?: string,
+    @Query("transactionType") transactionType?: string,
+    @Query("status") status?: string,
+    @Query("direction") direction?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listTransactions({
+      accountCode,
+      transactionType,
+      status,
+      direction,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   @Get("reconciliation")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "AUDITOR", "OVE_OPERATOR")

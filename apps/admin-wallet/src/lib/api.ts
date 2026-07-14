@@ -44,6 +44,20 @@ export interface WalletListItem {
   account: { accountCode: string; status: string; displayName: string | null };
 }
 
+export interface TransactionItem {
+  id: string;
+  transaction_code: string;
+  wallet_id: string;
+  account_code: string;
+  transaction_type: string;
+  direction: "CREDIT" | "DEBIT";
+  amount: string;
+  status: string;
+  display_name: string;
+  description: string | null;
+  occurred_at: string;
+}
+
 export interface AccountListItem {
   id: string;
   accountCode: string;

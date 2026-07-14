@@ -11,6 +11,7 @@
 | アカウント一覧 | `/accounts` | 一覧・ウォレットへのリンク |
 | ウォレット一覧 | `/wallets` | 一覧・詳細へのリンク |
 | ウォレット詳細 | `/wallets/[walletId]` | 残高・個別付与/減算/保留・保留解除・最近の取引 |
+| 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向)・取消 |
 | CSV一括付与 | `/bulk-grants` | CSVアップロード・プレビュー・実行・結果サマリ |
 | 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
 | 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ (`docs/migration.md`) |
@@ -79,10 +80,19 @@ E2Eテスト (`apps/api/src/e2e/approval-workflow.test.ts`) で、しきい値�
 乗せる実装 (申請→承認の強制) は未着手。アカウント統合は現状 `SUPER_ADMIN` による
 即時実行のままである (`docs/admin-operations.md` の「アカウント統合」参照)。
 
+## 取引一覧・取引取消 (指示書13章)
+
+`GET /api/v1/admin/transactions` はアカウントコード・状態 (`COMPLETED`/`HELD`/
+`REVERSED`/`FAILED`)・方向 (`CREDIT`/`DEBIT`) でフィルタし、全ウォレット横断で
+取引を検索できる (各行に `account_code` を含める)。`COMPLETED` の行には取消ボタンを
+表示し、既存の `POST /api/v1/admin/transactions/:transactionId/reverse` を呼び出す。
+存在しないアカウントコードで検索した場合はエラーではなく空配列を返す。
+E2Eテスト (`apps/api/src/e2e/transactions-list.test.ts`) と実ブラウザでの
+フィルタ操作・取消操作を確認済み。
+
 ## 未実装画面 (今後の課題)
 
-アカウント詳細 (個別)、取引一覧 (全体横断)、取引取消専用画面、付与ルール管理、
-APIアクセスログ、発行量の時系列グラフ。
+アカウント詳細 (個別)、付与ルール管理、APIアクセスログ、発行量の時系列グラフ。
 
 ## 管理者権限
 

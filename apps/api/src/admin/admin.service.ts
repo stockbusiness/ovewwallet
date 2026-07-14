@@ -158,6 +158,37 @@ export class AdminService {
     return serializeTransaction(transaction);
   }
 
+  /** 取引一覧 (全ウォレット横断)。管理画面の「取引一覧」画面から使う。 */
+  async listTransactions(params: {
+    accountCode?: string;
+    transactionType?: string;
+    status?: string;
+    direction?: string;
+    limit?: number;
+  }) {
+    const wallet = params.accountCode
+      ? await this.db.wallet.findFirst({ where: { account: { accountCode: params.accountCode } } })
+      : undefined;
+    if (params.accountCode && !wallet) return [];
+
+    const transactions = await this.db.oveTransaction.findMany({
+      where: {
+        walletId: wallet?.id,
+        transactionType: params.transactionType ? (params.transactionType as never) : undefined,
+        status: params.status ? (params.status as never) : undefined,
+        direction: params.direction ? (params.direction as never) : undefined,
+      },
+      include: { wallet: { include: { account: true } } },
+      orderBy: { occurredAt: "desc" },
+      take: Math.min(params.limit ?? 100, 500),
+    });
+
+    return transactions.map((t) => ({
+      ...serializeTransaction(t),
+      account_code: t.wallet.account.accountCode,
+    }));
+  }
+
   async listAuditLogs(params: { targetType?: string; limit?: number }): Promise<unknown[]> {
     return this.db.auditLog.findMany({
       where: params.targetType ? { targetType: params.targetType } : undefined,
