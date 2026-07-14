@@ -28,6 +28,29 @@ export class AdminService {
     });
   }
 
+  /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */
+  async getAccountDetail(accountId: string): Promise<unknown> {
+    const account = await this.db.oveAccount.findUnique({
+      where: { id: accountId },
+      include: {
+        wallet: true,
+        identities: { orderBy: { createdAt: "desc" } },
+        links: { include: { serviceIntegration: { select: { serviceCode: true, serviceName: true } } } },
+        mergedIntoAccount: { select: { id: true, accountCode: true } },
+        mergedAccounts: { select: { id: true, accountCode: true } },
+      },
+    });
+    if (!account) throw new NotFoundException("account not found");
+
+    const auditLogs = await this.db.auditLog.findMany({
+      where: { targetType: "ove_account", targetId: accountId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    return { ...account, auditLogs };
+  }
+
   async listWallets(params: { status?: string; limit?: number }) {
     return this.db.wallet.findMany({
       where: params.status ? { status: params.status as never } : undefined,

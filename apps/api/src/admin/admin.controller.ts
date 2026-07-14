@@ -135,6 +135,13 @@ export class AdminController {
     return this.admin.listAccounts({ status, limit: limit ? Number(limit) : undefined });
   }
 
+  /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */
+  @Get("accounts/:accountId")
+  @UseGuards(AdminAuthGuard)
+  async accountDetail(@Param("accountId") accountId: string) {
+    return this.admin.getAccountDetail(accountId);
+  }
+
   @Get("wallets")
   @UseGuards(AdminAuthGuard)
   async listWallets(@Query("status") status?: string, @Query("limit") limit?: string) {

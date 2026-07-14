@@ -87,6 +87,39 @@ export interface AccountListItem {
   wallet: { id: string; walletCode: string; availableBalance: string } | null;
 }
 
+export interface AccountDetailItem {
+  id: string;
+  accountCode: string;
+  status: string;
+  displayName: string | null;
+  primaryEmail: string | null;
+  primaryPhone: string | null;
+  verificationLevel: number;
+  createdAt: string;
+  closedAt: string | null;
+  wallet: { id: string; walletCode: string; availableBalance: string; status: string } | null;
+  identities: Array<{
+    id: string;
+    identityType: string;
+    provider: string;
+    providerSubject: string;
+    email: string | null;
+    status: string;
+    createdAt: string;
+  }>;
+  links: Array<{
+    id: string;
+    externalUserId: string;
+    status: string;
+    linkMethod: string;
+    linkedAt: string;
+    serviceIntegration: { serviceCode: string; serviceName: string };
+  }>;
+  mergedIntoAccount: { id: string; accountCode: string } | null;
+  mergedAccounts: Array<{ id: string; accountCode: string }>;
+  auditLogs: AuditLogItem[];
+}
+
 export interface AuditLogItem {
   id: string;
   actorType: string;

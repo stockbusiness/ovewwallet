@@ -44,7 +44,11 @@ export default function AccountsPage() {
           <tbody>
             {accounts.map((a) => (
               <tr key={a.id} className="border-t border-neutral-100">
-                <td className="p-3">{a.accountCode}</td>
+                <td className="p-3">
+                  <Link href={`/accounts/${a.id}`} className="text-brand-600 underline">
+                    {a.accountCode}
+                  </Link>
+                </td>
                 <td className="p-3">{a.status}</td>
                 <td className="p-3">{a.primaryEmail ?? "-"}</td>
                 <td className="p-3">
