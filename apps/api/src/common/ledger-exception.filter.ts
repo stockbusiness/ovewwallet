@@ -8,10 +8,13 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 import {
+  AccountAlreadyMergedError,
+  AccountNotFoundError,
   HoldNotActiveError,
   HoldNotFoundError,
   InsufficientBalanceError,
   InvalidAmountError,
+  InvalidMergeError,
   TransactionNotFoundError,
   TransactionNotReversibleError,
   WalletNotActiveError,
@@ -20,13 +23,15 @@ import {
 import { ExternalApiAuthError } from "@ove/auth";
 import type { RequestWithId } from "./request-id.middleware";
 
-const NOT_FOUND_ERRORS = [WalletNotFoundError, TransactionNotFoundError, HoldNotFoundError];
+const NOT_FOUND_ERRORS = [WalletNotFoundError, TransactionNotFoundError, HoldNotFoundError, AccountNotFoundError];
 const CONFLICT_ERRORS = [
   WalletNotActiveError,
   InsufficientBalanceError,
   TransactionNotReversibleError,
   HoldNotActiveError,
+  AccountAlreadyMergedError,
 ];
+const BAD_REQUEST_ERRORS = [InvalidAmountError, InvalidMergeError];
 
 /**
  * 台帳コア (@ove/ledger) と外部API認証 (@ove/auth) が投げる例外を
@@ -51,13 +56,15 @@ export class LedgerExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    if (exception instanceof InvalidAmountError) {
-      response.status(HttpStatus.BAD_REQUEST).json({
-        error: exception.name,
-        message: exception.message,
-        requestId: request.requestId,
-      });
-      return;
+    for (const ErrorClass of BAD_REQUEST_ERRORS) {
+      if (exception instanceof ErrorClass) {
+        response.status(HttpStatus.BAD_REQUEST).json({
+          error: exception.name,
+          message: exception.message,
+          requestId: request.requestId,
+        });
+        return;
+      }
     }
 
     if (exception instanceof ExternalApiAuthError) {

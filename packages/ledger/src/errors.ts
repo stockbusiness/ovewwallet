@@ -55,3 +55,24 @@ export class HoldNotActiveError extends Error {
     this.name = "HoldNotActiveError";
   }
 }
+
+export class AccountNotFoundError extends Error {
+  constructor(accountId: string) {
+    super(`Account not found: ${accountId}`);
+    this.name = "AccountNotFoundError";
+  }
+}
+
+export class InvalidMergeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMergeError";
+  }
+}
+
+export class AccountAlreadyMergedError extends Error {
+  constructor(accountId: string, mergedIntoAccountId: string | null) {
+    super(`Account ${accountId} is already merged into a different account (${mergedIntoAccountId ?? "unknown"})`);
+    this.name = "AccountAlreadyMergedError";
+  }
+}

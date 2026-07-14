@@ -14,6 +14,7 @@
 | CSV一括付与 | `/bulk-grants` | CSVアップロード・プレビュー・実行・結果サマリ |
 | 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
 | 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ (`docs/migration.md`) |
+| アカウント統合 | `/accounts/merge` | 統合元→統合先へ残高・連携情報を移管 |
 | 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
 
 ## 外部サービス緊急停止 (指示書5章)
@@ -28,12 +29,31 @@
 (`apps/api/src/e2e/service-integration-suspend.test.ts`) で、停止後に実際のAPIリクエストが
 401になり、再開後に再び成功することを確認済み。
 
+## アカウント統合 (指示書6章・13章)
+
+`POST /api/v1/admin/accounts/merge` (`packages/ledger/src/merge.ts` の
+`mergeAccounts()`) が以下をすべて1つのDBトランザクション内で行う:
+
+1. 統合元・統合先の両ウォレットを (デッドロック回避のためID昇順で) 行ロックする。
+2. 統合元の `available_balance` を統合先へ全額移管する
+   (`ACCOUNT_MERGE_OUT`/`ACCOUNT_MERGE_IN` の対になる取引を作成)。
+3. `account_identities`/`account_links` の所有者 (`ove_account_id`) を統合先へ付け替える。
+4. 統合元の有効なセッションをすべて無効化する (統合済みアカウントではログインできない)。
+5. 統合元 `ove_accounts.status = MERGED`, `merged_into_account_id = 統合先ID` を設定する。
+
+`idempotencyKey` は `ACCOUNT_MERGE:${sourceId}:${targetId}` で固定するため、同じ統合を
+再実行しても冪等に成功する (二重の残高移管は発生しない)。同じ統合元を**別の**統合先へ
+再度統合しようとした場合はエラーになる。管理画面では実行前に確認ダイアログを挟む
+(取り消せない操作であるため)。高額操作に準じ `SUPER_ADMIN` ロールのみ実行できる。
+E2Eテスト (`apps/api/src/e2e/account-merge.test.ts`) と、実ブラウザでの操作確認
+(残高移管・identity付け替え・整合性チェックが0件のままであること) を実施済み。
+
 ## 未実装画面 (今後の課題)
 
 アカウント詳細 (個別)、取引一覧 (全体横断)、取引取消専用画面、付与ルール管理、
-APIアクセスログ、アカウント統合、発行量の時系列グラフ。
-API自体 (`apps/api`) 側の対応する機能 (アカウント統合、承認フロー本実装含む) も
-フェーズ6の残課題として未着手。
+APIアクセスログ、発行量の時系列グラフ。二段階承認の本ワークフロー
+(アカウント統合含む高額操作の申請者/承認者分離) はフェーズ6の残課題として未着手
+(アカウント統合自体はSUPER_ADMIN限定の即時実行として実装済み)。
 
 ## 管理者権限
 

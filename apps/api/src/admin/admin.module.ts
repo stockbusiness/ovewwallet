@@ -5,6 +5,7 @@ import { AdminAuthService } from "./admin-auth.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminMigrationService } from "./admin-migration.service";
+import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AccountsModule } from "../accounts/accounts.module";
 
 @Module({
@@ -16,6 +17,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminBulkGrantService,
     AdminServiceIntegrationsService,
     AdminMigrationService,
+    AdminAccountMergeService,
   ],
 })
 export class AdminModule {}

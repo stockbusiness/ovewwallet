@@ -25,7 +25,12 @@ export default function AccountsPage() {
     <div>
       <AdminNav />
       <main className="mx-auto max-w-5xl p-6">
-        <h1 className="mb-4 text-xl font-bold">アカウント一覧</h1>
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold">アカウント一覧</h1>
+          <Link href="/accounts/merge" className="text-sm text-brand-600 underline">
+            アカウント統合
+          </Link>
+        </div>
         <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>

@@ -8,6 +8,7 @@ import { AdminService } from "./admin.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminMigrationService } from "./admin-migration.service";
+import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -41,6 +42,11 @@ const MigrationExecuteSchema = z.object({
   batchName: z.string().min(1),
   verifiedBy: z.string().optional(),
 });
+const AccountMergeSchema = z.object({
+  sourceAccountCode: z.string().min(1),
+  targetAccountCode: z.string().min(1),
+  reason: z.string().min(1),
+});
 
 @ApiTags("admin")
 @Controller("api/v1/admin")
@@ -51,6 +57,7 @@ export class AdminController {
     private readonly bulkGrant: AdminBulkGrantService,
     private readonly serviceIntegrations: AdminServiceIntegrationsService,
     private readonly migration: AdminMigrationService,
+    private readonly accountMerge: AdminAccountMergeService,
   ) {}
 
   @Post("login")
@@ -226,5 +233,16 @@ export class AdminController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.migration.execute(body.csvContent, body.fileName, body.batchName, req.admin.id, body.verifiedBy);
+  }
+
+  /** アカウント統合 (指示書6章・13章)。高額操作に準じ SUPER_ADMIN のみ許可する。 */
+  @Post("accounts/merge")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN")
+  async mergeAccounts(
+    @Body(new ZodValidationPipe(AccountMergeSchema)) body: z.infer<typeof AccountMergeSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.accountMerge.merge({ ...body, adminId: req.admin.id });
   }
 }
