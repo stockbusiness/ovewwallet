@@ -1,0 +1,21 @@
+{
+  "name": "@ove/ledger",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "dotenv -e ../../.env.test -- vitest run",
+    "test:watch": "dotenv -e ../../.env.test -- vitest",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ove/database": "workspace:*"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^7.4.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@ove/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:test": "dotenv -e ../../.env.test -- prisma migrate deploy",
+    "seed": "tsx src/seed.ts",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ove/auth": "workspace:*",
+    "@prisma/client": "^5.20.0",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0",
+    "typescript": "^5.6.3",
+    "tsx": "^4.19.1",
+    "dotenv-cli": "^7.4.2"
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+coverage/
+*.log
+.env
+.env.local
+.env.test
+.env.*.local
+.DS_Store
+packages/database/generated/

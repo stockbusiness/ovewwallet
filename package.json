@@ -1,0 +1,26 @@
+{
+  "name": "ove-wallet-platform",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* build && pnpm -r --filter=./apps/* build",
+    "dev:api": "pnpm --filter @ove/api start:dev",
+    "dev:user": "pnpm --filter @ove/user-wallet dev",
+    "dev:admin": "pnpm --filter @ove/admin-wallet dev",
+    "test": "pnpm -r test",
+    "test:ledger": "pnpm --filter @ove/ledger test",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @ove/database generate",
+    "db:migrate": "pnpm --filter @ove/database migrate",
+    "db:migrate:test": "pnpm --filter @ove/database migrate:test",
+    "db:seed": "pnpm --filter @ove/database seed"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.11",
+    "typescript": "^5.6.3"
+  }
+}

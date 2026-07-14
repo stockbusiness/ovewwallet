@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// Enums
+// =====================================================================
+
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  RESTRICTED
+  REVIEWING
+  LOCKED
+  CLOSED
+  MERGED
+}
+
+enum IdentityType {
+  LINE
+  EMAIL
+  PHONE
+  PASSKEY
+  GOOGLE
+  APPLE
+  BLOCKCHAIN_WALLET
+}
+
+enum IdentityStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ServiceCode {
+  SENGOKU_PASSPORT
+  AIART
+  SENGOKU_GACHA
+  SENGOKU_EC
+  NFT_MARKET
+  SENGOKU_METAVERSE
+  EVENT_SYSTEM
+}
+
+enum ServiceIntegrationStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum AccountLinkStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum WalletStatus {
+  ACTIVE
+  RESTRICTED
+  LOCKED
+  REVIEWING
+  MIGRATING
+  MIGRATED
+  CLOSED
+  MERGED
+}
+
+enum TransactionDirection {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  HELD
+  FAILED
+  REVERSED
+  MIGRATING
+  MIGRATED
+}
+
+enum TransactionType {
+  REGISTRATION_BONUS
+  AIART_ATTENDANCE
+  EVENT_REWARD
+  CAMPAIGN_REWARD
+  REFERRAL_REWARD
+  PURCHASE_REWARD
+  GACHA_REWARD
+  ADMIN_GRANT
+  ADMIN_DEDUCTION
+  OPENING_BALANCE
+  GACHA_TICKET_EXCHANGE
+  COUPON_EXCHANGE
+  ITEM_EXCHANGE
+  HOLD
+  RELEASE
+  REVERSAL
+  RECOVERY
+  ACCOUNT_MERGE_IN
+  ACCOUNT_MERGE_OUT
+  BLOCKCHAIN_MIGRATION
+  MIGRATION_REVERSAL
+}
+
+enum CreatedByType {
+  USER
+  ADMIN
+  SYSTEM
+  EXTERNAL_SERVICE
+}
+
+enum ApprovalType {
+  AUTOMATIC
+  MANUAL
+}
+
+enum RewardRuleStatus {
+  ACTIVE
+  INACTIVE
+  SCHEDULED
+  ENDED
+}
+
+enum WalletHoldStatus {
+  HELD
+  RELEASED
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  OVE_OPERATOR
+  INTEGRATION_ADMIN
+  EVENT_OPERATOR
+  AUDITOR
+  VIEWER
+}
+
+enum AdminUserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalRequestType {
+  HIGH_VALUE_GRANT
+  HIGH_VALUE_DEDUCTION
+  ACCOUNT_MERGE
+  EXTERNAL_WALLET_CHANGE
+  BLOCKCHAIN_MIGRATION
+  SERVICE_LIMIT_CHANGE
+}
+
+enum BlockchainMigrationStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  FAILED
+}
+
+enum BulkGrantBatchStatus {
+  UPLOADED
+  PREVIEWED
+  EXECUTING
+  COMPLETED
+  FAILED
+}
+
+enum MigrationBatchStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/// 表示用コード (OVE-ACC-00001234 / OVE-WLT-00001234 等) を採番するためのカウンタ。
+/// UPDATE ... RETURNING の単一ステートメントで原子的にインクリメントする。
+model CodeCounter {
+  id        String @id
+  nextValue BigInt @default(1) @map("next_value")
+
+  @@map("code_counters")
+}
+
+// =====================================================================
+// 2. アカウント・認証
+// =====================================================================
+
+model OveAccount {
+  id                  String        @id
+  accountCode         String        @unique @map("account_code")
+  status              AccountStatus @default(PENDING)
+  displayName         String?       @map("display_name")
+  primaryEmail        String?       @map("primary_email")
+  primaryPhone        String?       @map("primary_phone")
+  verificationLevel   Int           @default(0) @map("verification_level")
+  mergedIntoAccountId String?       @map("merged_into_account_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  closedAt            DateTime?     @map("closed_at")
+
+  mergedIntoAccount OveAccount?  @relation("AccountMerge", fields: [mergedIntoAccountId], references: [id])
+  mergedAccounts    OveAccount[] @relation("AccountMerge")
+
+  identities AccountIdentity[]
+  links      AccountLink[]
+  wallet     Wallet?
+  sessions   UserSession[]
+
+  @@map("ove_accounts")
+}
+
+model AccountIdentity {
+  id              String         @id
+  oveAccountId    String         @map("ove_account_id")
+  identityType    IdentityType   @map("identity_type")
+  provider        String
+  providerSubject String         @map("provider_subject")
+  email           String?
+  phone           String?
+  verifiedAt      DateTime?      @map("verified_at")
+  status          IdentityStatus @default(ACTIVE)
+  metadata        Json?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  account OveAccount @relation(fields: [oveAccountId], references: [id])
+
+  @@unique([provider, providerSubject])
+  @@index([oveAccountId])
+  @@map("account_identities")
+}
+
+model ServiceIntegration {
+  id                     String                   @id
+  serviceCode            ServiceCode              @unique @map("service_code")
+  serviceName            String                   @map("service_name")
+  apiKeyHash             String                   @map("api_key_hash")
+  /// HMAC署名検証には平文シークレットの復元が必要なため、一方向ハッシュではなく
+  /// ENCRYPTION_KEY による可逆暗号化 (AES-256-GCM) で保存する。
+  signingSecretEncrypted String                   @map("signing_secret_encrypted")
+  allowedIps             String[]                 @map("allowed_ips")
+  dailyAmountLimit       BigInt                   @map("daily_amount_limit")
+  perRequestAmountLimit  BigInt                   @map("per_request_amount_limit")
+  status                 ServiceIntegrationStatus @default(ACTIVE)
+  lastAccessedAt         DateTime?                @map("last_accessed_at")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+
+  links AccountLink[]
+
+  @@map("service_integrations")
+}
+
+model AccountLink {
+  id                   String            @id
+  oveAccountId         String            @map("ove_account_id")
+  serviceIntegrationId String            @map("service_integration_id")
+  externalUserId       String            @map("external_user_id")
+  status               AccountLinkStatus @default(ACTIVE)
+  linkMethod           String            @map("link_method")
+  linkedAt             DateTime          @default(now()) @map("linked_at")
+  verifiedAt           DateTime?         @map("verified_at")
+  revokedAt            DateTime?         @map("revoked_at")
+  metadata             Json?
+
+  account            OveAccount         @relation(fields: [oveAccountId], references: [id])
+  serviceIntegration ServiceIntegration @relation(fields: [serviceIntegrationId], references: [id])
+
+  @@unique([serviceIntegrationId, externalUserId])
+  @@index([oveAccountId])
+  @@map("account_links")
+}
+
+model UserSession {
+  id               String    @id
+  oveAccountId     String    @map("ove_account_id")
+  sessionTokenHash String    @unique @map("session_token_hash")
+  deviceId         String?   @map("device_id")
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  issuedAt         DateTime  @default(now()) @map("issued_at")
+  expiresAt        DateTime  @map("expires_at")
+  lastUsedAt       DateTime? @map("last_used_at")
+  revokedAt        DateTime? @map("revoked_at")
+  revokeReason     String?   @map("revoke_reason")
+
+  account OveAccount @relation(fields: [oveAccountId], references: [id])
+
+  @@index([oveAccountId])
+  @@map("user_sessions")
+}
+
+model AdminUser {
+  id           String          @id
+  adminCode    String          @unique @map("admin_code")
+  email        String          @unique
+  passwordHash String          @map("password_hash")
+  role         AdminRole
+  status       AdminUserStatus @default(ACTIVE)
+  displayName  String          @map("display_name")
+  lastLoginAt  DateTime?       @map("last_login_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+// =====================================================================
+// 3. ウォレット・台帳
+// =====================================================================
+
+model Wallet {
+  id               String       @id
+  oveAccountId     String       @unique @map("ove_account_id")
+  walletCode       String       @unique @map("wallet_code")
+  status           WalletStatus @default(ACTIVE)
+  availableBalance BigInt       @default(0) @map("available_balance")
+  pendingBalance   BigInt       @default(0) @map("pending_balance")
+  heldBalance      BigInt       @default(0) @map("held_balance")
+  recoveryBalance  BigInt       @default(0) @map("recovery_balance")
+  lifetimeCredited BigInt       @default(0) @map("lifetime_credited")
+  lifetimeDebited  BigInt       @default(0) @map("lifetime_debited")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  account      OveAccount            @relation(fields: [oveAccountId], references: [id])
+  transactions OveTransaction[]
+  holds        WalletHold[]
+  migrations   BlockchainMigration[]
+
+  @@map("wallets")
+}
+
+model OveTransaction {
+  id                   String               @id
+  walletId             String               @map("wallet_id")
+  transactionCode      String               @unique @map("transaction_code")
+  transactionType      TransactionType      @map("transaction_type")
+  direction            TransactionDirection
+  amount               BigInt
+  status               TransactionStatus    @default(PENDING)
+  balanceBefore        BigInt               @map("balance_before")
+  balanceAfter         BigInt               @map("balance_after")
+  displayName          String               @map("display_name")
+  description          String?
+  sourceService        String?              @map("source_service")
+  sourceReferenceId    String?              @map("source_reference_id")
+  relatedTransactionId String?              @map("related_transaction_id")
+  idempotencyKey       String               @unique @map("idempotency_key")
+  occurredAt           DateTime             @default(now()) @map("occurred_at")
+  completedAt          DateTime?            @map("completed_at")
+  createdByType        CreatedByType        @map("created_by_type")
+  createdById          String?              @map("created_by_id")
+  metadata             Json?
+  createdAt            DateTime             @default(now()) @map("created_at")
+
+  wallet             Wallet           @relation(fields: [walletId], references: [id])
+  relatedTransaction OveTransaction?  @relation("TransactionReversal", fields: [relatedTransactionId], references: [id])
+  reversals          OveTransaction[] @relation("TransactionReversal")
+
+  @@index([walletId])
+  @@index([sourceService, sourceReferenceId])
+  @@map("ove_transactions")
+}
+
+model RewardRule {
+  id                 String           @id
+  ruleCode           String           @unique @map("rule_code")
+  ruleName           String           @map("rule_name")
+  sourceService      ServiceCode      @map("source_service")
+  rewardAmount       BigInt           @map("reward_amount")
+  perUserLimit       Int?             @map("per_user_limit")
+  perEventLimit      Int?             @map("per_event_limit")
+  monthlyCountLimit  Int?             @map("monthly_count_limit")
+  monthlyAmountLimit BigInt?          @map("monthly_amount_limit")
+  globalAmountLimit  BigInt?          @map("global_amount_limit")
+  startsAt           DateTime?        @map("starts_at")
+  endsAt             DateTime?        @map("ends_at")
+  approvalType       ApprovalType     @default(AUTOMATIC) @map("approval_type")
+  status             RewardRuleStatus @default(ACTIVE)
+  displayName        String           @map("display_name")
+  description        String?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  @@map("reward_rules")
+}
+
+model WalletHold {
+  id         String           @id
+  walletId   String           @map("wallet_id")
+  amount     BigInt
+  reason     String
+  status     WalletHoldStatus @default(HELD)
+  heldAt     DateTime         @default(now()) @map("held_at")
+  releasedAt DateTime?        @map("released_at")
+  createdBy  String           @map("created_by")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@map("wallet_holds")
+}
+
+// =====================================================================
+// 監査・承認
+// =====================================================================
+
+model AuditLog {
+  id         String        @id
+  actorType  CreatedByType @map("actor_type")
+  actorId    String?       @map("actor_id")
+  actionType String        @map("action_type")
+  targetType String        @map("target_type")
+  targetId   String?       @map("target_id")
+  result     AuditResult
+  beforeData Json?         @map("before_data")
+  afterData  Json?         @map("after_data")
+  reason     String?
+  ipAddress  String?       @map("ip_address")
+  userAgent  String?       @map("user_agent")
+  requestId  String?       @map("request_id")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@index([targetType, targetId])
+  @@index([actorType, actorId])
+  @@map("audit_logs")
+}
+
+/// 高額付与・アカウント統合など二段階承認対象の申請/承認記録。
+/// 申請者と承認者を分離するための最小構造 (フェーズ6で本格実装)。
+model ApprovalRequest {
+  id              String                @id
+  requestType     ApprovalRequestType   @map("request_type")
+  status          ApprovalRequestStatus @default(PENDING)
+  requestedBy     String                @map("requested_by")
+  requestedAt     DateTime              @default(now()) @map("requested_at")
+  approvedBy      String?               @map("approved_by")
+  decidedAt       DateTime?             @map("decided_at")
+  rejectionReason String?               @map("rejection_reason")
+  payload         Json
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  @@map("approval_requests")
+}
+
+// =====================================================================
+// CSV一括付与 / 既存ユーザー移行
+// =====================================================================
+
+model BulkGrantBatch {
+  id               String               @id
+  fileName         String               @map("file_name")
+  totalCount       Int                  @map("total_count")
+  successCount     Int                  @default(0) @map("success_count")
+  duplicateCount   Int                  @default(0) @map("duplicate_count")
+  unknownUserCount Int                  @default(0) @map("unknown_user_count")
+  errorCount       Int                  @default(0) @map("error_count")
+  totalAmount      BigInt               @map("total_amount")
+  status           BulkGrantBatchStatus @default(UPLOADED)
+  resultFileUrl    String?              @map("result_file_url")
+  createdBy        String               @map("created_by")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  executedAt       DateTime?            @map("executed_at")
+
+  @@map("bulk_grant_batches")
+}
+
+model MigrationBatch {
+  id             String               @id
+  batchName      String               @map("batch_name")
+  sourceFileName String               @map("source_file_name")
+  sourceDataHash String               @map("source_data_hash")
+  executedBy     String               @map("executed_by")
+  verifiedBy     String?              @map("verified_by")
+  status         MigrationBatchStatus @default(PENDING)
+  totalCount     Int                  @default(0) @map("total_count")
+  successCount   Int                  @default(0) @map("success_count")
+  reviewingCount Int                  @default(0) @map("reviewing_count")
+  errorDetail    String?              @map("error_detail")
+  executedAt     DateTime?            @map("executed_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  @@map("migration_batches")
+}
+
+// =====================================================================
+// 将来のブロックチェーン移行 (MVPではデータ構造のみ)
+// =====================================================================
+
+model BlockchainMigration {
+  id              String                    @id
+  walletId        String                    @map("wallet_id")
+  snapshotBalance BigInt                    @map("snapshot_balance")
+  conversionRate  Decimal                   @map("conversion_rate")
+  tokenAmount     Decimal?                  @map("token_amount")
+  network         String?
+  walletAddress   String?                   @map("wallet_address")
+  contractAddress String?                   @map("contract_address")
+  txHash          String?                   @map("tx_hash")
+  status          BlockchainMigrationStatus @default(PENDING)
+  requestedAt     DateTime?                 @map("requested_at")
+  approvedAt      DateTime?                 @map("approved_at")
+  completedAt     DateTime?                 @map("completed_at")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@map("blockchain_migrations")
+}
