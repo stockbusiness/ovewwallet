@@ -3,14 +3,9 @@ import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
+import "./common/bigint-json";
 import { AppModule } from "./app.module";
 import { LedgerExceptionFilter } from "./common/ledger-exception.filter";
-
-// Prisma の BigInt (残高等) を JSON レスポンスへそのまま含められるようにする。
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-(BigInt.prototype as any).toJSON = function (this: bigint) {
-  return this.toString();
-};
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

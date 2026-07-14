@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import "./common/bigint-json";
 import { PrismaModule } from "./common/prisma.module";
 import { KeyValueStoreModule } from "./common/kv-store.module";
 import { requestIdMiddleware } from "./common/request-id.middleware";

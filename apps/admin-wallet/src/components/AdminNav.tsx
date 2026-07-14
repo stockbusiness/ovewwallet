@@ -9,6 +9,8 @@ const LINKS = [
   { href: "/accounts", label: "アカウント一覧" },
   { href: "/wallets", label: "ウォレット一覧" },
   { href: "/bulk-grants", label: "CSV一括付与" },
+  { href: "/service-integrations", label: "外部サービス管理" },
+  { href: "/migrations", label: "既存ユーザー移行" },
   { href: "/audit-logs", label: "操作ログ" },
 ];
 

@@ -54,6 +54,23 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 アカウント・ウォレット・連携をまとめて自動作成する
 (`apps/api/src/accounts/accounts.service.ts` の `findOrCreateByServiceLink`)。
 
+## 付与ルール (reward_rules) の上限enforcement
+
+`transaction_type: REGISTRATION_BONUS / AIART_ATTENDANCE` については、対応する
+`reward_rules` 行 (`SENGOKU_REGISTRATION_BONUS` / `AIART_ATTENDANCE_REWARD`) の
+以下の制約をすべて検証する (`apps/api/src/rewards/rewards.service.ts`):
+
+- `starts_at`/`ends_at`: ルールの有効期間外なら拒否
+- `per_user_limit`: そのウォレットに対する当該取引種別のCOMPLETED件数が上限以上なら拒否
+- `per_event_limit`: 同一 `event_id` に対するCOMPLETED件数が上限以上なら拒否
+- `monthly_count_limit`/`monthly_amount_limit`: **ルール単位 (キャンペーン全体、
+  全ウォレット横断) の当月合計** が上限に達する/超えるなら拒否
+- `global_amount_limit`: ルール単位の全期間累計が上限を超えるなら拒否
+
+`monthly_count_limit`/`monthly_amount_limit` は `per_user_limit` (ユーザー単位) とは
+異なり、当初の実装では誤ってウォレット単位で集計してしまうバグがあった
+(実装中にテストで発見・修正。`docs/test-plan.md` 参照)。
+
 ## 動作確認済みの内容
 
 実際にHTTPリクエストを送って以下を確認済み (シミュレーションではなく実通信):

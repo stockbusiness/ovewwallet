@@ -29,6 +29,8 @@ enum IdentityType {
   GOOGLE
   APPLE
   BLOCKCHAIN_WALLET
+  /// 既存ユーザー移行 (指示書15章) で旧システムのユーザーIDを紐付けるための識別子種別。
+  LEGACY_SYSTEM
 }
 
 enum IdentityStatus {

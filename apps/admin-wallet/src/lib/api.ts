@@ -66,6 +66,18 @@ export interface AuditLogItem {
   createdAt: string;
 }
 
+export interface ServiceIntegrationItem {
+  id: string;
+  serviceCode: string;
+  serviceName: string;
+  status: string;
+  allowedIps: string[];
+  dailyAmountLimit: string;
+  perRequestAmountLimit: string;
+  lastAccessedAt: string | null;
+  createdAt: string;
+}
+
 export interface ReconciliationResult {
   checkedWalletCount: number;
   mismatchedWalletCount: number;

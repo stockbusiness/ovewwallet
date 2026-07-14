@@ -28,7 +28,7 @@ describe("golden path (E2E)", () => {
     await prisma.adminUser.create({
       data: {
         id: generateId(),
-        adminCode: `OVE-ADM-${generateId().slice(0, 8)}`,
+        adminCode: `OVE-ADM-${generateId()}`,
         email: adminEmail,
         passwordHash: hashSecret(adminPassword),
         role: "SUPER_ADMIN",

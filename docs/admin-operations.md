@@ -11,13 +11,27 @@
 | アカウント一覧 | `/accounts` | 一覧・ウォレットへのリンク |
 | ウォレット一覧 | `/wallets` | 一覧・詳細へのリンク |
 | ウォレット詳細 | `/wallets/[walletId]` | 残高・個別付与/減算/保留・保留解除・最近の取引 |
-| CSV一括付与 | `/bulk-grants` | CSVアップロード・実行・結果サマリ |
+| CSV一括付与 | `/bulk-grants` | CSVアップロード・プレビュー・実行・結果サマリ |
+| 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
+| 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ (`docs/migration.md`) |
 | 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
+
+## 外部サービス緊急停止 (指示書5章)
+
+`POST /api/v1/admin/service-integrations/:id/suspend` で `service_integrations.status`
+を `SUSPENDED` にすると、`ExternalApiAuthGuard` はAPIキー照合時に
+`status: "ACTIVE"` の連携のみを対象にするため、当該サービスの既存APIキーによる
+リクエストは即座に (別途のキャッシュ無効化などを待たず) 401エラーになる。
+`POST /api/v1/admin/service-integrations/:id/reactivate` で再開できる。
+両操作とも監査ログ (`SERVICE_INTEGRATION_SUSPEND`/`SERVICE_INTEGRATION_REACTIVATE`) に
+理由付きで記録される。E2Eテスト
+(`apps/api/src/e2e/service-integration-suspend.test.ts`) で、停止後に実際のAPIリクエストが
+401になり、再開後に再び成功することを確認済み。
 
 ## 未実装画面 (今後の課題)
 
 アカウント詳細 (個別)、取引一覧 (全体横断)、取引取消専用画面、付与ルール管理、
-外部サービス管理、APIアクセスログ、アカウント統合、発行量の時系列グラフ。
+APIアクセスログ、アカウント統合、発行量の時系列グラフ。
 API自体 (`apps/api`) 側の対応する機能 (アカウント統合、承認フロー本実装含む) も
 フェーズ6の残課題として未着手。
 
@@ -42,9 +56,14 @@ external_user_id,amount,transaction_name,reason,event_id,idempotency_key
 - 処理結果: 総件数・正常件数・重複件数・ユーザー不明件数・エラー件数・合計付与予定OVE。
 - 同じCSVを再実行しても、行ごとの `idempotency_key` により二重付与されない
   (実際にCSVを2回投入するテストで確認済み)。
-- **簡略化した点**: 指示書の「プレビュー→管理者確認→実行」の2段階フローではなく、
-  アップロードと同時に実行し結果を返す1段階フローにしている
-  (`bulk_grant_batches` テーブルに実行結果を保存)。事前プレビュー画面は未実装。
+- **プレビュー→実行の2段階フロー**: `POST /api/v1/admin/bulk-grants/preview` が
+  ウォレットを一切更新せずに集計結果 (総件数/正常/重複/ユーザー不明/エラー/合計付与予定OVE)
+  と `batchId` (`bulk_grant_batches` に `status: PREVIEWED` で保存) を返す。管理者が内容を
+  確認した上で `POST /api/v1/admin/bulk-grants/execute` に同じCSVと `batchId` を渡すと
+  実際に付与を実行し、対応するバッチを `status: COMPLETED` に更新する。
+  (raw CSV行はDBへ保存していないため、実行時も同じCSV本文を送る必要がある)。
+  E2Eテスト (`apps/api/src/e2e/bulk-grant.test.ts`) でプレビュー時に残高が変化しないこと、
+  実行後に反映されること、再実行しても二重付与されないことを確認済み。
 
 ## 二段階承認 (指示書13章)
 

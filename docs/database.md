@@ -15,7 +15,7 @@ PostgreSQL + Prisma。スキーマ定義は `packages/database/prisma/schema.pri
 | テーブル | 役割 |
 |---|---|
 | `ove_accounts` | ユーザーの正式アカウント。`merged_into_account_id` で統合を表現 |
-| `account_identities` | LINE/EMAIL/PHONE/PASSKEY/GOOGLE/APPLE/BLOCKCHAIN_WALLET の認証情報。`(provider, provider_subject)` に一意制約 |
+| `account_identities` | LINE/EMAIL/PHONE/PASSKEY/GOOGLE/APPLE/BLOCKCHAIN_WALLET/LEGACY_SYSTEM の認証情報。`(provider, provider_subject)` に一意制約。`LEGACY_SYSTEM` は既存ユーザー移行 (`docs/migration.md`) で旧システムのユーザーIDを紐付けるために追加した |
 | `service_integrations` | 外部サービスAPIの認証情報。APIキーはハッシュ、署名シークレットは暗号化して保存 (下記「秘密情報の扱い」参照) |
 | `account_links` | OVEアカウントと外部サービスの `external_user_id` の紐付け。`(service_integration_id, external_user_id)` に一意制約 |
 | `wallets` | 1アカウント1ウォレット。`available/pending/held/recovery_balance`, `lifetime_credited/debited` |
