@@ -10,10 +10,14 @@ import {
 } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { serializeTransaction } from "../wallets/wallets.service";
+import { AdminApprovalService, HIGH_VALUE_THRESHOLD } from "./admin-approval.service";
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly approvals: AdminApprovalService,
+  ) {}
 
   async listAccounts(params: { status?: string; limit?: number }) {
     return this.db.oveAccount.findMany({
@@ -47,13 +51,32 @@ export class AdminService {
     return { ...wallet, recentTransactions: transactions.map(serializeTransaction) };
   }
 
+  /**
+   * HIGH_VALUE_THRESHOLD (指示書13章「高額手動付与」) 以上の場合は即時実行せず、
+   * 二段階承認の申請を作成して { status: "PENDING_APPROVAL" } を返す。
+   */
   async grant(params: { walletId: string; amount: number; reason: string; idempotencyKey?: string; adminId: string }) {
+    const amount = BigInt(params.amount);
+    const idempotencyKey = params.idempotencyKey ?? `ADMIN_GRANT:${generateId()}`;
+
+    if (amount >= HIGH_VALUE_THRESHOLD) {
+      const request = await this.approvals.requestHighValueOperation({
+        kind: "HIGH_VALUE_GRANT",
+        walletId: params.walletId,
+        amount,
+        reason: params.reason,
+        idempotencyKey,
+        requestedBy: params.adminId,
+      });
+      return { result: "PENDING_APPROVAL" as const, approvalRequestId: request.id };
+    }
+
     const transaction = await creditWallet(
       {
         walletId: params.walletId,
-        amount: params.amount,
+        amount,
         transactionType: "ADMIN_GRANT",
-        idempotencyKey: params.idempotencyKey ?? `ADMIN_GRANT:${generateId()}`,
+        idempotencyKey,
         displayName: "管理者による個別付与",
         description: params.reason,
         createdByType: "ADMIN",
@@ -61,16 +84,31 @@ export class AdminService {
       },
       this.db,
     );
-    return serializeTransaction(transaction);
+    return { result: "COMPLETED" as const, transaction: serializeTransaction(transaction) };
   }
 
   async deduct(params: { walletId: string; amount: number; reason: string; idempotencyKey?: string; adminId: string }) {
+    const amount = BigInt(params.amount);
+    const idempotencyKey = params.idempotencyKey ?? `ADMIN_DEDUCTION:${generateId()}`;
+
+    if (amount >= HIGH_VALUE_THRESHOLD) {
+      const request = await this.approvals.requestHighValueOperation({
+        kind: "HIGH_VALUE_DEDUCTION",
+        walletId: params.walletId,
+        amount,
+        reason: params.reason,
+        idempotencyKey,
+        requestedBy: params.adminId,
+      });
+      return { result: "PENDING_APPROVAL" as const, approvalRequestId: request.id };
+    }
+
     const transaction = await debitWallet(
       {
         walletId: params.walletId,
-        amount: params.amount,
+        amount,
         transactionType: "ADMIN_DEDUCTION",
-        idempotencyKey: params.idempotencyKey ?? `ADMIN_DEDUCTION:${generateId()}`,
+        idempotencyKey,
         displayName: "管理者による個別減算",
         description: params.reason,
         createdByType: "ADMIN",
@@ -78,7 +116,7 @@ export class AdminService {
       },
       this.db,
     );
-    return serializeTransaction(transaction);
+    return { result: "COMPLETED" as const, transaction: serializeTransaction(transaction) };
   }
 
   async reverse(params: { transactionId: string; reason: string; idempotencyKey?: string; adminId: string }) {

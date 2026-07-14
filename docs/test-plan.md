@@ -27,8 +27,9 @@
 | `service-integration-suspend.test.ts` | 緊急停止後にAPIキーが401になること、再開後に成功すること、監査ログが記録されること |
 | `migration.test.ts` | 既知残高の付与、残高不明時のREVIEWING遷移 (推定残高を入れないこと)、同じCSVの再実行で二重付与されないこと |
 | `account-merge.test.ts` | 残高移管・identity付け替え・統合済みアカウントのログイン不可・冪等性・自己統合の400拒否 |
+| `approval-workflow.test.ts` | 高額付与のPENDING_APPROVAL化・残高不変・申請者本人の承認拒否(400)・別管理者の承認で実行・却下で残高不変・承認済み申請の再承認拒否(409)・しきい値未満は即時実行 |
 
-**合計 10件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 13件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない

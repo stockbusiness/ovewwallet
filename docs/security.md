@@ -15,6 +15,9 @@
   **DB権限レベルでのDELETE禁止 (REVOKE) は本番デプロイ時の運用手順として別途設定が必要**
   (このリポジトリのマイグレーションには含めていない)。
 - 管理権限分離: `AdminRole` によるロールベースアクセス制御 (`RolesGuard`)。
+- 高額操作の承認: `HIGH_VALUE_THRESHOLD` 以上の個別付与・個別減算は二段階承認
+  (申請者と承認者が別人であることを強制) を経なければ実行されない
+  (`docs/admin-operations.md` の「二段階承認」参照)。
 - request_id付与: 全リクエストに `x-request-id` を採番しレスポンスヘッダへ付与
   (`apps/api/src/common/request-id.middleware.ts`)。エラーレスポンスにも含める。
 - 残高整合性検査: `GET /api/v1/admin/reconciliation` (`docs/ledger-rules.md`)。

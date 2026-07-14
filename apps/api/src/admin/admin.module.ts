@@ -6,6 +6,7 @@ import { AdminBulkGrantService } from "./admin-bulk-grant.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminMigrationService } from "./admin-migration.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
+import { AdminApprovalService } from "./admin-approval.service";
 import { AccountsModule } from "../accounts/accounts.module";
 
 @Module({
@@ -18,6 +19,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminServiceIntegrationsService,
     AdminMigrationService,
     AdminAccountMergeService,
+    AdminApprovalService,
   ],
 })
 export class AdminModule {}

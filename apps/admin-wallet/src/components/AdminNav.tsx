@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/bulk-grants", label: "CSV一括付与" },
   { href: "/service-integrations", label: "外部サービス管理" },
   { href: "/migrations", label: "既存ユーザー移行" },
+  { href: "/approval-requests", label: "二段階承認" },
   { href: "/audit-logs", label: "操作ログ" },
 ];
 

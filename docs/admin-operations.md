@@ -15,6 +15,7 @@
 | 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
 | 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ (`docs/migration.md`) |
 | アカウント統合 | `/accounts/merge` | 統合元→統合先へ残高・連携情報を移管 |
+| 二段階承認 | `/approval-requests` | 高額付与・高額減算の承認待ち一覧、承認/却下、履歴 |
 | 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
 
 ## 外部サービス緊急停止 (指示書5章)
@@ -48,12 +49,40 @@
 E2Eテスト (`apps/api/src/e2e/account-merge.test.ts`) と、実ブラウザでの操作確認
 (残高移管・identity付け替え・整合性チェックが0件のままであること) を実施済み。
 
+## 二段階承認 (指示書13章)
+
+`packages/database` の `approval_requests` テーブルを使い、高額付与・高額減算を対象に
+基本ワークフローを実装した (`apps/api/src/admin/admin-approval.service.ts`)。
+
+- しきい値: `HIGH_VALUE_THRESHOLD` 環境変数 (デフォルト 50,000 OVE)。
+- `POST /api/v1/admin/wallets/grant`/`deduct` は、金額がしきい値**以上**の場合、
+  即時実行せず `approval_requests` に `status: PENDING` の申請を作成し、
+  `{ result: "PENDING_APPROVAL", approvalRequestId }` を返す (しきい値未満は従来通り
+  `{ result: "COMPLETED", transaction: {...} }` で即時実行される)。
+- `GET /api/v1/admin/approval-requests` — 一覧 (承認待ち/履歴)。
+- `POST /api/v1/admin/approval-requests/:id/approve` — 承認して実際に
+  `creditWallet`/`debitWallet` を実行する。**申請者本人は承認できない**
+  (職務分離。同一管理者IDでの承認は400エラー)。
+- `POST /api/v1/admin/approval-requests/:id/reject` — 却下 (理由必須)。ウォレットは
+  一切変更されない。
+- 承認・却下・申請作成はすべて監査ログに記録される
+  (`APPROVAL_REQUEST_CREATED`/`APPROVED`/`REJECTED`)。
+
+E2Eテスト (`apps/api/src/e2e/approval-workflow.test.ts`) で、しきい値以上の付与が
+保留されること・残高が変化しないこと・申請者本人による承認が拒否されること・別の
+管理者が承認すると実際に残高が反映されること・却下すると残高が変化しないこと・
+承認済み申請の再承認が拒否されることを検証済み。加えて、2つの別々の管理者セッションで
+実ブラウザから申請→承認まで操作し、動作を確認済み。
+
+**MVPでの制約**: `approval_requests.request_type` にはアカウント統合・オンチェーン移行・
+外部ウォレット変更・APIサービス上限変更の値も用意しているが、これらを本ワークフローに
+乗せる実装 (申請→承認の強制) は未着手。アカウント統合は現状 `SUPER_ADMIN` による
+即時実行のままである (`docs/admin-operations.md` の「アカウント統合」参照)。
+
 ## 未実装画面 (今後の課題)
 
 アカウント詳細 (個別)、取引一覧 (全体横断)、取引取消専用画面、付与ルール管理、
-APIアクセスログ、発行量の時系列グラフ。二段階承認の本ワークフロー
-(アカウント統合含む高額操作の申請者/承認者分離) はフェーズ6の残課題として未着手
-(アカウント統合自体はSUPER_ADMIN限定の即時実行として実装済み)。
+APIアクセスログ、発行量の時系列グラフ。
 
 ## 管理者権限
 

@@ -68,11 +68,15 @@ export default function WalletDetailPage() {
           ? "/api/v1/admin/wallets/deduct"
           : "/api/v1/admin/wallets/hold";
     try {
-      await apiFetch(endpoint, {
+      const res = await apiFetch<{ result?: string; approvalRequestId?: string }>(endpoint, {
         method: "POST",
         body: JSON.stringify({ walletId: params.walletId, amount: parsedAmount, reason }),
       });
-      setMessage("処理が完了しました");
+      setMessage(
+        res.result === "PENDING_APPROVAL"
+          ? "高額操作のため二段階承認の申請を作成しました (「二段階承認」画面から別の管理者が承認するまで反映されません)"
+          : "処理が完了しました",
+      );
       setAmount("");
       setReason("");
       await load();

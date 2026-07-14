@@ -78,6 +78,18 @@ export interface ServiceIntegrationItem {
   createdAt: string;
 }
 
+export interface ApprovalRequestItem {
+  id: string;
+  requestType: string;
+  status: string;
+  requestedBy: string;
+  requestedAt: string;
+  approvedBy: string | null;
+  decidedAt: string | null;
+  rejectionReason: string | null;
+  payload: { kind: string; walletId: string; amount: string; reason: string };
+}
+
 export interface ReconciliationResult {
   checkedWalletCount: number;
   mismatchedWalletCount: number;

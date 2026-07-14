@@ -95,11 +95,12 @@ describe("golden path (E2E)", () => {
     expect(historyRes.body).toHaveLength(1);
     expect(historyRes.body[0].transaction_type).toBe("ADMIN_GRANT");
 
-    // 残高不足時は拒否される (減算APIは外部サービス認証が必要なため、管理者減算で確認)
+    // 残高不足時は拒否される (減算APIは外部サービス認証が必要なため、管理者減算で確認)。
+    // 金額はHIGH_VALUE_THRESHOLD (二段階承認の対象) 未満かつ残高 (3000) 超過にする。
     await request(server)
       .post("/api/v1/admin/wallets/deduct")
       .set("Cookie", adminCookie)
-      .send({ walletId, amount: 999999, reason: "残高超過テスト" })
+      .send({ walletId, amount: 40000, reason: "残高超過テスト" })
       .expect(409);
 
     const balanceUnchanged = await request(server)

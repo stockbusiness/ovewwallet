@@ -1,0 +1,139 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import AdminNav from "@/components/AdminNav";
+import { apiFetch, ApiError, type ApprovalRequestItem } from "@/lib/api";
+
+const KIND_LABEL: Record<string, string> = {
+  HIGH_VALUE_GRANT: "高額付与",
+  HIGH_VALUE_DEDUCTION: "高額減算",
+};
+
+export default function ApprovalRequestsPage() {
+  const router = useRouter();
+  const [requests, setRequests] = useState<ApprovalRequestItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const list = await apiFetch<ApprovalRequestItem[]>("/api/v1/admin/approval-requests");
+      setRequests(list);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) router.push("/login");
+    }
+  }, [router]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function approve(id: string) {
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/approval-requests/${id}/approve`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "承認に失敗しました");
+    }
+  }
+
+  async function reject(id: string) {
+    const reason = window.prompt("却下理由を入力してください");
+    if (!reason) return;
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/approval-requests/${id}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "却下に失敗しました");
+    }
+  }
+
+  const pending = requests.filter((r) => r.status === "PENDING");
+  const decided = requests.filter((r) => r.status !== "PENDING");
+
+  return (
+    <div>
+      <AdminNav />
+      <main className="mx-auto max-w-5xl p-6">
+        <h1 className="mb-1 text-xl font-bold">二段階承認</h1>
+        <p className="mb-4 text-xs text-neutral-500">
+          高額付与・高額減算 (指示書13章のしきい値以上) は申請者本人以外の管理者が承認するまで実行されません。
+        </p>
+        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+
+        <h2 className="mb-2 text-sm font-semibold">承認待ち ({pending.length})</h2>
+        <table className="mb-6 w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
+          <thead className="bg-neutral-50 text-xs text-neutral-500">
+            <tr>
+              <th className="p-3">種別</th>
+              <th className="p-3">金額</th>
+              <th className="p-3">理由</th>
+              <th className="p-3">申請者</th>
+              <th className="p-3">申請日時</th>
+              <th className="p-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pending.map((r) => (
+              <tr key={r.id} className="border-t border-neutral-100">
+                <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
+                <td className="p-3">{Number(r.payload.amount).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">{r.payload.reason}</td>
+                <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
+                <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
+                <td className="p-3">
+                  <div className="flex gap-2">
+                    <button onClick={() => approve(r.id)} className="text-xs text-brand-600 underline">
+                      承認
+                    </button>
+                    <button onClick={() => reject(r.id)} className="text-xs text-red-600 underline">
+                      却下
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {pending.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-3 text-xs text-neutral-400">
+                  承認待ちの申請はありません
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <h2 className="mb-2 text-sm font-semibold">履歴</h2>
+        <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
+          <thead className="bg-neutral-50 text-xs text-neutral-500">
+            <tr>
+              <th className="p-3">種別</th>
+              <th className="p-3">金額</th>
+              <th className="p-3">状態</th>
+              <th className="p-3">承認/却下者</th>
+              <th className="p-3">日時</th>
+            </tr>
+          </thead>
+          <tbody>
+            {decided.map((r) => (
+              <tr key={r.id} className="border-t border-neutral-100">
+                <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
+                <td className="p-3">{Number(r.payload.amount).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">
+                  <span className={r.status === "APPROVED" ? "text-emerald-600" : "text-red-600"}>{r.status}</span>
+                </td>
+                <td className="p-3 font-mono text-xs">{r.approvedBy ?? "-"}</td>
+                <td className="p-3">{r.decidedAt ? new Date(r.decidedAt).toLocaleString("ja-JP") : "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </main>
+    </div>
+  );
+}
