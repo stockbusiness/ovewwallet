@@ -90,9 +90,24 @@ E2Eテスト (`apps/api/src/e2e/approval-workflow.test.ts`) で、しきい値�
 E2Eテスト (`apps/api/src/e2e/transactions-list.test.ts`) と実ブラウザでの
 フィルタ操作・取消操作を確認済み。
 
+## 付与ルール管理 (指示書13章)
+
+`/reward-rules` 画面から `reward_rules` の作成・状態切替 (ACTIVE/INACTIVE)・
+上限値の調整ができる (`GET/POST /api/v1/admin/reward-rules`,
+`PATCH /api/v1/admin/reward-rules/:ruleCode`)。作成はSUPER_ADMIN限定、閲覧は
+SUPER_ADMIN/OVE_OPERATOR/EVENT_OPERATOR/AUDITORに許可している。
+
+**既知の制約**: `rewards.service.ts` の `RULE_CODE_BY_TRANSACTION_TYPE` が
+`transaction_type -> rule_code` を固定的にマッピングしているため、この画面で新規に
+作成したルールは、対応する`transaction_type`がそのマッピングに登録されていない限り
+外部APIの `/rewards/grant` から自動的には適用されない。既存の2ルール
+(`SENGOKU_REGISTRATION_BONUS`, `AIART_ATTENDANCE_REWARD`) の上限・状態変更には
+即座に反映される。E2Eテスト (`apps/api/src/e2e/reward-rules-admin.test.ts`) と
+実ブラウザでの作成・状態切替を確認済み。
+
 ## 未実装画面 (今後の課題)
 
-アカウント詳細 (個別)、付与ルール管理、APIアクセスログ、発行量の時系列グラフ。
+アカウント詳細 (個別)、APIアクセスログ、発行量の時系列グラフ。
 
 ## 管理者権限
 

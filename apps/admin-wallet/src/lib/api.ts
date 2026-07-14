@@ -44,6 +44,25 @@ export interface WalletListItem {
   account: { accountCode: string; status: string; displayName: string | null };
 }
 
+export interface RewardRuleItem {
+  id: string;
+  ruleCode: string;
+  ruleName: string;
+  sourceService: string;
+  rewardAmount: string;
+  perUserLimit: number | null;
+  perEventLimit: number | null;
+  monthlyCountLimit: number | null;
+  monthlyAmountLimit: string | null;
+  globalAmountLimit: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  approvalType: string;
+  status: string;
+  displayName: string;
+  description: string | null;
+}
+
 export interface TransactionItem {
   id: string;
   transaction_code: string;

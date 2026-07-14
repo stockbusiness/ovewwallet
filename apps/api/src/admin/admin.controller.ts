@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 import { z } from "zod";
@@ -10,9 +10,15 @@ import { AdminServiceIntegrationsService } from "./admin-service-integrations.se
 import { AdminMigrationService } from "./admin-migration.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminApprovalService } from "./admin-approval.service";
+import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
+import { ServiceCode, ApprovalType, RewardRuleStatus } from "@ove/shared-types";
+
+const serviceCodeValues = Object.values(ServiceCode) as [string, ...string[]];
+const approvalTypeValues = Object.values(ApprovalType) as [string, ...string[]];
+const rewardRuleStatusValues = Object.values(RewardRuleStatus) as [string, ...string[]];
 
 const LoginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const GrantSchema = z.object({
@@ -49,6 +55,37 @@ const AccountMergeSchema = z.object({
   reason: z.string().min(1),
 });
 const RejectApprovalSchema = z.object({ reason: z.string().min(1) });
+const CreateRewardRuleSchema = z.object({
+  ruleCode: z.string().min(1),
+  ruleName: z.string().min(1),
+  sourceService: z.enum(serviceCodeValues),
+  rewardAmount: z.number().int().positive(),
+  displayName: z.string().min(1),
+  description: z.string().optional(),
+  perUserLimit: z.number().int().positive().optional(),
+  perEventLimit: z.number().int().positive().optional(),
+  monthlyCountLimit: z.number().int().positive().optional(),
+  monthlyAmountLimit: z.number().int().positive().optional(),
+  globalAmountLimit: z.number().int().positive().optional(),
+  startsAt: z.string().datetime().optional(),
+  endsAt: z.string().datetime().optional(),
+  approvalType: z.enum(approvalTypeValues).optional(),
+});
+const UpdateRewardRuleSchema = z.object({
+  ruleName: z.string().min(1).optional(),
+  rewardAmount: z.number().int().positive().optional(),
+  displayName: z.string().min(1).optional(),
+  description: z.string().optional(),
+  status: z.enum(rewardRuleStatusValues).optional(),
+  perUserLimit: z.number().int().positive().nullable().optional(),
+  perEventLimit: z.number().int().positive().nullable().optional(),
+  monthlyCountLimit: z.number().int().positive().nullable().optional(),
+  monthlyAmountLimit: z.number().int().positive().nullable().optional(),
+  globalAmountLimit: z.number().int().positive().nullable().optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  approvalType: z.enum(approvalTypeValues).optional(),
+});
 
 @ApiTags("admin")
 @Controller("api/v1/admin")
@@ -61,6 +98,7 @@ export class AdminController {
     private readonly migration: AdminMigrationService,
     private readonly accountMerge: AdminAccountMergeService,
     private readonly approvals: AdminApprovalService,
+    private readonly rewardRules: AdminRewardRulesService,
   ) {}
 
   @Post("login")
@@ -294,5 +332,32 @@ export class AdminController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.approvals.reject(id, req.admin.id, body.reason);
+  }
+
+  /** 付与ルール管理 (指示書13章)。 */
+  @Get("reward-rules")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
+  async listRewardRules() {
+    return this.rewardRules.list();
+  }
+
+  @Post("reward-rules")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN")
+  async createRewardRule(
+    @Body(new ZodValidationPipe(CreateRewardRuleSchema)) body: z.infer<typeof CreateRewardRuleSchema>,
+  ) {
+    return this.rewardRules.create(body);
+  }
+
+  @Patch("reward-rules/:ruleCode")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN")
+  async updateRewardRule(
+    @Param("ruleCode") ruleCode: string,
+    @Body(new ZodValidationPipe(UpdateRewardRuleSchema)) body: z.infer<typeof UpdateRewardRuleSchema>,
+  ) {
+    return this.rewardRules.update(ruleCode, body);
   }
 }
