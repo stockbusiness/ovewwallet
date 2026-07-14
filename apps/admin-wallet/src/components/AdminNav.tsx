@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/migrations", label: "既存ユーザー移行" },
   { href: "/approval-requests", label: "二段階承認" },
   { href: "/audit-logs", label: "操作ログ" },
+  { href: "/api-access-logs", label: "APIアクセスログ" },
 ];
 
 export default function AdminNav() {

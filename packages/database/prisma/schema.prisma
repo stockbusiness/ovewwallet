@@ -264,9 +264,31 @@ model ServiceIntegration {
   createdAt              DateTime                 @default(now()) @map("created_at")
   updatedAt              DateTime                 @updatedAt @map("updated_at")
 
-  links AccountLink[]
+  links      AccountLink[]
+  accessLogs ApiAccessLog[]
 
   @@map("service_integrations")
+}
+
+/// 外部サービスAPI (指示書11章) へのリクエスト記録。管理画面の
+/// 「APIアクセスログ」画面 (指示書13章) で参照する。
+model ApiAccessLog {
+  id                   String   @id
+  serviceIntegrationId String?  @map("service_integration_id")
+  apiKeyPrefix         String?  @map("api_key_prefix")
+  method               String
+  path                 String
+  statusCode           Int      @map("status_code")
+  sourceIp             String?  @map("source_ip")
+  requestId            String?  @map("request_id")
+  errorMessage         String?  @map("error_message")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  serviceIntegration ServiceIntegration? @relation(fields: [serviceIntegrationId], references: [id])
+
+  @@index([serviceIntegrationId])
+  @@index([createdAt])
+  @@map("api_access_logs")
 }
 
 model AccountLink {

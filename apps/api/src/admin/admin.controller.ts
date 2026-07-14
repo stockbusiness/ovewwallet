@@ -228,6 +228,22 @@ export class AdminController {
     return this.admin.listAuditLogs({ targetType, limit: limit ? Number(limit) : undefined });
   }
 
+  /** APIアクセスログ一覧。指示書13章の「APIアクセスログ」画面。 */
+  @Get("api-access-logs")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "AUDITOR", "INTEGRATION_ADMIN")
+  async apiAccessLogs(
+    @Query("serviceIntegrationId") serviceIntegrationId?: string,
+    @Query("statusCode") statusCode?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listApiAccessLogs({
+      serviceIntegrationId,
+      statusCode: statusCode ? Number(statusCode) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
+  }
+
   /** 取引一覧 (全ウォレット横断)。指示書13章の「取引一覧」画面。 */
   @Get("transactions")
   @UseGuards(AdminAuthGuard, RolesGuard)

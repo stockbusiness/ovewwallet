@@ -18,6 +18,7 @@
 | アカウント統合 | `/accounts/merge` | 統合元→統合先へ残高・連携情報を移管 |
 | 二段階承認 | `/approval-requests` | 高額付与・高額減算の承認待ち一覧、承認/却下、履歴 |
 | 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
+| APIアクセスログ | `/api-access-logs` | 外部サービスAPI (指示書11章) へのリクエスト履歴。認証失敗 (401) も含む。ステータスコードで絞り込み可 |
 
 ## 外部サービス緊急停止 (指示書5章)
 
@@ -105,9 +106,33 @@ SUPER_ADMIN/OVE_OPERATOR/EVENT_OPERATOR/AUDITORに許可している。
 即座に反映される。E2Eテスト (`apps/api/src/e2e/reward-rules-admin.test.ts`) と
 実ブラウザでの作成・状態切替を確認済み。
 
+## APIアクセスログ (指示書11章・13章)
+
+外部サービスAPI (`/api/v1/rewards/grant`, `/api/v1/transactions/debit`,
+`/api/v1/transactions/:transactionId/reverse`) へのすべてのリクエストを
+`api_access_logs` テーブルに記録する。
+
+- 認証段階での拒否 (APIキー不正・署名不正・nonce再利用・タイムスタンプずれ・IP制限など、
+  常に401) は `ExternalApiAuthGuard` が記録する。この場合 `service_integration_id` は
+  APIキーが特定できていれば設定されるが、キー自体が不正な場合は `null` になる。
+  `api_key_prefix` (先頭10文字) のみを記録し、APIキー全体は保存しない。
+- 認証成功後の業務ロジックの結果 (成功・バリデーションエラー・残高不足など) は
+  `ApiAccessLogInterceptor` が記録する (Guard実行後、Interceptorが実行される
+  NestJSの実行順序を利用し、認証成功済みリクエストのみを対象とする)。
+- ログ書き込み自体の失敗はAPIリクエストの本来の処理結果に影響しない
+  (`try/catch` で握りつぶし、リクエスト処理は継続する)。
+- `GET /api/v1/admin/api-access-logs` で一覧取得。`serviceIntegrationId`/
+  `statusCode`/`limit` でフィルタ可能。`SUPER_ADMIN`/`AUDITOR`/`INTEGRATION_ADMIN`
+  ロールのみ閲覧可能。
+
+`/api-access-logs` 画面ではステータスコードで絞り込んで一覧表示する。
+E2Eテスト (`apps/api/src/e2e/api-access-logs.test.ts`) で、認証失敗・認証成功後の
+業務エラーの両方が記録されること、管理APIのフィルタが機能すること、権限のない
+ロールでは403になることを検証済み。実ブラウザでも一覧表示・フィルタ操作を確認済み。
+
 ## 未実装画面 (今後の課題)
 
-アカウント詳細 (個別)、APIアクセスログ、発行量の時系列グラフ。
+アカウント詳細 (個別)、発行量の時系列グラフ。
 
 ## 管理者権限
 

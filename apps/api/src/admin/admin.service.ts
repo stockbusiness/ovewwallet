@@ -197,6 +197,30 @@ export class AdminService {
     });
   }
 
+  /** 指示書13章「APIアクセスログ」画面: 外部サービスAPIへのリクエスト履歴。 */
+  async listApiAccessLogs(params: {
+    serviceIntegrationId?: string;
+    statusCode?: number;
+    limit?: number;
+  }): Promise<unknown[]> {
+    const logs = await this.db.apiAccessLog.findMany({
+      where: {
+        serviceIntegrationId: params.serviceIntegrationId,
+        statusCode: params.statusCode,
+      },
+      include: { serviceIntegration: { select: { serviceCode: true, serviceName: true } } },
+      orderBy: { createdAt: "desc" },
+      take: Math.min(params.limit ?? 100, 500),
+    });
+
+    return logs.map((log) => ({
+      ...log,
+      serviceCode: log.serviceIntegration?.serviceCode ?? null,
+      serviceName: log.serviceIntegration?.serviceName ?? null,
+      serviceIntegration: undefined,
+    }));
+  }
+
   /** 指示書17章: 定期整合性チェック。不一致は自動修正せず一覧を返す。 */
   async reconcile() {
     const results = await reconcileAllWallets(this.db);

@@ -1,9 +1,10 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Param, Post, Req, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { DebitRequestSchema, ReverseRequestSchema, type DebitRequest, type ReverseRequest } from "@ove/shared-types";
 import { TransactionsService } from "./transactions.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
+import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
 
 @ApiTags("transactions")
 @Controller("api/v1/transactions")
@@ -13,6 +14,7 @@ export class TransactionsController {
   /** POST /api/v1/transactions/debit (指示書11章) */
   @Post("debit")
   @UseGuards(ExternalApiAuthGuard)
+  @UseInterceptors(ApiAccessLogInterceptor)
   async debit(
     @Body(new ZodValidationPipe(DebitRequestSchema)) body: DebitRequest,
     @Req() req: AuthenticatedServiceRequest,
@@ -23,6 +25,7 @@ export class TransactionsController {
   /** POST /api/v1/transactions/{transactionId}/reverse (指示書11章) */
   @Post(":transactionId/reverse")
   @UseGuards(ExternalApiAuthGuard)
+  @UseInterceptors(ApiAccessLogInterceptor)
   async reverse(
     @Param("transactionId") transactionId: string,
     @Body(new ZodValidationPipe(ReverseRequestSchema)) body: ReverseRequest,

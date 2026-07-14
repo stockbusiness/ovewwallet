@@ -99,6 +99,21 @@ export interface AuditLogItem {
   createdAt: string;
 }
 
+export interface ApiAccessLogItem {
+  id: string;
+  serviceIntegrationId: string | null;
+  serviceCode: string | null;
+  serviceName: string | null;
+  apiKeyPrefix: string | null;
+  method: string;
+  path: string;
+  statusCode: number;
+  sourceIp: string | null;
+  requestId: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 export interface ServiceIntegrationItem {
   id: string;
   serviceCode: string;
