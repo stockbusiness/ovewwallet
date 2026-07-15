@@ -6,6 +6,12 @@
 # (database/auth/ledger/shared-types/config) を含めてビルドする必要がある。
 
 FROM node:20-slim AS base
+# node:20-slimにはOpenSSL(libssl)が含まれておらず、Prismaのエンジンバイナリ
+# (migrate deploy等が使うschema engine)が起動できずに「Schema engine error」で
+# 失敗する。Prismaの公式案内どおりopensslをインストールする。
+RUN apt-get update -y \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 WORKDIR /repo
 
