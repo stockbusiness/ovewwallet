@@ -1,4 +1,4 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import {
   generateId,
   nextDisplayCode,
@@ -10,6 +10,9 @@ import {
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 
+/** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
+export const CURRENT_TERMS_VERSION = "1.0";
+
 export interface FindOrCreateIdentityParams {
   identityType: IdentityType;
   provider: string;
@@ -17,6 +20,8 @@ export interface FindOrCreateIdentityParams {
   email?: string;
   phone?: string;
   displayName?: string;
+  /** 新規アカウント作成時のみ必須 (指示書: 利用規約同意の永続化)。既存アカウントのログインでは不要。 */
+  termsAccepted?: boolean;
 }
 
 @Injectable()
@@ -44,6 +49,10 @@ export class AccountsService {
     });
     if (existing) return existing.account;
 
+    if (!params.termsAccepted) {
+      throw new BadRequestException("terms of service agreement is required to create a new account");
+    }
+
     return this.db.$transaction(async (tx) => {
       const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
       const account = await tx.oveAccount.create({
@@ -54,6 +63,8 @@ export class AccountsService {
           displayName: params.displayName,
           primaryEmail: params.email,
           primaryPhone: params.phone,
+          termsAgreedAt: new Date(),
+          termsVersion: CURRENT_TERMS_VERSION,
         },
       });
 
@@ -88,7 +99,12 @@ export class AccountsService {
           targetType: "ove_account",
           targetId: account.id,
           result: "SUCCESS",
-          afterData: { accountCode, identityType: params.identityType, provider: params.provider },
+          afterData: {
+            accountCode,
+            identityType: params.identityType,
+            provider: params.provider,
+            termsVersion: CURRENT_TERMS_VERSION,
+          },
         },
       });
 

@@ -33,7 +33,7 @@ export class AuthService {
     return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
   }
 
-  async verifyEmailOtpAndLogin(email: string, code: string) {
+  async verifyEmailOtpAndLogin(email: string, code: string, termsAccepted?: boolean) {
     const ok = await this.emailOtp.verify(email, code);
     if (!ok) throw new UnauthorizedException("invalid verification code");
 
@@ -42,17 +42,19 @@ export class AuthService {
       provider: "EMAIL",
       providerSubject: email.toLowerCase(),
       email,
+      termsAccepted,
     });
     return this.createSessionForAccount(account.id);
   }
 
-  async loginWithLineMock(idToken: string) {
+  async loginWithLineMock(idToken: string, termsAccepted?: boolean) {
     const claims = await this.lineVerifier.verifyIdToken(idToken);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "LINE",
       provider: "LINE",
       providerSubject: claims.lineUserId,
       email: claims.email,
+      termsAccepted,
     });
     return this.createSessionForAccount(account.id);
   }
@@ -62,12 +64,13 @@ export class AuthService {
     return this.sengokuSso.issueCode(sengokuMemberId);
   }
 
-  async loginWithSengokuSso(code: string) {
+  async loginWithSengokuSso(code: string, termsAccepted?: boolean) {
     const { sengokuMemberId } = await this.sengokuSso.exchangeCode(code);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "PASSKEY",
       provider: "SENGOKU_PASSPORT_SSO",
       providerSubject: sengokuMemberId,
+      termsAccepted,
     });
     return this.createSessionForAccount(account.id);
   }

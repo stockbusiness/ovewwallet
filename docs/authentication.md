@@ -34,6 +34,30 @@
   セッション情報を一切含めない。
 - 開発用に `POST /api/v1/auth/sso/sengoku/dev-issue` でモックコードを発行できる。
 
+## 利用規約同意の永続化
+
+`ove_accounts.terms_agreed_at` (DateTime?) / `terms_version` (String?) に、新規アカウント
+作成時点の同意日時とバージョン (`apps/api/src/accounts/accounts.service.ts` の
+`CURRENT_TERMS_VERSION`、現在 `"1.0"`) を記録する。
+
+- `AccountsService.findOrCreateByIdentity()` は、**新規にアカウントを作成する場合のみ**
+  `termsAccepted: true` を必須とし、指定がなければ400エラーで作成を拒否する
+  (`termsAgreedAt`/`termsVersion` は作成時の1回のみ記録し、以後は更新しない)。
+- 既存アカウントでの再ログイン (`accountIdentity` が既に存在する場合) は
+  `termsAccepted` を要求しない — 同意は初回登録時のみでよい、という一般的なUXに合わせている。
+- `POST /api/v1/auth/email/verify-otp` / `POST /api/v1/auth/line/login` /
+  `POST /api/v1/auth/sso/sengoku/exchange` のリクエストボディにオプションの
+  `termsAccepted: boolean` を追加し、`apps/user-wallet` のログイン画面
+  (`/login`) から送信する。画面には `/terms` (OVE利用規約) へのリンク付き
+  同意チェックボックスを表示し、未チェックのまま送信すると画面側でも拒否する。
+- `AdminMigrationService` (既存ユーザー一括移行) や `AccountsService.findOrCreateByServiceLink`
+  (外部サービスAPI経由の初回自動プロビジョニング) は対話的な同意画面を経由しないため、
+  この必須化の対象外としている (前者は `termsAccepted: true` を明示的に渡して意図を残している)。
+
+E2Eテスト (`apps/api/src/e2e/terms-consent.test.ts`) で、同意なしの新規作成が
+400で拒否されアカウントが作成されないこと、同意ありで `terms_agreed_at`/`terms_version`
+が記録されること、既存アカウントの再ログインでは同意不要であることを検証済み。
+
 ## 管理者認証
 
 - `packages/database` の `admin_users` テーブル (`role`: SUPER_ADMIN / OVE_OPERATOR /
@@ -46,6 +70,5 @@
 
 ## 未実装/簡略化した項目 (今後の課題)
 
-- OVE利用規約同意の永続化 (現状はUIフローとしてのみ想定、DBへの同意記録カラムは未追加)。
 - 管理画面MFA (拡張ポイントとしてのみ確保、実装なし)。
 - LINE本番連携・戦国パスポート本番SSO交換 (インターフェースとモックのみ)。

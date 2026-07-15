@@ -11,7 +11,7 @@
 | フェーズ | 内容 | 状態 |
 |---|---|---|
 | 1 | モノレポ・Next.js・NestJS・PostgreSQL・Prisma・共通型・Swagger・Docker Compose | 完了 |
-| 2 | OVE_ACCOUNT_ID・account_identities・LINE認証(モック)・メールOTP・OVEセッション・管理者認証・権限制御 | 完了 (規約同意の永続化は未実装) |
+| 2 | OVE_ACCOUNT_ID・account_identities・LINE認証(モック)・メールOTP・OVEセッション・管理者認証・権限制御・利用規約同意の永続化 | 完了 |
 | 3 | ウォレット自動作成・CREDIT/DEBIT/REVERSAL/HOLD/RELEASE・idempotency・行ロック・残高整合性検査 | 完了 (実PostgreSQLでの並行処理テスト込み) |
 | 4 (一部) | 登録特典/AIアート特典ルール・個別付与・CSV一括付与 | 完了 (簡易版、詳細は各docs参照) |
 | 5 (一部) | APIキー管理・HMAC署名・戦国パスポートSSO(モック)・APIログ(最小) | 主要部分完了 |

@@ -100,6 +100,9 @@ export class AdminMigrationService {
           identityType: "LEGACY_SYSTEM",
           provider: "LEGACY_SYSTEM",
           providerSubject: row.oldUserId,
+          // 管理者による一括移行であり、対話的な同意画面を経由しないため対象外とする
+          // (指示書: 利用規約同意の永続化はユーザー自身のログイン/新規登録フロー向け)。
+          termsAccepted: true,
         });
 
         if (!row.oldBalanceRaw) {

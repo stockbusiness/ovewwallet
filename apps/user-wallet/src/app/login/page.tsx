@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -24,15 +25,23 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
   const [sengokuMemberId, setSengokuMemberId] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"line" | "email" | "sengoku" | null>(null);
 
   async function loginWithLine() {
+    if (!termsAccepted) {
+      setError("利用規約への同意が必要です");
+      return;
+    }
     setError(null);
     setLoading("line");
     try {
       const idToken = `mock.${getMockLineUserId()}`;
-      await apiFetch("/api/v1/auth/line/login", { method: "POST", body: JSON.stringify({ idToken }) });
+      await apiFetch("/api/v1/auth/line/login", {
+        method: "POST",
+        body: JSON.stringify({ idToken, termsAccepted }),
+      });
       router.push("/wallet");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
@@ -61,10 +70,17 @@ export default function LoginPage() {
 
   async function verifyOtp(e: React.FormEvent) {
     e.preventDefault();
+    if (!termsAccepted) {
+      setError("利用規約への同意が必要です");
+      return;
+    }
     setError(null);
     setLoading("email");
     try {
-      await apiFetch("/api/v1/auth/email/verify-otp", { method: "POST", body: JSON.stringify({ email, code }) });
+      await apiFetch("/api/v1/auth/email/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ email, code, termsAccepted }),
+      });
       router.push("/wallet");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "認証に失敗しました");
@@ -75,6 +91,10 @@ export default function LoginPage() {
 
   async function loginWithSengokuPassport(e: React.FormEvent) {
     e.preventDefault();
+    if (!termsAccepted) {
+      setError("利用規約への同意が必要です");
+      return;
+    }
     setError(null);
     setLoading("sengoku");
     try {
@@ -82,7 +102,10 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ sengokuMemberId }),
       });
-      await apiFetch("/api/v1/auth/sso/sengoku/exchange", { method: "POST", body: JSON.stringify({ code: ssoCode }) });
+      await apiFetch("/api/v1/auth/sso/sengoku/exchange", {
+        method: "POST",
+        body: JSON.stringify({ code: ssoCode, termsAccepted }),
+      });
       router.push("/wallet");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "戦国パスポートIDでのログインに失敗しました");
@@ -95,7 +118,7 @@ export default function LoginPage() {
     <main className="relative flex min-h-screen flex-col overflow-hidden px-6 pb-10 pt-16">
       <BackgroundGlow />
 
-      <div className="relative flex flex-1 flex-col justify-center gap-10">
+      <div className="relative flex flex-1 flex-col justify-center gap-8">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-sengoku-gold/50 bg-sengoku-navy">
             <span className="font-heading text-2xl font-bold text-sengoku-gold">戦</span>
@@ -111,6 +134,7 @@ export default function LoginPage() {
               <br />
               ご利用のログイン方法を選択してください。
             </p>
+            <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <PrimaryButton fullWidth onClick={loginWithLine} disabled={loading !== null}>
               <ChatBubbleIcon className="h-5 w-5" />
               {loading === "line" ? "ログイン中..." : "LINEでログイン"}
@@ -174,6 +198,7 @@ export default function LoginPage() {
                 placeholder="000000"
               />
             </label>
+            <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
               {loading === "email" ? "確認中..." : "ログイン"}
             </PrimaryButton>
@@ -201,6 +226,7 @@ export default function LoginPage() {
                 placeholder="SP-000000"
               />
             </label>
+            <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
               {loading === "sengoku" ? "連携中..." : "戦国パスポートIDでログイン"}
             </PrimaryButton>
@@ -217,6 +243,25 @@ export default function LoginPage() {
         {error && <p className="text-center text-sm font-medium text-sengoku-gold-soft">{error}</p>}
       </div>
     </main>
+  );
+}
+
+function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-sengoku-muted">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-sengoku-gold"
+      />
+      <span>
+        <Link href="/terms" target="_blank" className="text-sengoku-gold underline underline-offset-2">
+          利用規約
+        </Link>
+        に同意する (初めてご利用の方は同意が必要です)
+      </span>
+    </label>
   );
 }
 

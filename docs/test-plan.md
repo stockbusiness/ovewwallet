@@ -32,8 +32,9 @@
 | `reward-rules-admin.test.ts` | ルール作成・重複ルールコードの409拒否・状態/上限の更新・存在しないルールコードの404 |
 | `api-access-logs.test.ts` | 認証失敗(401)・認証成功後の業務エラー(404)の両方が記録されること、`serviceIntegrationId`/`statusCode`によるフィルタ、権限のないロールでの403拒否 |
 | `account-detail.test.ts` | 基本情報・ウォレット・連携ID・外部サービス連携・操作ログが返ること、存在しないIDで404、統合済みアカウントで統合先が表示されること |
+| `terms-consent.test.ts` | 同意なしの新規アカウント作成が400で拒否されアカウントが作成されないこと、同意ありで`terms_agreed_at`/`terms_version`が記録されること、既存アカウントの再ログインでは同意不要であること (LINEモックログイン) |
 
-**合計 22件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 26件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない

@@ -55,7 +55,7 @@ describe("golden path (E2E)", () => {
 
     const verifyRes = await request(server)
       .post("/api/v1/auth/email/verify-otp")
-      .send({ email, code: devCode })
+      .send({ email, code: devCode, termsAccepted: true })
       .expect(201);
     const oveAccountId: string = verifyRes.body.ove_account_id;
     const sessionCookie = verifyRes.headers["set-cookie"] as unknown as string[];

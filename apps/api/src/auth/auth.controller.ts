@@ -8,9 +8,13 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 
 const RequestOtpSchema = z.object({ email: z.string().email() });
-const VerifyOtpSchema = z.object({ email: z.string().email(), code: z.string().length(6) });
-const LineLoginSchema = z.object({ idToken: z.string().min(1) });
-const SsoExchangeSchema = z.object({ code: z.string().min(1) });
+const VerifyOtpSchema = z.object({
+  email: z.string().email(),
+  code: z.string().length(6),
+  termsAccepted: z.boolean().optional(),
+});
+const LineLoginSchema = z.object({ idToken: z.string().min(1), termsAccepted: z.boolean().optional() });
+const SsoExchangeSchema = z.object({ code: z.string().min(1), termsAccepted: z.boolean().optional() });
 const SsoIssueMockSchema = z.object({ sengokuMemberId: z.string().min(1) });
 
 function setSessionCookie(res: Response, token: string, expiresAt: Date): void {
@@ -32,7 +36,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(VerifyOtpSchema)) body: z.infer<typeof VerifyOtpSchema>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.verifyEmailOtpAndLogin(body.email, body.code);
+    const session = await this.auth.verifyEmailOtpAndLogin(body.email, body.code, body.termsAccepted);
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }
@@ -43,7 +47,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(LineLoginSchema)) body: z.infer<typeof LineLoginSchema>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithLineMock(body.idToken);
+    const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted);
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }
@@ -63,7 +67,7 @@ export class AuthController {
     @Body(new ZodValidationPipe(SsoExchangeSchema)) body: z.infer<typeof SsoExchangeSchema>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithSengokuSso(body.code);
+    const session = await this.auth.loginWithSengokuSso(body.code, body.termsAccepted);
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }

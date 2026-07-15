@@ -212,6 +212,11 @@ model OveAccount {
   primaryPhone        String?       @map("primary_phone")
   verificationLevel   Int           @default(0) @map("verification_level")
   mergedIntoAccountId String?       @map("merged_into_account_id")
+  /// OVE利用規約に同意した日時。アカウント作成時に必須で記録する
+  /// (この機能追加前に作成されたアカウントは null になりうる)。
+  termsAgreedAt       DateTime?     @map("terms_agreed_at")
+  /// 同意した利用規約のバージョン (例: "1.0")。
+  termsVersion        String?       @map("terms_version")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   closedAt            DateTime?     @map("closed_at")
