@@ -136,7 +136,11 @@ jobs:
           railway variable set "RUN_SEED_ON_BOOT=true" --service api --skip-deploys --json
           railway variable set "AUTH_MODE=mock" --service api --skip-deploys --json
           railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
-          railway variable set "API_PORT=4000" --service api --skip-deploys --json
+          # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
+          # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
+          # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、
+          # コンテナは正常に起動していても「service unavailable」になる。
+          railway variable set "PORT=4000" --service api --skip-deploys --json
 
       - name: Deploy API service
         env:
