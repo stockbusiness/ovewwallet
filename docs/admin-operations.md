@@ -145,6 +145,10 @@ E2Eテスト (`apps/api/src/e2e/api-access-logs.test.ts`) で、認証失敗・�
   `targetId: accountId` で絞り込んだもの)。アカウント統合など、このアカウントに対して
   行われた管理操作の履歴を直接確認できる。
 - アカウントが統合 (`MERGED`) 済みの場合、統合先アカウントへのリンクを警告バナーで表示する。
+- セキュリティ: アクティブセッション数の表示と、「全セッションを無効化」ボタン
+  (`POST /api/v1/admin/accounts/:accountId/revoke-sessions`、`docs/security.md` の
+  「全セッション無効化」参照)。不正利用が疑われるアカウントを即座に全端末からログアウト
+  させられる。
 
 存在しないアカウントIDを指定した場合は404を返す (画面側では「アカウントが見つかりません」
 と表示)。E2Eテスト (`apps/api/src/e2e/account-detail.test.ts`) で、基本情報・連携ID・

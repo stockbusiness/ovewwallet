@@ -126,6 +126,7 @@ export interface AccountDetailItem {
   mergedIntoAccount: { id: string; accountCode: string } | null;
   mergedAccounts: Array<{ id: string; accountCode: string }>;
   auditLogs: AuditLogItem[];
+  activeSessionCount: number;
 }
 
 export interface AuditLogItem {

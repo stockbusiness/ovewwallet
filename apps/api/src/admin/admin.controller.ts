@@ -205,6 +205,17 @@ export class AdminController {
     return this.admin.getAccountDetail(accountId);
   }
 
+  /** 全セッション無効化 (指示書16章): 不正利用が疑われるアカウントを全端末から強制ログアウトする。 */
+  @Post("accounts/:accountId/revoke-sessions")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR")
+  async revokeAccountSessions(
+    @Param("accountId") accountId: string,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.admin.revokeAllSessions(accountId, req.admin.id);
+  }
+
   @Get("wallets")
   @UseGuards(AdminAuthGuard)
   async listWallets(@Query("status") status?: string, @Query("limit") limit?: string) {

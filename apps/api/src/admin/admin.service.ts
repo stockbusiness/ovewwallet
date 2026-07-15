@@ -106,7 +106,37 @@ export class AdminService {
       take: 50,
     });
 
-    return { ...account, auditLogs };
+    const activeSessionCount = await this.db.userSession.count({
+      where: { oveAccountId: accountId, revokedAt: null, expiresAt: { gt: new Date() } },
+    });
+
+    return { ...account, auditLogs, activeSessionCount };
+  }
+
+  /** 全セッション無効化 (指示書16章): 端末を問わずアカウントの有効なセッションを一括で失効させる。 */
+  async revokeAllSessions(accountId: string, adminId: string): Promise<{ revokedCount: number }> {
+    const account = await this.db.oveAccount.findUnique({ where: { id: accountId } });
+    if (!account) throw new NotFoundException("account not found");
+
+    const { count } = await this.db.userSession.updateMany({
+      where: { oveAccountId: accountId, revokedAt: null },
+      data: { revokedAt: new Date(), revokeReason: "ADMIN_FORCED_LOGOUT" },
+    });
+
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "ADMIN",
+        actorId: adminId,
+        actionType: "ACCOUNT_SESSIONS_REVOKED",
+        targetType: "ove_account",
+        targetId: accountId,
+        result: "SUCCESS",
+        afterData: { revokedCount: count },
+      },
+    });
+
+    return { revokedCount: count };
   }
 
   async listWallets(params: { status?: string; limit?: number }) {
