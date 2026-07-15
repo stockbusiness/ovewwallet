@@ -30,8 +30,10 @@ pnpm dev:admin          # apps/admin-wallet を http://localhost:3100 で起動
   「レート制限値の見直し」参照)。外部サービスAPIについては下記「レート制限 (外部API)」を参照。
 - `ENCRYPTION_KEY` のローテーション手順 → 下記「ENCRYPTION_KEYのローテーション」参照。
 - CORS本番設定 → 下記「CORS本番設定」参照。
-- コンテナ化 (Dockerfile) は本リポジトリには未整備。`docker-compose.yml` はPostgreSQL/Redis
-  のみを対象としている。
+- ~~コンテナ化 (Dockerfile) は本リポジトリには未整備~~ → **対応済み**。3アプリそれぞれに
+  本番用Dockerfileを用意した (下記「Dockerイメージ (本番)」参照)。`docker-compose.yml` は
+  引き続きPostgreSQL/Redisのみを対象としている (ローカル開発用。アプリ本体は
+  `pnpm dev:*` で起動する運用のため、意図的に含めていない)。
 
 ## ENCRYPTION_KEYのローテーション
 
@@ -82,6 +84,47 @@ pnpm dev:admin          # apps/admin-wallet を http://localhost:3100 で起動
 既定実装によりIPアドレス単位でカウントされる。連携先が増え、1つのIPから継続的に
 120回/分を超える正当なトラフィックが発生する場合は、`X-OVE-Api-Key` (連携先ID) を
 キーにした専用のレート制限バケットへの変更を検討すること (現状は未実装)。
+
+## Dockerイメージ (本番)
+
+`apps/api`・`apps/user-wallet`・`apps/admin-wallet` それぞれに本番用マルチステージ
+`Dockerfile` を用意した。pnpmワークスペース構成のため、**ビルドコンテキストは
+リポジトリルート** (各Dockerfileが依存パッケージのpackage.json/ソースを参照するため)。
+
+```bash
+# apps/api (NestJS)
+docker build -f apps/api/Dockerfile -t ove-wallet-api .
+docker run --rm -p 4000:4000 \
+  -e DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:5432/ove_wallet_dev \
+  -e REDIS_URL=redis://host.docker.internal:6379 \
+  -e NODE_ENV=production -e AUTH_MODE=production \
+  -e APP_URL=https://wallet.example.com -e ADMIN_URL=https://admin-wallet.example.com \
+  -e SESSION_SECRET=... -e ENCRYPTION_KEY=... \
+  ove-wallet-api
+
+# apps/user-wallet / apps/admin-wallet (Next.js, standalone出力)
+# NEXT_PUBLIC_API_URL はNext.jsの仕様上ビルド時に埋め込まれるため --build-arg で渡す
+docker build -f apps/user-wallet/Dockerfile -t ove-wallet-user \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
+docker run --rm -p 3000:3000 ove-wallet-user
+
+docker build -f apps/admin-wallet/Dockerfile -t ove-wallet-admin \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com .
+docker run --rm -p 3100:3100 ove-wallet-admin
+```
+
+Next.jsの2アプリは `next.config.mjs` の `output: "standalone"` を使い、実行に必要な
+`node_modules` のみをトレースした自己完結フォルダ (`.next/standalone`) をベースにしている
+(Next.js公式のDocker推奨構成)。`apps/api` はワークスペース内の依存パッケージ
+(`database`/`auth`/`ledger`/`shared-types`/`config`) をビルドステージ内でまとめてビルドしてから
+`node_modules` ごと実行イメージにコピーする素朴な構成であり、`pnpm deploy` やturborepoの
+prune機能によるさらなる最小化は今回のスコープでは行っていない (将来の改善余地)。
+
+**検証状況**: このリポジトリの開発コンテナにはDockerデーモンが無く、`docker build`/
+`docker run` そのものは未実行。ただし各Dockerfileの各RUNステップに対応する処理
+(`pnpm install`、`pnpm -r build`、`next build` with `output: "standalone"`) は
+このドキュメント作成時にコンテナ外で個別に実行し、いずれも成功することを確認済み。
+実際にDockerが使える環境で `docker build` によるエンドツーエンドの検証を行うこと。
 
 ## Swagger
 

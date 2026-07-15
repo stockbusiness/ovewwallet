@@ -151,11 +151,13 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 - 二段階承認のアカウント統合・オンチェーン移行・APIサービス上限変更への拡張
   (現状は高額付与/高額減算のみ対象、`docs/admin-operations.md` 参照)。
 - 既存ユーザー移行の検証者フロー・文字コード対応の強化。
-- インフラ整備: Dockerfile本番化 (未着手)。
-  (`audit_logs`のDBレベルDELETE/UPDATE禁止・ログイン系エンドポイントのレート制限強化は
-  対応済み。`ENCRYPTION_KEY`のローテーション手順・CORS本番設定は`docs/deployment.md`に
-  運用手順として文書化済み (コード変更は不要な設計であることを確認)。詳細は
-  `docs/security.md`・`docs/deployment.md`参照)
+- インフラ整備は一通り対応済み: `audit_logs`のDBレベルDELETE/UPDATE禁止、ログイン系
+  エンドポイントのレート制限強化、`ENCRYPTION_KEY`ローテーション手順・CORS本番設定の
+  文書化、3アプリの本番用Dockerfile。ただし本番用Dockerfileは、このリポジトリの開発
+  コンテナにDockerデーモンが無く `docker build`/`docker run` そのものは未実行
+  (各ビルドステップに相当する処理は個別に成功確認済み。`docs/deployment.md`
+  「Dockerイメージ (本番)」の「検証状況」参照)。実際にDockerが使える環境での
+  エンドツーエンド検証が必要。詳細は`docs/security.md`・`docs/deployment.md`参照。
 - Playwright E2Eのリポジトリ内自動化 (現状は手動実行での確認)。
 - 負荷テスト。
 
