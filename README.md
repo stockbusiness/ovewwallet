@@ -92,6 +92,7 @@ pnpm --filter @ove/api test       # APIのE2Eテスト (実PostgreSQL接続が�
 - `docs/ledger-rules.md` — 台帳ルール・整合性チェック
 - `docs/external-api.md` — 外部サービスAPI仕様
 - `docs/admin-operations.md` — 管理画面操作
+- `docs/ui-design.md` — 戦国ウォレット UIデザインシステム (デザイントークン・共通コンポーネント)
 - `docs/migration.md` — 既存ユーザー移行 (設計のみ、実装は未着手)
 - `docs/security.md` — セキュリティ対策と既知の課題
 - `docs/test-plan.md` — テスト計画と実施結果

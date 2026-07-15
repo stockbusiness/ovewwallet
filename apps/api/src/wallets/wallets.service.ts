@@ -38,6 +38,16 @@ export class WalletsService {
     );
     return rows.map(serializeTransaction);
   }
+
+  /** 取引詳細画面 (指示書13章) 用。本人のウォレットに属する取引のみ取得できる。 */
+  async getTransaction(oveAccountId: string, transactionId: string) {
+    const wallet = await this.requireWalletForAccount(oveAccountId);
+    const transaction = await this.db.oveTransaction.findFirst({
+      where: { id: transactionId, walletId: wallet.id },
+    });
+    if (!transaction) throw new NotFoundException("transaction not found");
+    return serializeTransaction(transaction);
+  }
 }
 
 export function serializeTransaction(t: {
@@ -52,6 +62,9 @@ export function serializeTransaction(t: {
   balanceAfter: bigint;
   displayName: string;
   description: string | null;
+  sourceService?: string | null;
+  sourceReferenceId?: string | null;
+  relatedTransactionId?: string | null;
   occurredAt: Date;
   completedAt: Date | null;
 }) {
@@ -67,6 +80,9 @@ export function serializeTransaction(t: {
     balance_after: t.balanceAfter.toString(),
     display_name: t.displayName,
     description: t.description,
+    source_service: t.sourceService ?? null,
+    source_reference_id: t.sourceReferenceId ?? null,
+    related_transaction_id: t.relatedTransactionId ?? null,
     occurred_at: t.occurredAt.toISOString(),
     completed_at: t.completedAt ? t.completedAt.toISOString() : null,
   };

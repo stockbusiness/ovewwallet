@@ -1,19 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  BottomNavigation,
+  TransactionItem,
+  TRANSACTION_TYPE_LABEL,
+  ArrowLeftIcon,
+  HomeIcon,
+  ClockIcon,
+  GiftIcon,
+  CartIcon,
+} from "@ove/shared-ui";
 import { apiFetch, ApiError, type OveAccount, type TransactionSummary } from "@/lib/api";
 
-function formatAmount(amount: string, direction: "CREDIT" | "DEBIT"): string {
-  const sign = direction === "CREDIT" ? "+" : "-";
-  return `${sign}${Number(amount).toLocaleString("ja-JP")}`;
+type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "VOID";
+
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
+  { key: "ALL", label: "すべて" },
+  { key: "CREDIT", label: "獲得" },
+  { key: "DEBIT", label: "利用" },
+  { key: "VOID", label: "失効" },
+];
+
+function matchesFilter(t: TransactionSummary, filter: FilterKey): boolean {
+  if (filter === "ALL") return true;
+  if (filter === "VOID") return t.status === "REVERSED" || t.status === "FAILED";
+  if (filter === "CREDIT") return t.direction === "CREDIT" && t.status !== "REVERSED" && t.status !== "FAILED";
+  return t.direction === "DEBIT" && t.status !== "REVERSED" && t.status !== "FAILED";
+}
+
+function monthGroupLabel(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`;
 }
 
 export default function TransactionHistoryPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterKey>("ALL");
 
   useEffect(() => {
     (async () => {
@@ -32,35 +59,84 @@ export default function TransactionHistoryPage() {
     })();
   }, [router]);
 
+  const filtered = useMemo(() => transactions.filter((t) => matchesFilter(t, filter)), [transactions, filter]);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, TransactionSummary[]>();
+    for (const t of filtered) {
+      const key = monthGroupLabel(t.occurred_at);
+      const list = map.get(key) ?? [];
+      list.push(t);
+      map.set(key, list);
+    }
+    return Array.from(map.entries());
+  }, [filtered]);
+
   return (
-    <main className="flex flex-col gap-4 p-6">
-      <div className="flex items-center gap-2">
-        <Link href="/wallet" className="text-sm text-brand-600">
-          ← ウォレットトップ
+    <main className="flex flex-col gap-4 px-4 pb-24 pt-6">
+      <header className="flex items-center gap-3">
+        <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
+          <ArrowLeftIcon className="h-5 w-5" />
         </Link>
+        <h1 className="font-heading text-lg font-bold text-white">取引履歴</h1>
+      </header>
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                active ? "bg-sengoku-red text-white" : "border border-sengoku-border text-sengoku-muted"
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
       </div>
-      <h1 className="text-lg font-bold text-brand-700">OVE履歴一覧</h1>
 
-      {loading && <p className="text-sm text-neutral-500">読み込み中...</p>}
+      {loading && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
 
-      <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-        {!loading && transactions.length === 0 && (
-          <li className="p-3 text-xs text-neutral-400">取引履歴はありません</li>
-        )}
-        {transactions.map((t) => (
-          <li key={t.id} className="p-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm">{t.display_name}</p>
-              <span className={t.direction === "CREDIT" ? "text-sm font-semibold text-brand-600" : "text-sm font-semibold text-neutral-600"}>
-                {formatAmount(t.amount, t.direction)} OVE
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-neutral-400">
-              {t.transaction_code} ・ {t.status} ・ {new Date(t.occurred_at).toLocaleString("ja-JP")}
-            </p>
-          </li>
-        ))}
-      </ul>
+      {!loading && filtered.length === 0 && (
+        <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
+          該当する取引はありません
+        </p>
+      )}
+
+      {groups.map(([month, items]) => (
+        <section key={month}>
+          <p className="mb-2 text-xs font-semibold text-sengoku-muted">{month}</p>
+          <ul className="divide-y divide-sengoku-border overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
+            {items.map((t) => (
+              <li key={t.id}>
+                <TransactionItem
+                  icon={
+                    t.direction === "CREDIT" ? <GiftIcon className="h-5 w-5" /> : <CartIcon className="h-5 w-5" />
+                  }
+                  title={t.display_name || TRANSACTION_TYPE_LABEL[t.transaction_type] || t.transaction_type}
+                  subtitle={new Date(t.occurred_at).toLocaleString("ja-JP")}
+                  amount={t.amount}
+                  direction={t.direction}
+                  href={`/wallet/transactions/${t.id}`}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      <BottomNavigation
+        items={[
+          { href: "/wallet", label: "ホーム", icon: <HomeIcon className="h-5 w-5" /> },
+          { href: "/wallet/transactions", label: "履歴", icon: <ClockIcon className="h-5 w-5" />, matchPrefix: true },
+          { href: "/wallet/save", label: "貯める", icon: <GiftIcon className="h-5 w-5" />, disabled: true },
+          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" />, disabled: true },
+        ]}
+      />
     </main>
   );
 }

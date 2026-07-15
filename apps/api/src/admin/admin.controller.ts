@@ -129,6 +129,13 @@ export class AdminController {
     return { id: req.admin.id, email: req.admin.email, role: req.admin.role, displayName: req.admin.displayName };
   }
 
+  /** PC向け管理ダッシュボード (指示書13章) 用の集計値・過去30日推移。 */
+  @Get("dashboard-stats")
+  @UseGuards(AdminAuthGuard)
+  async dashboardStats() {
+    return this.admin.getDashboardStats();
+  }
+
   @Get("accounts")
   @UseGuards(AdminAuthGuard)
   async listAccounts(@Query("status") status?: string, @Query("limit") limit?: string) {

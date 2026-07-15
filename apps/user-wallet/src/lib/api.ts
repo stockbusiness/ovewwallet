@@ -55,6 +55,16 @@ export interface TransactionSummary {
   occurred_at: string;
 }
 
+export interface TransactionDetail extends TransactionSummary {
+  wallet_id: string;
+  balance_before: string;
+  balance_after: string;
+  source_service: string | null;
+  source_reference_id: string | null;
+  related_transaction_id: string | null;
+  completed_at: string | null;
+}
+
 export interface OveAccount {
   id: string;
   accountCode: string;

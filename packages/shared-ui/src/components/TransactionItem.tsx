@@ -1,0 +1,43 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+export interface TransactionItemProps {
+  icon?: ReactNode;
+  title: string;
+  subtitle: string;
+  amount: string | number;
+  direction: "CREDIT" | "DEBIT";
+  unit?: string;
+  href?: string;
+}
+
+/** 取引一覧・ウォレットホームの「最近の取引」で使う1行。獲得は金、利用は白で表示する。 */
+export function TransactionItem({ icon, title, subtitle, amount, direction, unit = "OVE", href }: TransactionItemProps) {
+  const formatted = `${direction === "CREDIT" ? "+" : "-"}${Number(amount).toLocaleString("ja-JP")}`;
+  const amountColor = direction === "CREDIT" ? "text-sengoku-gold" : "text-white";
+
+  const content = (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sengoku-gold/10 text-sengoku-gold">
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-white">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-sengoku-muted">{subtitle}</p>
+      </div>
+      <span className={`shrink-0 text-right text-sm font-bold ${amountColor}`}>
+        {formatted}
+        <span className="ml-0.5 text-xs font-medium">{unit}</span>
+      </span>
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="block transition-colors hover:bg-white/5 active:bg-white/10">
+        {content}
+      </Link>
+    );
+  }
+  return content;
+}

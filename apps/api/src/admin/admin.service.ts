@@ -19,6 +19,64 @@ export class AdminService {
     private readonly approvals: AdminApprovalService,
   ) {}
 
+  /** PC向け管理ダッシュボード (指示書13章) 用の集計値・過去30日推移。 */
+  async getDashboardStats(): Promise<{
+    totalAccounts: number;
+    todayCredited: string;
+    todayDebited: string;
+    dailyTrend: Array<{ date: string; credited: string; debited: string }>;
+  }> {
+    const totalAccounts = await this.db.oveAccount.count();
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const since = new Date(todayStart);
+    since.setDate(since.getDate() - 29);
+
+    const rows = await this.db.oveTransaction.findMany({
+      where: {
+        occurredAt: { gte: since },
+        status: "COMPLETED",
+        transactionType: { notIn: ["HOLD", "RELEASE"] },
+      },
+      select: { occurredAt: true, direction: true, amount: true },
+    });
+
+    const trend = new Map<string, { credited: bigint; debited: bigint }>();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(since);
+      d.setDate(d.getDate() + i);
+      trend.set(d.toISOString().slice(0, 10), { credited: 0n, debited: 0n });
+    }
+
+    let todayCredited = 0n;
+    let todayDebited = 0n;
+
+    for (const row of rows) {
+      const key = row.occurredAt.toISOString().slice(0, 10);
+      const bucket = trend.get(key);
+      if (bucket) {
+        if (row.direction === "CREDIT") bucket.credited += row.amount;
+        else bucket.debited += row.amount;
+      }
+      if (row.occurredAt >= todayStart) {
+        if (row.direction === "CREDIT") todayCredited += row.amount;
+        else todayDebited += row.amount;
+      }
+    }
+
+    return {
+      totalAccounts,
+      todayCredited: todayCredited.toString(),
+      todayDebited: todayDebited.toString(),
+      dailyTrend: Array.from(trend.entries()).map(([date, v]) => ({
+        date,
+        credited: v.credited.toString(),
+        debited: v.debited.toString(),
+      })),
+    };
+  }
+
   async listAccounts(params: { status?: string; limit?: number }) {
     return this.db.oveAccount.findMany({
       where: params.status ? { status: params.status as never } : undefined,

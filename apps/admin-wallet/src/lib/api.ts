@@ -33,6 +33,13 @@ export interface AdminMe {
   displayName: string;
 }
 
+export interface DashboardStats {
+  totalAccounts: number;
+  todayCredited: string;
+  todayDebited: string;
+  dailyTrend: Array<{ date: string; credited: string; debited: string }>;
+}
+
 export interface WalletListItem {
   id: string;
   walletCode: string;

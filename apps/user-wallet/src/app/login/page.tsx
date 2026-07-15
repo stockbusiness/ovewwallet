@@ -2,119 +2,237 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
 
-type Step = "email" | "code";
+type View = "choose" | "email-request" | "email-code" | "sengoku";
+
+/** ブラウザ内で安定させた擬似LINEユーザーID (指示書10章: LINE本番連携までのモック用)。 */
+function getMockLineUserId(): string {
+  const key = "ove-mock-line-user-id";
+  const existing = window.localStorage.getItem(key);
+  if (existing) return existing;
+  const generated = crypto.randomUUID();
+  window.localStorage.setItem(key, generated);
+  return generated;
+}
 
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("email");
+  const [view, setView] = useState<View>("choose");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [sengokuMemberId, setSengokuMemberId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<"line" | "email" | "sengoku" | null>(null);
+
+  async function loginWithLine() {
+    setError(null);
+    setLoading("line");
+    try {
+      const idToken = `mock.${getMockLineUserId()}`;
+      await apiFetch("/api/v1/auth/line/login", { method: "POST", body: JSON.stringify({ idToken }) });
+      router.push("/wallet");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
+    } finally {
+      setLoading(null);
+    }
+  }
 
   async function requestOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setLoading("email");
     try {
       const res = await apiFetch<{ devCode?: string }>("/api/v1/auth/email/request-otp", {
         method: "POST",
         body: JSON.stringify({ email }),
       });
       setDevCode(res.devCode ?? null);
-      setStep("code");
+      setView("email-code");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "送信に失敗しました");
     } finally {
-      setLoading(false);
+      setLoading(null);
     }
   }
 
   async function verifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
+    setLoading("email");
     try {
-      await apiFetch("/api/v1/auth/email/verify-otp", {
-        method: "POST",
-        body: JSON.stringify({ email, code }),
-      });
+      await apiFetch("/api/v1/auth/email/verify-otp", { method: "POST", body: JSON.stringify({ email, code }) });
       router.push("/wallet");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "認証に失敗しました");
     } finally {
-      setLoading(false);
+      setLoading(null);
+    }
+  }
+
+  async function loginWithSengokuPassport(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading("sengoku");
+    try {
+      const { code: ssoCode } = await apiFetch<{ code: string }>("/api/v1/auth/sso/sengoku/dev-issue", {
+        method: "POST",
+        body: JSON.stringify({ sengokuMemberId }),
+      });
+      await apiFetch("/api/v1/auth/sso/sengoku/exchange", { method: "POST", body: JSON.stringify({ code: ssoCode }) });
+      router.push("/wallet");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "戦国パスポートIDでのログインに失敗しました");
+    } finally {
+      setLoading(null);
     }
   }
 
   return (
-    <main className="flex min-h-screen flex-col justify-center gap-6 p-6">
-      <div>
-        <h1 className="text-xl font-bold text-brand-700">OVEウォレット</h1>
-        <p className="mt-1 text-sm text-neutral-500">メールアドレスでログイン・新規登録します。</p>
-      </div>
+    <main className="relative flex min-h-screen flex-col overflow-hidden px-6 pb-10 pt-16">
+      <BackgroundGlow />
 
-      {step === "email" && (
-        <form onSubmit={requestOtp} className="flex flex-col gap-3">
-          <label className="text-sm font-medium">
-            メールアドレス
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-              placeholder="you@example.com"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            確認コードを送信
-          </button>
-        </form>
-      )}
+      <div className="relative flex flex-1 flex-col justify-center gap-10">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-sengoku-gold/50 bg-sengoku-navy">
+            <span className="font-heading text-2xl font-bold text-sengoku-gold">戦</span>
+          </div>
+          <h1 className="font-heading text-2xl font-bold tracking-wide text-white">戦国ウォレット</h1>
+          <p className="mt-1 text-xs font-semibold tracking-[0.2em] text-sengoku-gold">OVE WALLET</p>
+        </div>
 
-      {step === "code" && (
-        <form onSubmit={verifyOtp} className="flex flex-col gap-3">
-          <p className="text-sm text-neutral-600">{email} に6桁のコードを送信しました。</p>
-          {devCode && (
-            <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-700">
-              開発環境用コード: <span className="font-mono font-bold">{devCode}</span>
+        {view === "choose" && (
+          <div className="flex flex-col gap-4">
+            <p className="text-center text-sm leading-relaxed text-sengoku-muted">
+              OVEウォレットへようこそ。
+              <br />
+              ご利用のログイン方法を選択してください。
             </p>
-          )}
-          <label className="text-sm font-medium">
-            確認コード
-            <input
-              type="text"
-              inputMode="numeric"
-              required
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm tracking-widest"
-              placeholder="000000"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            ログイン
-          </button>
-          <button type="button" onClick={() => setStep("email")} className="text-xs text-neutral-500 underline">
-            メールアドレスを変更する
-          </button>
-        </form>
-      )}
+            <PrimaryButton fullWidth onClick={loginWithLine} disabled={loading !== null}>
+              <ChatBubbleIcon className="h-5 w-5" />
+              {loading === "line" ? "ログイン中..." : "LINEでログイン"}
+            </PrimaryButton>
+            <SecondaryButton fullWidth tone="gold" onClick={() => setView("email-request")} disabled={loading !== null}>
+              メールでログイン
+            </SecondaryButton>
+            <SecondaryButton fullWidth tone="neutral" onClick={() => setView("sengoku")} disabled={loading !== null}>
+              <IdCardIcon className="h-5 w-5" />
+              戦国パスポートIDでログイン
+            </SecondaryButton>
+          </div>
+        )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+        {view === "email-request" && (
+          <form onSubmit={requestOtp} className="flex flex-col gap-4">
+            <label className="text-sm font-semibold text-white">
+              メールアドレス
+              <input
+                type="email"
+                required
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                placeholder="you@example.com"
+              />
+            </label>
+            <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
+              {loading === "email" ? "送信中..." : "確認コードを送信"}
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setView("choose")}
+              className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
+            >
+              戻る
+            </button>
+          </form>
+        )}
+
+        {view === "email-code" && (
+          <form onSubmit={verifyOtp} className="flex flex-col gap-4">
+            <p className="text-sm text-sengoku-muted">{email} に6桁の確認コードを送信しました。</p>
+            {devCode && (
+              <p className="rounded-lg border border-sengoku-gold/40 bg-sengoku-gold/10 p-3 text-xs text-sengoku-gold-soft">
+                開発環境用コード: <span className="font-mono text-sm font-bold">{devCode}</span>
+              </p>
+            )}
+            <label className="text-sm font-semibold text-white">
+              確認コード
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                maxLength={6}
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-center text-lg tracking-[0.5em] text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                placeholder="000000"
+              />
+            </label>
+            <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
+              {loading === "email" ? "確認中..." : "ログイン"}
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setView("email-request")}
+              className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
+            >
+              メールアドレスを変更する
+            </button>
+          </form>
+        )}
+
+        {view === "sengoku" && (
+          <form onSubmit={loginWithSengokuPassport} className="flex flex-col gap-4">
+            <label className="text-sm font-semibold text-white">
+              戦国パスポート会員ID
+              <input
+                type="text"
+                required
+                autoFocus
+                value={sengokuMemberId}
+                onChange={(e) => setSengokuMemberId(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                placeholder="SP-000000"
+              />
+            </label>
+            <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
+              {loading === "sengoku" ? "連携中..." : "戦国パスポートIDでログイン"}
+            </PrimaryButton>
+            <button
+              type="button"
+              onClick={() => setView("choose")}
+              className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
+            >
+              戻る
+            </button>
+          </form>
+        )}
+
+        {error && <p className="text-center text-sm font-medium text-sengoku-gold-soft">{error}</p>}
+      </div>
     </main>
+  );
+}
+
+function BackgroundGlow() {
+  return (
+    <div className="pointer-events-none absolute inset-0 -z-10">
+      <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-sengoku-gold/10 blur-3xl" />
+      <svg
+        className="absolute inset-x-0 bottom-0 h-40 w-full text-sengoku-navy"
+        viewBox="0 0 400 120"
+        preserveAspectRatio="none"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M0 120V70l40-22 25 12 35-30 30 20 20-10 45 24 15-8 30 16 20-14 40 22 20-6 30 14 20-10 35 18V120Z" />
+      </svg>
+    </div>
   );
 }

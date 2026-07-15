@@ -22,4 +22,13 @@ export class WalletsController {
   ) {
     return this.wallets.listTransactions(oveAccountId, limit ? Number(limit) : undefined, before);
   }
+
+  /** GET /api/v1/wallets/{oveAccountId}/transactions/{transactionId} (指示書13章 取引詳細画面) */
+  @Get(":oveAccountId/transactions/:transactionId")
+  async transactionDetail(
+    @Param("oveAccountId") oveAccountId: string,
+    @Param("transactionId") transactionId: string,
+  ) {
+    return this.wallets.getTransaction(oveAccountId, transactionId);
+  }
 }
