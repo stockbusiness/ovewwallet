@@ -13,7 +13,7 @@ import {
   GiftIcon,
   CartIcon,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type TransactionSummary } from "@/lib/api";
+import { apiFetch, ApiError, type TransactionSummary } from "@/lib/api";
 
 type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "VOID";
 
@@ -45,8 +45,7 @@ export default function TransactionHistoryPage() {
   useEffect(() => {
     (async () => {
       try {
-        const acc = await apiFetch<OveAccount>("/api/v1/accounts/me");
-        const txns = await apiFetch<TransactionSummary[]>(`/api/v1/wallets/${acc.id}/transactions?limit=100`);
+        const txns = await apiFetch<TransactionSummary[]>("/api/v1/me/transactions?limit=100");
         setTransactions(txns);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {

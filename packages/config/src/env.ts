@@ -32,6 +32,10 @@ const envSchema = z.object({
   AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
 
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  // 開発ガイドライン12.2章: LINE/戦国パスポートSSOの本番実装が未接続の間、
+  // NODE_ENV=production では AUTH_MODE=production の明示指定を必須とする
+  // (apps/api/src/common/assert-auth-mode.ts が起動時に検証する)。
+  AUTH_MODE: z.enum(["mock", "production"]).default("mock"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

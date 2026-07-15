@@ -6,6 +6,10 @@
 - Cookie名: `ove_session` (ユーザー) / `ove_admin_session` (管理者)。
 - Cookie属性: `HttpOnly`, `Secure`, `SameSite=Lax`。認証トークンをLocalStorageへは保存しない。
 - DBには `sessionTokenHash` (SHA-256の決定的ハッシュ) のみ保存し、平文トークンは保存しない。
+- 本人向けAPI (`GET /api/v1/me/wallet`, `/me/transactions`, `/me/transactions/{id}`) は
+  `SessionAuthGuard` でこのセッションを検証し、`req.account.id` から本人のOVEアカウントを
+  特定する。URLで `oveAccountId` を受け取らないため、他人の残高・取引を推測URLで
+  参照することはできない (開発ガイドライン12.1章に対応。`docs/external-api.md` 参照)。
 
 ## メールワンタイムコード
 

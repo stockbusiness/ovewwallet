@@ -12,7 +12,7 @@ import {
   transactionStatusLabel,
   transactionStatusTone,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type TransactionDetail } from "@/lib/api";
+import { apiFetch, ApiError, type TransactionDetail } from "@/lib/api";
 
 export default function TransactionDetailPage() {
   const params = useParams<{ transactionId: string }>();
@@ -23,10 +23,7 @@ export default function TransactionDetailPage() {
   useEffect(() => {
     (async () => {
       try {
-        const acc = await apiFetch<OveAccount>("/api/v1/accounts/me");
-        const detail = await apiFetch<TransactionDetail>(
-          `/api/v1/wallets/${acc.id}/transactions/${params.transactionId}`,
-        );
+        const detail = await apiFetch<TransactionDetail>(`/api/v1/me/transactions/${params.transactionId}`);
         setTransaction(detail);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {

@@ -35,8 +35,10 @@
 | `terms-consent.test.ts` | 同意なしの新規アカウント作成が400で拒否されアカウントが作成されないこと、同意ありで`terms_agreed_at`/`terms_version`が記録されること、既存アカウントの再ログインでは同意不要であること (LINEモックログイン) |
 | `admin-mfa.test.ts` | MFA未設定時は通常ログインできること、setup→誤ったコードでの有効化拒否→正しいコードでの有効化、有効化後のログインが`mfaRequired`を返しセッションを発行しないこと、2段階目の誤りコード拒否・正しいコードでのセッション発行、使い捨てmfaTokenの再利用拒否、パスワード/コード誤りでの無効化拒否、無効化後は通常ログインに戻ること |
 | `revoke-sessions.test.ts` | 複数端末のセッションが一括で失効しTTL待ちでなく即401になること、セッションが既にない状態での再実行が0件で冪等に成功すること、存在しないアカウントで404、権限のないロールでの403拒否 |
+| `me-and-service-accounts.test.ts` | 旧`/api/v1/wallets/{oveAccountId}/*`が404になること、`/api/v1/me/*`がセッションから本人を特定し他人の残高・取引を返さないこと (取引詳細は他人のIDだと404)、`/api/v1/service/accounts/{externalUserId}/balance`が自サービスの利用者のみ照会でき他サービスの利用者は404、HMAC未署名は401 |
+| `common/assert-auth-mode.test.ts` | `NODE_ENV=production`かつ`AUTH_MODE`が`production`以外(未設定含む)なら起動ガードが例外を投げること、`AUTH_MODE=production`なら例外を投げないこと、production以外の環境ではAUTH_MODEに関わらず例外を投げないこと |
 
-**合計 32件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 42件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない
@@ -63,7 +65,9 @@
   ログインできることを確認 → 戦国ウォレットデザイン刷新後のログイン画面で、利用規約に
   同意せずログインを試みるとエラーになり、同意後は成功することを確認 → アカウント詳細画面で
   「全セッションを無効化」を実行し、アクティブセッション数が更新され、実際にユーザー側の
-  セッションが即座に使えなくなることを確認
+  セッションが即座に使えなくなることを確認 → LINEログイン後にウォレットホーム・取引履歴が
+  新しい `/api/v1/me/*` API経由で表示されること、旧`/api/v1/wallets/{oveAccountId}/*`が
+  404で応答しないことをブラウザから確認
 - 外部API: HMAC署名付きリクエストで rewards/grant, transactions/debit, reverse を実行し、
   正しい署名は成功、リプレイは401、上限超過・重複はそれぞれ想定通りのレスポンスになることを
   curl/Pythonスクリプトで確認

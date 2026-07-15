@@ -53,6 +53,12 @@ describe("CSV bulk grant (preview -> execute)", () => {
     await prisma.$disconnect();
   });
 
+  async function walletBalance(): Promise<string> {
+    const account = await prisma.oveAccount.findUniqueOrThrow({ where: { accountCode } });
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId: account.id } });
+    return wallet.availableBalance.toString();
+  }
+
   it("preview does not touch wallet balance; execute (with batchId) does, and re-execute stays idempotent", async () => {
     const key = `bulk-e2e-${generateId()}`;
     const csvContent = [
@@ -71,10 +77,7 @@ describe("CSV bulk grant (preview -> execute)", () => {
     expect(previewRes.body.successCount).toBe(1);
     expect(previewRes.body.unknownUserCount).toBe(1);
 
-    const balanceAfterPreview = await request(app.getHttpServer())
-      .get(`/api/v1/wallets/${(await prisma.oveAccount.findUniqueOrThrow({ where: { accountCode } })).id}/balance`)
-      .expect(200);
-    expect(balanceAfterPreview.body.available_balance).toBe("0"); // プレビューでは反映されない
+    expect(await walletBalance()).toBe("0"); // プレビューでは反映されない
 
     const batchId = previewRes.body.batchId;
     const executeRes = await request(app.getHttpServer())
@@ -83,12 +86,7 @@ describe("CSV bulk grant (preview -> execute)", () => {
       .send({ fileName: "test.csv", csvContent, batchId })
       .expect(201);
     expect(executeRes.body.successCount).toBe(1);
-
-    const accountRow = await prisma.oveAccount.findUniqueOrThrow({ where: { accountCode } });
-    const balanceAfterExecute = await request(app.getHttpServer())
-      .get(`/api/v1/wallets/${accountRow.id}/balance`)
-      .expect(200);
-    expect(balanceAfterExecute.body.available_balance).toBe("2500");
+    expect(await walletBalance()).toBe("2500");
 
     // 同じCSVを再実行しても二重付与されない
     const secondExecuteRes = await request(app.getHttpServer())
@@ -97,10 +95,6 @@ describe("CSV bulk grant (preview -> execute)", () => {
       .send({ fileName: "test.csv", csvContent })
       .expect(201);
     expect(secondExecuteRes.body.duplicateCount).toBe(1);
-
-    const balanceAfterRerun = await request(app.getHttpServer())
-      .get(`/api/v1/wallets/${accountRow.id}/balance`)
-      .expect(200);
-    expect(balanceAfterRerun.body.available_balance).toBe("2500"); // 変わらない
+    expect(await walletBalance()).toBe("2500"); // 変わらない
   });
 });

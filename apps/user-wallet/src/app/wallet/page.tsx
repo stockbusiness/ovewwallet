@@ -31,8 +31,8 @@ export default function WalletTopPage() {
         const acc = await apiFetch<OveAccount>("/api/v1/accounts/me");
         setAccount(acc);
         const [bal, txns] = await Promise.all([
-          apiFetch<WalletBalance>(`/api/v1/wallets/${acc.id}/balance`),
-          apiFetch<TransactionSummary[]>(`/api/v1/wallets/${acc.id}/transactions?limit=5`),
+          apiFetch<WalletBalance>("/api/v1/me/wallet"),
+          apiFetch<TransactionSummary[]>("/api/v1/me/transactions?limit=5"),
         ]);
         setBalance(bal);
         setTransactions(txns);

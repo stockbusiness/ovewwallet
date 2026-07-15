@@ -45,9 +45,33 @@ E2Eテスト (`apps/api/src/e2e/revoke-sessions.test.ts`) で、複数端末の�
 実ブラウザでも、無効化前後でセッション数表示が更新されること、実際にユーザー側の
 セッションが使えなくなることを確認済み。
 
+## API利用者ごとのアクセス制御分離 (開発ガイドライン12.1章)
+
+残高照会・取引履歴・取引詳細を、本人向け・外部サービス向けで完全に分離した
+(旧 `GET /api/v1/wallets/{oveAccountId}/...` は `oveAccountId` さえ知っていれば
+誰でも参照できてしまう実装だったため廃止):
+
+- 本人向け: `GET /api/v1/me/wallet` / `/me/transactions` / `/me/transactions/{id}`
+  (OVE独自セッション認証、URLでOVEアカウントIDを受け取らずセッションから解決)。
+- 外部サービス向け: `GET /api/v1/service/accounts/{externalUserId}/balance`
+  (HMAC認証、認証済みの連携先自身の `external_user_id` のみ照会可能。他サービスに
+  紐づく `external_user_id` を指定すると404になる)。
+- 管理者向け: 既存の `GET /api/v1/admin/wallets/{walletId}` (管理者セッション認証)。
+
+E2Eテスト (`apps/api/src/e2e/me-and-service-accounts.test.ts`) で、旧エンドポイントが
+404になること、本人セッションで他人の残高・取引が取得できないこと、外部サービスが
+他サービス利用者の残高を照会できないことを検証済み。実ブラウザでも本人向けAPIへの
+移行後の動作を確認済み。
+
+## モック認証の本番起動ガード (開発ガイドライン12.2章)
+
+`apps/api/src/common/assert-auth-mode.ts` が起動時に検証し、`NODE_ENV=production` かつ
+`AUTH_MODE` が `production` 以外 (未設定を含む) の場合はアプリ起動自体を失敗させる。
+LINEログイン・戦国パスポートSSOの本番実装が接続されるまでは、本番環境を起動できない。
+単体テスト (`apps/api/src/common/assert-auth-mode.test.ts`) で検証済み。
+
 ## 未実装・今後の課題
 
-- 残高照会・取引履歴APIのアクセス制御強化 (`docs/external-api.md` 参照)。
 - 個人情報のURL掲載禁止: SSOコード・OTPには個人情報を含めない設計を徹底しているが、
   他のURLパラメータ全体の監査は未実施。
 

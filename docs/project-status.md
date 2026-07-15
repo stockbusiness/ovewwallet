@@ -21,7 +21,7 @@ packages/
 
 PostgreSQL 16 + Redis (KVストア、未設定時はインメモリへフォールバック) を使用。
 DBスキーマ・API・管理画面・ユーザー画面のすべてに対して、実DBに対する自動テスト
-(現時点で API 32件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計78件、すべて成功)
+(現時点で API 42件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計88件、すべて成功)
 と、実ブラウザ (Playwright) での動作確認を行っています。
 
 ## 2. 実装済み機能
@@ -108,12 +108,30 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 付与/消し込みの粒度・レート制限値の要件をヒアリングした上で、`service_integrations` への
 登録とドキュメント整備 (`docs/external-api.md` への連携先追加) を行う想定です。
 
-## 5. 未実装・今後の課題
+## 5. 「OVEウォレット開発・連携上の留意事項 v1.0」への対応状況
+
+代理店システム等の外部連携を見据えたガイドライン文書 (2026-07-15付) を踏まえ、
+その17章のPhase区分に沿って以下の対応を行っています。
+
+- **Phase 1 (本番前セキュリティ) — 完了**:
+  - 本人向けAPIを `GET /api/v1/me/wallet` / `/me/transactions` / `/me/transactions/{id}`
+    に分離し、URLでOVEアカウントIDを受け取らずセッションから本人を特定する方式へ変更。
+  - 外部サービス向け残高照会 `GET /api/v1/service/accounts/{externalUserId}/balance`
+    を新設し、認証済みの連携先自身に紐づく利用者のみ照会できるようにした
+    (他サービスの利用者は404)。
+  - 旧 `GET /api/v1/wallets/{oveAccountId}/...` (誰でも`oveAccountId`を知っていれば
+    参照できた実装) は廃止。
+  - `NODE_ENV=production` かつ `AUTH_MODE` が `production` 以外ならアプリ起動を
+    失敗させるガードを追加 (モック認証のまま本番稼働することを防止)。
+  - 詳細: `docs/security.md`, `docs/external-api.md`, `docs/authentication.md`
+- **Phase 2以降 (紹介情報受入基盤・代理店紹介同期・登録特典連動・外部サービス本番連携) —
+  未着手**: `referral_session`/`agency_referral_links`/Transactional Outbox/Feature Flag
+  基盤はまだ存在しません。着手する際は、ガイドライン19章の指示通り、現状調査と影響範囲を
+  Markdownにまとめてから実装します。
+
+## 6. 未実装・今後の課題
 
 - LINE本番連携・戦国パスポート本番SSO交換 (今回保留)。
-- 残高照会・取引履歴APIのアクセス制御強化 (`GET /api/v1/wallets/...` が現状
-  `oveAccountId` を知っていれば誰でも参照できる。本番投入前に連携先ごとのアクセス制御が
-  必要 — `docs/external-api.md`, `docs/security.md` 参照)。
 - 二段階承認のアカウント統合・オンチェーン移行・APIサービス上限変更への拡張
   (現状は高額付与/高額減算のみ対象、`docs/admin-operations.md` 参照)。
 - 既存ユーザー移行の検証者フロー・文字コード対応の強化。
@@ -122,7 +140,7 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 - Playwright E2Eのリポジトリ内自動化 (現状は手動実行での確認)。
 - 負荷テスト。
 
-## 6. 参考: 主要ドキュメント一覧
+## 7. 参考: 主要ドキュメント一覧
 
 | ドキュメント | 内容 |
 |---|---|
@@ -138,3 +156,4 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 | `docs/migration.md` | 既存ユーザー移行 |
 | `docs/deployment.md` | デプロイ手順 |
 | `docs/implementation-plan.md` | 初期実装計画・フェーズ進行状況 |
+| `docs/development-guardrails.md` | 代理店システム等の外部連携に向けた開発基準 (このドキュメントの元) |

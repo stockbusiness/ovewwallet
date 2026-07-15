@@ -83,11 +83,8 @@ describe("two-step approval workflow (指示書13章 二段階承認)", () => {
     expect(requestId).toBeTruthy();
 
     // 残高はまだ動かない
-    const balanceBefore = await request(app.getHttpServer()).get(`/api/v1/wallets/${walletId}/balance`);
-    // wallets/:oveAccountId/balance は oveAccountId で引くため、walletから逆引きする
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
     expect(wallet.availableBalance.toString()).toBe("0");
-    void balanceBefore;
 
     // 申請者本人は承認できない
     await request(app.getHttpServer())

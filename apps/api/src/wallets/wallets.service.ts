@@ -48,6 +48,19 @@ export class WalletsService {
     if (!transaction) throw new NotFoundException("transaction not found");
     return serializeTransaction(transaction);
   }
+
+  /**
+   * 外部サービス向け残高照会 (開発ガイドライン12章)。任意の oveAccountId ではなく、
+   * 認証済みの連携先 (serviceIntegrationId) に紐づく external_user_id だけを起点に解決する
+   * ことで、他サービスの利用者を横断的に照会できないようにする。
+   */
+  async getBalanceForServiceLink(serviceIntegrationId: string, externalUserId: string) {
+    const link = await this.db.accountLink.findUnique({
+      where: { serviceIntegrationId_externalUserId: { serviceIntegrationId, externalUserId } },
+    });
+    if (!link) throw new NotFoundException("no OVE account linked to this external_user_id");
+    return this.getBalance(link.oveAccountId);
+  }
 }
 
 export function serializeTransaction(t: {

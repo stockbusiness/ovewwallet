@@ -1,34 +1,56 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query, Req, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { WalletsService } from "./wallets.service";
+import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
+import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
+import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
 
-@ApiTags("wallets")
-@Controller("api/v1/wallets")
-export class WalletsController {
+/**
+ * 本人向けウォレットAPI (開発ガイドライン12章「本番公開前の必須項目」)。
+ * URLでOVEアカウントIDを受け取らず、セッションから本人を特定する
+ * (旧 `/api/v1/wallets/{oveAccountId}/...` はここへ統合し廃止した)。
+ */
+@ApiTags("me")
+@Controller("api/v1/me")
+export class MeController {
   constructor(private readonly wallets: WalletsService) {}
 
-  /** GET /api/v1/wallets/{oveAccountId}/balance (指示書11章) */
-  @Get(":oveAccountId/balance")
-  async balance(@Param("oveAccountId") oveAccountId: string) {
-    return this.wallets.getBalance(oveAccountId);
+  @Get("wallet")
+  @UseGuards(SessionAuthGuard)
+  async wallet(@Req() req: AuthenticatedUserRequest) {
+    return this.wallets.getBalance(req.account.id);
   }
 
-  /** GET /api/v1/wallets/{oveAccountId}/transactions (指示書11章) */
-  @Get(":oveAccountId/transactions")
+  @Get("transactions")
+  @UseGuards(SessionAuthGuard)
   async transactions(
-    @Param("oveAccountId") oveAccountId: string,
+    @Req() req: AuthenticatedUserRequest,
     @Query("limit") limit?: string,
     @Query("before") before?: string,
   ) {
-    return this.wallets.listTransactions(oveAccountId, limit ? Number(limit) : undefined, before);
+    return this.wallets.listTransactions(req.account.id, limit ? Number(limit) : undefined, before);
   }
 
-  /** GET /api/v1/wallets/{oveAccountId}/transactions/{transactionId} (指示書13章 取引詳細画面) */
-  @Get(":oveAccountId/transactions/:transactionId")
-  async transactionDetail(
-    @Param("oveAccountId") oveAccountId: string,
-    @Param("transactionId") transactionId: string,
-  ) {
-    return this.wallets.getTransaction(oveAccountId, transactionId);
+  @Get("transactions/:transactionId")
+  @UseGuards(SessionAuthGuard)
+  async transactionDetail(@Req() req: AuthenticatedUserRequest, @Param("transactionId") transactionId: string) {
+    return this.wallets.getTransaction(req.account.id, transactionId);
+  }
+}
+
+/**
+ * 外部サービス向け残高照会 (開発ガイドライン9.3章・12章)。認証済みの連携先が持つ
+ * `external_user_id` だけを起点に解決し、任意の `oveAccountId` を直接指定させない。
+ */
+@ApiTags("service")
+@Controller("api/v1/service/accounts")
+export class ServiceAccountsController {
+  constructor(private readonly wallets: WalletsService) {}
+
+  @Get(":externalUserId/balance")
+  @UseGuards(ExternalApiAuthGuard)
+  @UseInterceptors(ApiAccessLogInterceptor)
+  async balance(@Req() req: AuthenticatedServiceRequest, @Param("externalUserId") externalUserId: string) {
+    return this.wallets.getBalanceForServiceLink(req.serviceIntegration.id, externalUserId);
   }
 }

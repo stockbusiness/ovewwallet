@@ -61,9 +61,10 @@ describe("golden path (E2E)", () => {
     const sessionCookie = verifyRes.headers["set-cookie"] as unknown as string[];
     expect(oveAccountId).toBeTruthy();
 
-    // 1アカウント1ウォレットが自動作成されている
+    // 1アカウント1ウォレットが自動作成されている (本人用API、セッションから解決)
     const balance0 = await request(server)
-      .get(`/api/v1/wallets/${oveAccountId}/balance`)
+      .get("/api/v1/me/wallet")
+      .set("Cookie", sessionCookie)
       .expect(200);
     expect(balance0.body.available_balance).toBe("0");
     const walletId: string = balance0.body.wallet_id;
@@ -83,15 +84,11 @@ describe("golden path (E2E)", () => {
       .expect(201);
 
     // ユーザーが残高を確認できる
-    const balance1 = await request(server)
-      .get(`/api/v1/wallets/${oveAccountId}/balance`)
-      .expect(200);
+    const balance1 = await request(server).get("/api/v1/me/wallet").set("Cookie", sessionCookie).expect(200);
     expect(balance1.body.available_balance).toBe("3000");
 
     // 取引履歴を確認できる
-    const historyRes = await request(server)
-      .get(`/api/v1/wallets/${oveAccountId}/transactions`)
-      .expect(200);
+    const historyRes = await request(server).get("/api/v1/me/transactions").set("Cookie", sessionCookie).expect(200);
     expect(historyRes.body).toHaveLength(1);
     expect(historyRes.body[0].transaction_type).toBe("ADMIN_GRANT");
 
@@ -104,7 +101,8 @@ describe("golden path (E2E)", () => {
       .expect(409);
 
     const balanceUnchanged = await request(server)
-      .get(`/api/v1/wallets/${oveAccountId}/balance`)
+      .get("/api/v1/me/wallet")
+      .set("Cookie", sessionCookie)
       .expect(200);
     expect(balanceUnchanged.body.available_balance).toBe("3000"); // 変化なし
 
@@ -115,9 +113,7 @@ describe("golden path (E2E)", () => {
       .send({ walletId, amount: 1000, reason: "利用テスト" })
       .expect(201);
 
-    const balanceFinal = await request(server)
-      .get(`/api/v1/wallets/${oveAccountId}/balance`)
-      .expect(200);
+    const balanceFinal = await request(server).get("/api/v1/me/wallet").set("Cookie", sessionCookie).expect(200);
     expect(balanceFinal.body.available_balance).toBe("2000");
 
     // ログアウト

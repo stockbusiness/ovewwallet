@@ -99,4 +99,6 @@ pnpm --filter @ove/api test       # APIのE2Eテスト (実PostgreSQL接続が�
 - `docs/test-plan.md` — テスト計画と実施結果
 - `docs/deployment.md` — デプロイ手順
 - `docs/implementation-plan.md` — 実装計画・フェーズ進行状況
+- `docs/development-guardrails.md` — 代理店システム等の外部連携に向けた開発基準
+  (正式な管理元の分離・ID設計・紹介連携・セキュリティ必須項目・実装順序)
 - `AGENTS.md` — 実装・変更時の禁止事項

@@ -9,12 +9,15 @@ Base URL: `${API_URL}` (デフォルト `http://localhost:4000`)。Swagger: `/ap
 | `POST /api/v1/rewards/grant` | HMAC (外部サービス) | ポイント付与。idempotency必須 |
 | `POST /api/v1/transactions/debit` | HMAC (外部サービス) | ポイント利用 (減算) |
 | `POST /api/v1/transactions/{transactionId}/reverse` | HMAC (外部サービス) | 取消 |
-| `GET /api/v1/wallets/{oveAccountId}/balance` | なし (MVP) | 残高照会 |
-| `GET /api/v1/wallets/{oveAccountId}/transactions` | なし (MVP) | 取引履歴 |
+| `GET /api/v1/service/accounts/{externalUserId}/balance` | HMAC (外部サービス) | 残高照会。**認証済みの連携先自身の`external_user_id`のみ**照会可能 |
 
-> 残高照会・取引履歴は現状 `oveAccountId` を知っていれば誰でも参照できる実装になっている。
-> 本番投入前に、サービス連携ごとのアクセス制御 (自サービスに紐付くアカウントのみ参照可) を
-> 追加する必要がある (既知の課題として `docs/security.md` にも明記)。
+> **本人向け** の残高照会・取引履歴・取引詳細は `GET /api/v1/me/wallet` /
+> `GET /api/v1/me/transactions` / `GET /api/v1/me/transactions/{id}` (OVE独自セッション認証、
+> `docs/authentication.md` 参照) を使う。**外部サービスからは他サービス利用者の残高を
+> 横断的に照会できない** よう、`service_integration_id + external_user_id` の組み合わせで
+> 解決する専用API (`GET /api/v1/service/accounts/...`) に分離している
+> (開発ガイドライン9.3章・12.1章に対応。旧 `GET /api/v1/wallets/{oveAccountId}/...` は
+> `oveAccountId` を知っていれば誰でも参照できてしまうため廃止した)。
 
 ## 外部API認証 (HMAC)
 
@@ -80,3 +83,6 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 - 同一nonceでの完全リプレイ → 401エラー
 - `reward_rules.per_event_limit` の超過拒否
 - debit / reverse の一連の流れ (残高減算 → 取消で復元)
+- `GET /api/v1/service/accounts/{externalUserId}/balance`: 自サービスに紐づく
+  `external_user_id` の残高は取得できるが、他サービスに紐づく `external_user_id` を
+  指定すると404になること (`apps/api/src/e2e/me-and-service-accounts.test.ts`)

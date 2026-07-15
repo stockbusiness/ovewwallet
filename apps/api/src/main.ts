@@ -6,8 +6,11 @@ import cookieParser from "cookie-parser";
 import "./common/bigint-json";
 import { AppModule } from "./app.module";
 import { LedgerExceptionFilter } from "./common/ledger-exception.filter";
+import { assertAuthModeSafeForProduction } from "./common/assert-auth-mode";
 
 async function bootstrap() {
+  assertAuthModeSafeForProduction();
+
   const app = await NestFactory.create(AppModule);
 
   app.use(helmet());
