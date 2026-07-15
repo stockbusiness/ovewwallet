@@ -37,11 +37,11 @@ RUN pnpm --filter @ove/api build
 # ---- 実行用イメージ ----
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/package.json ./package.json
-COPY --from=build /repo/packages ./packages
-COPY --from=build /repo/apps/api ./apps/api
-COPY apps/api/docker-entrypoint.sh /repo/docker-entrypoint.sh
+COPY --from=build --chown=node:node /repo/node_modules ./node_modules
+COPY --from=build --chown=node:node /repo/package.json ./package.json
+COPY --from=build --chown=node:node /repo/packages ./packages
+COPY --from=build --chown=node:node /repo/apps/api ./apps/api
+COPY --chown=node:node apps/api/docker-entrypoint.sh /repo/docker-entrypoint.sh
 RUN chmod +x /repo/docker-entrypoint.sh
 WORKDIR /repo/apps/api
 EXPOSE 4000
