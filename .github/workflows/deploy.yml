@@ -14,6 +14,7 @@ on:
 jobs:
   deploy-api:
     runs-on: ubuntu-latest
+    environment: RAILWAY
     outputs:
       api_url: ${{ steps.domain.outputs.api_url }}
     steps:
@@ -154,6 +155,7 @@ jobs:
     needs: deploy-api
     if: ${{ inputs.deploy_frontends }}
     runs-on: ubuntu-latest
+    environment: RAILWAY
     strategy:
       matrix:
         app: [user-wallet, admin-wallet]
@@ -197,6 +199,7 @@ jobs:
     needs: [deploy-api, deploy-frontends]
     if: ${{ inputs.deploy_frontends }}
     runs-on: ubuntu-latest
+    environment: RAILWAY
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
