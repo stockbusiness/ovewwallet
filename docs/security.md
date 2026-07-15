@@ -8,8 +8,12 @@
   `$queryRaw`/`$executeRaw` のタグ付きテンプレートのみで、文字列結合による生成はしていない)。
 - XSS対策: Next.jsのデフォルトエスケープに依存 (`dangerouslySetInnerHTML` 不使用)。
 - CSRF対策: `SameSite=Lax` Cookie + CORSオリジン制限 (`APP_URL`/`ADMIN_URL` のみ許可)。
-- ブルートフォース対策: メールOTPの試行回数上限(5回)・再送間隔(60秒)。
-  `@nestjs/throttler` によるグローバルレート制限 (60秒あたり120リクエスト、MVP値)。
+- ブルートフォース対策: メールOTPの試行回数上限(5回、メールアドレス単位)・再送間隔(60秒)。
+  `@nestjs/throttler` によるグローバルレート制限 (60秒あたり120リクエスト、MVP値) に加え、
+  ログイン系エンドポイント (管理者ログイン `POST /admin/login`・管理者MFA
+  `POST /admin/login/mfa`・メールOTP検証 `POST /auth/email/verify-otp`) はIPアドレス単位で
+  60秒あたり10リクエストに個別に制限し、総当たりの試行速度をさらに絞っている
+  (下記「レート制限値の見直し」参照)。
 - APIキー・署名シークレットの平文非保存 (`docs/database.md` 参照)。
 - 監査ログ (`audit_logs`): アプリケーション層にdelete用のAPI/UIを一切実装していない。
   さらにDBレベルでも改ざん・削除を防止している (下記「監査ログのDBレベル不変性」参照)。
@@ -86,6 +90,28 @@ BEFOREトリガー (`prevent_audit_logs_mutation()`、マイグレーション
 単体テスト (`apps/api/src/e2e/audit-log-immutability.test.ts`) で、DELETE/UPDATEが
 DBレベルで例外になりトランザクションごとロールバックされること、通常のINSERT/SELECTは
 影響を受けないことを検証済み。
+
+## レート制限値の見直し
+
+管理者ログイン・管理者MFA・メールOTP検証は、パスワード/6桁コードの総当たり攻撃の対象に
+なりうるため、`@nestjs/throttler` の `@Throttle({ default: { limit: 10, ttl: 60_000 } })` で
+IPアドレス単位60秒10回に個別制限した (全体既定の60秒120回より厳しい)。
+メールOTP検証はメールアドレス単位の5回試行上限 (`packages/auth/src/email-otp.ts`) に
+加えたIPベースの多層防御であり、片方が回避されてももう片方が効く設計にした。
+
+この作業中に、期限切れ・未発行のOTPコードで検証しようとした場合に `OtpVerificationError`
+が未捕捉のまま500エラーになる既存の実装ミスを発見した。誤ったコードを入力した場合は
+正しく401になっていたが、コード自体が存在しない/期限切れの場合だけ500になっていた
+(内部エラーの詳細が意図せず露出しうる状態)。`AuthService.verifyEmailOtpAndLogin` で
+`OtpVerificationError` を捕捉し、誤ったコードの場合と同じ401に統一する形で修正した。
+
+単体テスト (`apps/api/src/e2e/rate-limit.test.ts`) で、管理者ログイン・メールOTP検証の
+両方が11回目までに429になることを検証済み。管理者MFAコード自体は6桁 (100万通り) かつ
+30秒ごとに失効するため、レート制限を課さなくても現実的な時間での総当たりは困難だが、
+念のため同じ制限を適用した。
+
+外部サービスAPIのレート制限については `docs/deployment.md` の「レート制限 (外部API)」を
+参照 (連携先ごとの専用バケットは未実装)。
 
 ## 未実装・今後の課題
 

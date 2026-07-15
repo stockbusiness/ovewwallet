@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { Response } from "express";
 import { z } from "zod";
 import { ADMIN_SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
@@ -104,7 +105,12 @@ export class AdminController {
     private readonly rewardRules: AdminRewardRulesService,
   ) {}
 
-  /** MFA未設定なら即ログイン、設定済みなら `{ mfaRequired: true, mfaToken }` を返す (指示書13章 管理画面MFA)。 */
+  /**
+   * MFA未設定なら即ログイン、設定済みなら `{ mfaRequired: true, mfaToken }` を返す (指示書13章 管理画面MFA)。
+   * パスワード総当たり対策として、全体既定 (60秒120回) より厳しい60秒10回に制限する
+   * (`docs/security.md` の「レート制限値の見直し」参照)。
+   */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("login")
   async login(
     @Body(new ZodValidationPipe(LoginSchema)) body: z.infer<typeof LoginSchema>,
@@ -121,7 +127,11 @@ export class AdminController {
     return { success: true, mfaRequired: false };
   }
 
-  /** ログインの2段階目。パスワード認証済みの `mfaToken` と認証アプリのコードでセッションを発行する。 */
+  /**
+   * ログインの2段階目。パスワード認証済みの `mfaToken` と認証アプリのコードでセッションを発行する。
+   * TOTPコード総当たり対策として60秒10回に制限する。
+   */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("login/mfa")
   async loginMfa(
     @Body(new ZodValidationPipe(MfaLoginSchema)) body: z.infer<typeof MfaLoginSchema>,

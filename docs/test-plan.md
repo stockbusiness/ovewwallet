@@ -39,8 +39,9 @@
 | `common/assert-auth-mode.test.ts` | `NODE_ENV=production`かつ`AUTH_MODE`が`production`以外(未設定含む)なら起動ガードが例外を投げること、`AUTH_MODE=production`なら例外を投げないこと、production以外の環境ではAUTH_MODEに関わらず例外を投げないこと |
 | `outbox.test.ts` | Transactional Outbox (開発ガイドライン10章): `enqueue`が同一idempotencyKeyで二重登録しないこと、登録済みハンドラへの送信成功で`SENT`になること、失敗時に指数バックオフで再送され最大試行回数到達で`FAILED`になること、管理API経由の手動再送で`FAILED`→`PENDING`(試行回数0)にリセットされること、管理画面からのキュー一覧取得(連携先での絞り込み)・一括処理トリガー、未認証アクセスの401。Feature Flag (開発ガイドライン13章): 全フラグが既定でfalseであること、未認証アクセスの401 |
 | `audit-log-immutability.test.ts` | `audit_logs`へのDELETE/UPDATEがアプリの接続ロール(postgres特権ユーザー)でもDBトリガーにより例外で拒否されること、拒否時はトランザクションごとロールバックされ変更が一切残らないこと、通常のINSERT/SELECTは影響を受けないこと |
+| `rate-limit.test.ts` | 管理者ログイン・メールOTP検証が、それぞれ個別設定した60秒10回の制限を超えると429になること |
 
-**合計 53件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 55件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない
@@ -109,6 +110,11 @@
     `app.close()`がRedis接続自体を`quit()`してしまい、後段の`describe`が
     `Error: Connection is closed.`で管理者ログインに失敗していた。同一テストファイル内では
     Nest appを1つだけ生成し使い回すよう修正
+12. メールOTP検証で、コードが未発行・期限切れの場合に`OtpVerificationError`が未捕捉のまま
+    500エラーになる不具合。誤ったコードを入力した場合は401になっていたが、コード自体が
+    存在しない場合だけ500になっていた。`rate-limit.test.ts`作成中(存在しないメールアドレスで
+    OTP未発行のまま検証を試みるテストケース)に発覚。`AuthService.verifyEmailOtpAndLogin`で
+    `OtpVerificationError`を捕捉し401に統一するよう修正
 
 いずれも実際にAPIを呼び出して初めて発覚したものであり、修正後に自動テスト
 (回帰テストを追加したものを含む) と手動確認の両方で解消を確認済み。

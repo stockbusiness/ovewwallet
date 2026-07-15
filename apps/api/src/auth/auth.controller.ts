@@ -1,5 +1,6 @@
 import { Body, Controller, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
@@ -31,6 +32,11 @@ export class AuthController {
     return this.auth.requestEmailOtp(body.email);
   }
 
+  /**
+   * 6桁コードの総当たり対策として60秒10回に制限する (メールアドレス単位の5回試行上限
+   * (`packages/auth/src/email-otp.ts`) に加えたIPベースの多層防御、`docs/security.md` 参照)。
+   */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post("email/verify-otp")
   async verifyOtp(
     @Body(new ZodValidationPipe(VerifyOtpSchema)) body: z.infer<typeof VerifyOtpSchema>,

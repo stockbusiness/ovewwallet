@@ -1,6 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import {
   EmailOtpService,
+  OtpVerificationError,
   SengokuSsoService,
   MockLineAuthVerifier,
   issueSession,
@@ -34,7 +35,15 @@ export class AuthService {
   }
 
   async verifyEmailOtpAndLogin(email: string, code: string, termsAccepted?: boolean) {
-    const ok = await this.emailOtp.verify(email, code);
+    let ok: boolean;
+    try {
+      ok = await this.emailOtp.verify(email, code);
+    } catch (err) {
+      // コード未発行・期限切れ・試行回数上限は、間違ったコードの場合と同じく401として
+      // 扱う (内部実装の詳細を漏らさず、いずれも「認証できない」という結果は同じ)。
+      if (err instanceof OtpVerificationError) throw new UnauthorizedException("invalid verification code");
+      throw err;
+    }
     if (!ok) throw new UnauthorizedException("invalid verification code");
 
     const account = await this.accounts.findOrCreateByIdentity({
