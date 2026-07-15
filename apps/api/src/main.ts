@@ -13,7 +13,11 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
 
-  app.use(helmet());
+  // helmetのデフォルトはCross-Origin-Resource-Policy: same-originを付与し、
+  // CORSでオリジンを許可していても別オリジンからのfetchをブラウザ側で
+  // ブロックしてしまう。このAPIはVercel上の別オリジンのフロントエンドから
+  // 呼ばれる構成のため、cross-originを許可する。
+  app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cookieParser());
   const allowedOrigins = [process.env.APP_URL, process.env.ADMIN_URL].filter(
     (v): v is string => Boolean(v),

@@ -4,10 +4,14 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30日
 export const SESSION_COOKIE_NAME = "ove_session";
 export const ADMIN_SESSION_COOKIE_NAME = "ove_admin_session";
 
+// フロントエンド(Vercel)とAPI(Railway)が別ドメインの構成では、sameSite=laxだと
+// SPAのfetch()にセッションCookieが付与されずログイン状態を維持できない。
+// noneにするとクロスサイト送信を許可できる(secure:trueは必須要件で既に満たす)。
+// 将来、フロントエンド/APIを同一の親ドメイン配下に統一できればlaxに戻せる。
 export const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: true,
-  sameSite: "lax" as const,
+  sameSite: "none" as const,
   path: "/",
 };
 
