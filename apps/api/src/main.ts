@@ -31,7 +31,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup("api/docs", app, document);
 
-  const port = Number(process.env.API_PORT) || 4000;
+  // RailwayなどのPaaSはサービスごとに`PORT`を自動注入し、そのポートで
+  // リッスンしていないとヘルスチェック/エッジプロキシがコンテナに到達できない。
+  // `PORT`を最優先し、未設定時のみ独自の`API_PORT`(ローカル開発用)にフォールバックする。
+  const port = Number(process.env.PORT) || Number(process.env.API_PORT) || 4000;
   await app.listen(port);
   // eslint-disable-next-line no-console
   console.log(`OVE Wallet API listening on port ${port} (Swagger: /api/docs)`);
