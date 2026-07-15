@@ -1,0 +1,230 @@
+name: Deploy (Railway API + Vercel frontends)
+
+# 手動実行のみ。このセッション(サンドボックス)のネットワークポリシーが
+# api.vercel.com / backboard.railway.com への直接アクセスを禁止しているため、
+# 実際のデプロイ操作はGitHub Actionsのランナー上で行う。
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_frontends:
+        description: "フロントエンド(Vercel)もデプロイする"
+        type: boolean
+        default: true
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    outputs:
+      api_url: ${{ steps.domain.outputs.api_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Authenticate
+        run: railway whoami
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+
+      - name: Link or create Railway project
+        id: link
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "既存プロジェクトにリンクします: ${{ secrets.RAILWAY_PROJECT_ID }}"
+            railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+          else
+            echo "新規プロジェクトを作成します (初回のみ)"
+            railway init --name ove-wallet-api --json | tee init-output.json
+            echo "=================================================================="
+            echo "重要: 上記JSONに含まれるプロジェクトIDを、GitHub Secretsに"
+            echo "RAILWAY_PROJECT_ID として登録してください。次回以降の実行で"
+            echo "同じプロジェクトを再利用するために必要です。"
+            echo "=================================================================="
+          fi
+          railway status --json || true
+
+      - name: Ensure PostgreSQL and Redis exist
+        id: databases
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          EXISTING=$(railway service list --json 2>/dev/null || echo "[]")
+          echo "既存サービス: $EXISTING"
+
+          if ! echo "$EXISTING" | grep -qi "postgres"; then
+            echo "PostgreSQLを追加します"
+            railway add --database postgres --json | tee postgres-output.json
+          else
+            echo "PostgreSQLは既に存在します"
+          fi
+
+          if ! echo "$EXISTING" | grep -qi "redis"; then
+            echo "Redisを追加します"
+            railway add --database redis --json | tee redis-output.json
+          else
+            echo "Redisは既に存在します"
+          fi
+
+      - name: Wait for database services to be ready
+        run: sleep 20
+
+      - name: Read DATABASE_URL / REDIS_URL and set API service variables
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          echo "サービス一覧を確認します:"
+          railway service list --json | tee services.json
+
+          POSTGRES_SERVICE=$(node -e "
+            const s = require('./services.json');
+            const found = s.find(x => /postgres/i.test(x.name));
+            if (!found) { console.error('postgres service not found'); process.exit(1); }
+            console.log(found.name);
+          ")
+          REDIS_SERVICE=$(node -e "
+            const s = require('./services.json');
+            const found = s.find(x => /redis/i.test(x.name));
+            if (!found) { console.error('redis service not found'); process.exit(1); }
+            console.log(found.name);
+          ")
+          echo "postgres service: $POSTGRES_SERVICE"
+          echo "redis service: $REDIS_SERVICE"
+
+          DATABASE_URL=$(railway variable list --service "$POSTGRES_SERVICE" --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const v = JSON.parse(d);
+              console.log(v.DATABASE_URL || v.DATABASE_PUBLIC_URL || '');
+            });
+          ")
+          REDIS_URL=$(railway variable list --service "$REDIS_SERVICE" --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const v = JSON.parse(d);
+              console.log(v.REDIS_URL || v.REDIS_PUBLIC_URL || '');
+            });
+          ")
+
+          if [ -z "$DATABASE_URL" ] || [ -z "$REDIS_URL" ]; then
+            echo "DATABASE_URL または REDIS_URL の取得に失敗しました"
+            exit 1
+          fi
+
+          railway variable set "DATABASE_URL=$DATABASE_URL" --service api --skip-deploys --json
+          railway variable set "REDIS_URL=$REDIS_URL" --service api --skip-deploys --json
+          railway variable set "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" --service api --skip-deploys --json
+          railway variable set "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" --service api --skip-deploys --json
+          railway variable set "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}" --service api --skip-deploys --json
+          railway variable set "RUN_SEED_ON_BOOT=true" --service api --skip-deploys --json
+          railway variable set "AUTH_MODE=mock" --service api --skip-deploys --json
+          railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
+          railway variable set "API_PORT=4000" --service api --skip-deploys --json
+
+      - name: Deploy API service
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: railway up --service api --ci --detach
+
+      - name: Generate public domain
+        id: domain
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          railway domain --service api --json | tee domain-output.json || true
+          DOMAIN=$(railway domain list --service api --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const list = JSON.parse(d);
+              const first = Array.isArray(list) ? list[0] : list;
+              console.log((first && (first.domain || first.url)) || '');
+            });
+          ")
+          if [ -z "$DOMAIN" ]; then
+            echo "ドメインの取得に失敗しました。domain-output.jsonを確認してください。"
+            cat domain-output.json || true
+            exit 1
+          fi
+          echo "api_url=https://$DOMAIN" >> "$GITHUB_OUTPUT"
+          echo "API URL: https://$DOMAIN"
+
+  deploy-frontends:
+    needs: deploy-api
+    if: ${{ inputs.deploy_frontends }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [user-wallet, admin-wallet]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Link Vercel project (creates on first run, reuses on later runs)
+        working-directory: apps/${{ matrix.app }}
+        run: vercel link --token="${{ secrets.VERCEL_TOKEN }}" --yes
+
+      - name: Set NEXT_PUBLIC_API_URL for this project
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          vercel env rm NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}" --yes || true
+          echo "${{ needs.deploy-api.outputs.api_url }}" | vercel env add NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Deploy to Vercel (production)
+        id: deploy
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          set -e
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          URL=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed ${{ matrix.app }} to: $URL"
+
+      - name: Save URL as artifact
+        run: |
+          mkdir -p /tmp/urls
+          echo "${{ steps.deploy.outputs.url }}" > /tmp/urls/${{ matrix.app }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vercel-url-${{ matrix.app }}
+          path: /tmp/urls/${{ matrix.app }}.txt
+
+  update-api-cors:
+    needs: [deploy-api, deploy-frontends]
+    if: ${{ inputs.deploy_frontends }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vercel-url-*
+          path: /tmp/urls
+          merge-multiple: false
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Update APP_URL / ADMIN_URL and restart API
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+          USER_URL=$(cat /tmp/urls/vercel-url-user-wallet/user-wallet.txt)
+          ADMIN_URL=$(cat /tmp/urls/vercel-url-admin-wallet/admin-wallet.txt)
+          echo "APP_URL=$USER_URL"
+          echo "ADMIN_URL=$ADMIN_URL"
+          railway variable set "APP_URL=$USER_URL" --service api --skip-deploys --json
+          railway variable set "ADMIN_URL=$ADMIN_URL" --service api --json
+          railway service restart --service api || true
+
+      - name: Summary
+        run: |
+          echo "### デプロイ完了" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: ${{ needs.deploy-api.outputs.api_url || '(update-api-corsのログ参照)' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- user-wallet: $(cat /tmp/urls/vercel-url-user-wallet/user-wallet.txt)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- admin-wallet: $(cat /tmp/urls/vercel-url-admin-wallet/admin-wallet.txt)" >> "$GITHUB_STEP_SUMMARY"

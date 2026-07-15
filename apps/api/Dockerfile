@@ -41,7 +41,9 @@ COPY --from=build /repo/node_modules ./node_modules
 COPY --from=build /repo/package.json ./package.json
 COPY --from=build /repo/packages ./packages
 COPY --from=build /repo/apps/api ./apps/api
+COPY apps/api/docker-entrypoint.sh /repo/docker-entrypoint.sh
+RUN chmod +x /repo/docker-entrypoint.sh
 WORKDIR /repo/apps/api
 EXPOSE 4000
 USER node
-CMD ["node", "dist/main.js"]
+ENTRYPOINT ["/repo/docker-entrypoint.sh"]

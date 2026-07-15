@@ -126,6 +126,61 @@ prune機能によるさらなる最小化は今回のスコープでは行って
 このドキュメント作成時にコンテナ外で個別に実行し、いずれも成功することを確認済み。
 実際にDockerが使える環境で `docker build` によるエンドツーエンドの検証を行うこと。
 
+`apps/api` のコンテナは `apps/api/docker-entrypoint.sh` を起点として起動し、毎回
+`prisma migrate deploy` (保留中のマイグレーション適用、冪等) を実行してからAPIを起動する。
+`RUN_SEED_ON_BOOT=true` を設定すると、起動時に `packages/database/src/seed.ts`
+(初期SUPER_ADMIN・付与ルール・外部サービス連携の初期レコード投入、すべてupsertで冪等)
+も実行する。初回デプロイ後は誤って再実行しないよう `RUN_SEED_ON_BOOT` を外すか
+`false` にしておくこと (実害はないが不要な処理を避けるため)。
+
+## GitHub Actions経由のデプロイ (Railway + Vercel)
+
+`.github/workflows/deploy.yml` (`workflow_dispatch` による手動実行) が、
+`apps/api` をRailwayへ、`apps/user-wallet`/`apps/admin-wallet` をVercelへデプロイする。
+
+**背景**: 開発コンテナのネットワークポリシーが `api.vercel.com`/`backboard.railway.com`
+への直接アクセスを禁止しているため、Claude Codeのセッション内から直接
+`vercel`/`railway` CLIでデプロイすることができない。そのため、実際のデプロイ操作は
+GitHub Actionsのランナー上 (別ネットワーク環境) で行う構成にした。
+
+### 必要なGitHub Secrets
+
+| Secret名 | 内容 |
+|---|---|
+| `RAILWAY_API_TOKEN` | Railwayのアカウントレベルトークン (Account Settings → Tokens) |
+| `RAILWAY_PROJECT_ID` | 初回実行後にRailwayが払い出すプロジェクトID (下記参照。初回のみ未設定でよい) |
+| `VERCEL_TOKEN` | Vercelのアカウントレベルトークン、Full Accountスコープ (Account Settings → Tokens) |
+| `SESSION_SECRET` | セッションCookie署名用のランダム値 (`openssl rand -hex 32`) |
+| `ENCRYPTION_KEY` | MFAシークレット・外部API署名シークレットの暗号化キー (`openssl rand -hex 32`) |
+| `SEED_ADMIN_PASSWORD` | 初期SUPER_ADMINのパスワード (任意の強いパスワード) |
+
+### 実行フロー
+
+1. **初回実行**: `RAILWAY_PROJECT_ID` 未設定の状態で実行すると、`deploy-api` ジョブが
+   新規Railwayプロジェクトを作成し、ログにプロジェクトIDを出力する。このIDを
+   `RAILWAY_PROJECT_ID` としてGitHub Secretsに登録する (以降の実行で同じプロジェクトを
+   再利用するために必須)。`deploy-frontends`/`update-api-cors` ジョブは
+   `RAILWAY_PROJECT_ID` が無いと失敗するが、これは想定内 (初回はプロジェクト作成のみで
+   十分)。
+2. **2回目以降の実行**: `RAILWAY_PROJECT_ID` を登録した状態で再実行すると、
+   `deploy-api` (既存プロジェクトへのリンク・PostgreSQL/Redisの確認・APIのビルド&
+   デプロイ・公開ドメイン発行) → `deploy-frontends` (user-wallet/admin-walletを
+   Vercelへビルド時に `NEXT_PUBLIC_API_URL` を埋め込んでデプロイ) →
+   `update-api-cors` (VercelのURLをAPI側の `APP_URL`/`ADMIN_URL` に反映し再起動)
+   の順に一気通貫で実行される。
+
+### このデプロイの制約
+
+- `AUTH_MODE=mock` で起動する。LINE/戦国パスポートSSOは本番連携が未実装のため、
+  `NODE_ENV=production` は設定しない (`assertAuthModeSafeForProduction` のガードに
+  引っかかるうえ、`AUTH_MODE=production` にしても実装自体はモックのままで実態と
+  合わなくなるため)。つまりこのデプロイは動作確認用であり、実ユーザー向けの
+  本番公開ではない。
+- PostgreSQL/Redisのサービス名検出 (`postgres`/`redis` を含む名前で判定) や
+  変数名 (`DATABASE_URL`/`REDIS_URL`) は、Railwayの標準テンプレートの命名を
+  前提にしている。将来Railway側の命名規則が変わった場合はワークフローの調整が
+  必要になる可能性がある。
+
 ## Swagger
 
 `apps/api` 起動後、`http://localhost:4000/api/docs` でOpenAPI定義を確認できる。
