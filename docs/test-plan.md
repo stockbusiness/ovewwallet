@@ -37,8 +37,9 @@
 | `revoke-sessions.test.ts` | 複数端末のセッションが一括で失効しTTL待ちでなく即401になること、セッションが既にない状態での再実行が0件で冪等に成功すること、存在しないアカウントで404、権限のないロールでの403拒否 |
 | `me-and-service-accounts.test.ts` | 旧`/api/v1/wallets/{oveAccountId}/*`が404になること、`/api/v1/me/*`がセッションから本人を特定し他人の残高・取引を返さないこと (取引詳細は他人のIDだと404)、`/api/v1/service/accounts/{externalUserId}/balance`が自サービスの利用者のみ照会でき他サービスの利用者は404、HMAC未署名は401 |
 | `common/assert-auth-mode.test.ts` | `NODE_ENV=production`かつ`AUTH_MODE`が`production`以外(未設定含む)なら起動ガードが例外を投げること、`AUTH_MODE=production`なら例外を投げないこと、production以外の環境ではAUTH_MODEに関わらず例外を投げないこと |
+| `outbox.test.ts` | Transactional Outbox (開発ガイドライン10章): `enqueue`が同一idempotencyKeyで二重登録しないこと、登録済みハンドラへの送信成功で`SENT`になること、失敗時に指数バックオフで再送され最大試行回数到達で`FAILED`になること、管理API経由の手動再送で`FAILED`→`PENDING`(試行回数0)にリセットされること、管理画面からのキュー一覧取得(連携先での絞り込み)・一括処理トリガー、未認証アクセスの401。Feature Flag (開発ガイドライン13章): 全フラグが既定でfalseであること、未認証アクセスの401 |
 
-**合計 42件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 50件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない
@@ -67,7 +68,10 @@
   「全セッションを無効化」を実行し、アクティブセッション数が更新され、実際にユーザー側の
   セッションが即座に使えなくなることを確認 → LINEログイン後にウォレットホーム・取引履歴が
   新しい `/api/v1/me/*` API経由で表示されること、旧`/api/v1/wallets/{oveAccountId}/*`が
-  404で応答しないことをブラウザから確認
+  404で応答しないことをブラウザから確認 → 外部連携キュー画面で、Feature Flagが7件とも
+  OFF表示されること、ダミーで投入した再送待ち/失敗/送信済みの3件が正しい日本語ステータスで
+  表示されること、失敗行の「手動再送」ボタンを実際にクリックし、試行回数が0にリセットされ
+  ステータスが再送待ちに戻ることを確認 (確認後、投入したダミーデータは削除)
 - 外部API: HMAC署名付きリクエストで rewards/grant, transactions/debit, reverse を実行し、
   正しい署名は成功、リプレイは401、上限超過・重複はそれぞれ想定通りのレスポンスになることを
   curl/Pythonスクリプトで確認
@@ -98,6 +102,12 @@
 10. 既存ユーザー移行のidempotencyKeyに `migration_batches.id` (実行のたびに新規生成される値)
     を含めていたため、同じCSVを再実行すると二重付与されてしまう不具合。CSV内容のSHA-256
     ハッシュ (実行のたびに変わらない値) を使うよう修正
+11. (テストコード自身のバグ) `outbox.test.ts` で2つの`describe`ブロックがそれぞれ独立に
+    `NestFactory.create(AppModule)`→`app.close()`を行っていたところ、`KeyValueStoreModule`の
+    Redisクライアントがモジュールレベルの共有シングルトンであるため、先に閉じた側の
+    `app.close()`がRedis接続自体を`quit()`してしまい、後段の`describe`が
+    `Error: Connection is closed.`で管理者ログインに失敗していた。同一テストファイル内では
+    Nest appを1つだけ生成し使い回すよう修正
 
 いずれも実際にAPIを呼び出して初めて発覚したものであり、修正後に自動テスト
 (回帰テストを追加したものを含む) と手動確認の両方で解消を確認済み。

@@ -191,3 +191,39 @@ export interface ReconciliationResult {
     difference: string;
   }>;
 }
+
+export interface OutboxEventItem {
+  id: string;
+  eventType: string;
+  aggregateType: string;
+  aggregateId: string;
+  destinationService: string;
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  attemptCount: number;
+  availableAt: string;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  createdAt: string;
+  processedAt: string | null;
+}
+
+export type FeatureFlags = Record<
+  | "ENABLE_PLATFORM_USER_ID"
+  | "ENABLE_WALLET_REFERRAL_TOKEN"
+  | "ENABLE_AGENCY_REFERRAL_SYNC"
+  | "ENABLE_AGENCY_SYNC_RETRY"
+  | "ENABLE_WALLET_REGISTRATION_BONUS"
+  | "ENABLE_EXTERNAL_REWARD_TYPES"
+  | "ENABLE_ONCHAIN_MIGRATION",
+  boolean
+>;
+
+export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
+  ENABLE_PLATFORM_USER_ID: "共通プラットフォームユーザーID",
+  ENABLE_WALLET_REFERRAL_TOKEN: "紹介トークン受け取り",
+  ENABLE_AGENCY_REFERRAL_SYNC: "代理店紹介関係の同期",
+  ENABLE_AGENCY_SYNC_RETRY: "代理店同期の自動再送",
+  ENABLE_WALLET_REGISTRATION_BONUS: "登録ボーナス連携",
+  ENABLE_EXTERNAL_REWARD_TYPES: "外部サービス起点の付与種別",
+  ENABLE_ONCHAIN_MIGRATION: "オンチェーン移行",
+};

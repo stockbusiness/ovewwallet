@@ -560,3 +560,40 @@ model BlockchainMigration {
   @@index([walletId])
   @@map("blockchain_migrations")
 }
+
+// =====================================================================
+// 9. 外部連携基盤 (開発ガイドライン10章): Transactional Outbox
+// =====================================================================
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+/// Transactional Outbox (開発ガイドライン10.1章)。業務トランザクション (OVEアカウント作成・
+/// 紹介状態更新など) と同一DBトランザクションでイベントを確定することで、外部システムへの
+/// 連携ジョブ登録前に障害が起きても連携予定データを失わないようにする。送信自体は非同期の
+/// ワーカー (OutboxService.processPendingEvents) が指数バックオフで再送する。
+model IntegrationOutbox {
+  id                 String       @id
+  eventType          String       @map("event_type")
+  aggregateType      String       @map("aggregate_type")
+  aggregateId        String       @map("aggregate_id")
+  destinationService String       @map("destination_service")
+  payload            Json
+  idempotencyKey     String       @unique @map("idempotency_key")
+  status             OutboxStatus @default(PENDING)
+  attemptCount       Int          @default(0) @map("attempt_count")
+  availableAt        DateTime     @default(now()) @map("available_at")
+  lockedAt           DateTime?    @map("locked_at")
+  lastErrorCode      String?      @map("last_error_code")
+  lastErrorMessage   String?      @map("last_error_message")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  processedAt        DateTime?    @map("processed_at")
+
+  @@index([status, availableAt])
+  @@index([destinationService])
+  @@map("integration_outbox")
+}

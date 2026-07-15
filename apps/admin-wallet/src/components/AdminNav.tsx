@@ -16,6 +16,7 @@ const LINKS = [
   { href: "/approval-requests", label: "二段階承認" },
   { href: "/audit-logs", label: "操作ログ" },
   { href: "/api-access-logs", label: "APIアクセスログ" },
+  { href: "/outbox", label: "外部連携キュー" },
   { href: "/security", label: "セキュリティ設定" },
 ];
 

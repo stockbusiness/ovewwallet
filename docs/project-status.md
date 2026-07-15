@@ -21,7 +21,7 @@ packages/
 
 PostgreSQL 16 + Redis (KVストア、未設定時はインメモリへフォールバック) を使用。
 DBスキーマ・API・管理画面・ユーザー画面のすべてに対して、実DBに対する自動テスト
-(現時点で API 42件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計88件、すべて成功)
+(現時点で API 50件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計96件、すべて成功)
 と、実ブラウザ (Playwright) での動作確認を行っています。
 
 ## 2. 実装済み機能
@@ -61,7 +61,8 @@ DBスキーマ・API・管理画面・ユーザー画面のすべてに対して
 連携・操作ログ・全セッション無効化)、ウォレット一覧・詳細、取引一覧・取消、CSV一括付与、
 付与ルール管理、外部サービス管理、既存ユーザー移行、アカウント統合、二段階承認
 (高額操作の職務分離)、操作ログ、APIアクセスログ、セキュリティ設定 (**管理者MFA**:
-RFC 6238準拠のTOTP二要素認証、外部ライブラリ非依存で自前実装)。
+RFC 6238準拠のTOTP二要素認証、外部ライブラリ非依存で自前実装)、**外部連携キュー**
+(Transactional Outboxの一覧・ステータス/連携先での絞り込み・手動再送・Feature Flag確認)。
 
 ### 2.5 ユーザー向けウォレット画面 (`apps/user-wallet`, スマートフォン優先)
 「戦国ウォレット UIデザイン仕様 v1.0」(黒・濃紺・金・深紅を基調としたデザイン) で
@@ -124,10 +125,25 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
   - `NODE_ENV=production` かつ `AUTH_MODE` が `production` 以外ならアプリ起動を
     失敗させるガードを追加 (モック認証のまま本番稼働することを防止)。
   - 詳細: `docs/security.md`, `docs/external-api.md`, `docs/authentication.md`
+- **Phase 1.5 (素地インフラ: Transactional Outbox・Feature Flag) — 完了**:
+  代理店システム側の実装と並行して進められる、契約仕様に依存しない基盤部分のみ着手
+  (ガイドライン10章・13章)。
+  - `integration_outbox` テーブルと `OutboxService` を実装。`enqueue()`は既存の業務トランザクション
+    内から呼び出す想定の冪等な登録 (同一`idempotencyKey`では重複登録しない)、
+    `processPendingEvents()`は宛先ハンドラへの送信・失敗時の指数バックオフ再送
+    (最大8回、最終的に`FAILED`)を行う。宛先ハンドラは`registerDestination()`で後から
+    差し込む方式 (LINE/SSOのモック→実装差し替えパターンと同様)。実際の代理店連携先
+    ハンドラはまだ登録されていない (キューの土台のみ)。
+  - Feature Flag基盤 (`ENABLE_PLATFORM_USER_ID`等7個、すべて既定false) を実装。
+    どのコードもまだこれらのフラグを参照しておらず、OFFのままで既存機能に影響しないことを
+    自動テストで確認済み。
+  - 管理画面に「外部連携キュー」画面を追加 (キュー一覧・ステータス/連携先での絞り込み・
+    試行回数・最終エラー内容・手動再送・Feature Flag確認)。
+  - **紹介情報受入 (ref_token/referral_session) や代理店システムとの実際の通信は含まれない**。
+    これらはガイドライン19章の指示通り、代理店システム側の仕様が固まった時点で改めて
+    現状調査と影響範囲をMarkdownにまとめてから着手します。
 - **Phase 2以降 (紹介情報受入基盤・代理店紹介同期・登録特典連動・外部サービス本番連携) —
-  未着手**: `referral_session`/`agency_referral_links`/Transactional Outbox/Feature Flag
-  基盤はまだ存在しません。着手する際は、ガイドライン19章の指示通り、現状調査と影響範囲を
-  Markdownにまとめてから実装します。
+  未着手**: `referral_session`/`agency_referral_links`はまだ存在しません。
 
 ## 6. 未実装・今後の課題
 
@@ -149,6 +165,7 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 | `docs/authentication.md` | 認証設計 (MFA・利用規約同意を含む) |
 | `docs/ledger-rules.md` | 台帳ルール・整合性チェック |
 | `docs/external-api.md` | 外部サービスAPI仕様 (代理店連携の土台) |
+| `docs/integration-outbox.md` | Transactional Outbox・Feature Flag基盤 |
 | `docs/admin-operations.md` | 管理画面の全画面説明 |
 | `docs/ui-design.md` | 戦国ウォレットデザインシステム |
 | `docs/security.md` | セキュリティ対策と既知の課題 |

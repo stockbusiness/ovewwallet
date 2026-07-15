@@ -36,6 +36,17 @@ const envSchema = z.object({
   // NODE_ENV=production では AUTH_MODE=production の明示指定を必須とする
   // (apps/api/src/common/assert-auth-mode.ts が起動時に検証する)。
   AUTH_MODE: z.enum(["mock", "production"]).default("mock"),
+
+  // Feature Flag (開発ガイドライン13章): すべて既定でfalse。"true" を設定した場合のみ有効
+  // (apps/api/src/common/feature-flags.ts が実際の判定に使う真実源であり、こちらは
+  // .env.example との1:1対応を保つためのドキュメント目的のスキーマ)。
+  ENABLE_PLATFORM_USER_ID: z.enum(["true", "false"]).default("false"),
+  ENABLE_WALLET_REFERRAL_TOKEN: z.enum(["true", "false"]).default("false"),
+  ENABLE_AGENCY_REFERRAL_SYNC: z.enum(["true", "false"]).default("false"),
+  ENABLE_AGENCY_SYNC_RETRY: z.enum(["true", "false"]).default("false"),
+  ENABLE_WALLET_REGISTRATION_BONUS: z.enum(["true", "false"]).default("false"),
+  ENABLE_EXTERNAL_REWARD_TYPES: z.enum(["true", "false"]).default("false"),
+  ENABLE_ONCHAIN_MIGRATION: z.enum(["true", "false"]).default("false"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

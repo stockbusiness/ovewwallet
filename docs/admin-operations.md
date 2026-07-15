@@ -21,6 +21,7 @@
 | APIアクセスログ | `/api-access-logs` | 外部サービスAPI (指示書11章) へのリクエスト履歴。認証失敗 (401) も含む。ステータスコードで絞り込み可 |
 | アカウント詳細 | `/accounts/[accountId]` | 基本情報・連携ID・外部サービス連携・ウォレットへのリンク・当該アカウントの操作ログ |
 | セキュリティ設定 | `/security` | 自分自身のMFA (二要素認証) の設定・有効化・無効化 (`docs/authentication.md` 参照) |
+| 外部連携キュー | `/outbox` | Transactional Outboxの一覧・ステータス/連携先での絞り込み・試行回数/最終エラー確認・手動再送・Feature Flag確認 (`docs/integration-outbox.md` 参照) |
 
 ## 外部サービス緊急停止 (指示書5章)
 
