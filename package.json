@@ -14,6 +14,7 @@
     "test": "pnpm -r --filter=!@ove/e2e test",
     "test:ledger": "pnpm --filter @ove/ledger test",
     "test:e2e": "pnpm --filter @ove/e2e test",
+    "test:load": "node tests/load/run.mjs",
     "lint": "pnpm -r lint",
     "db:generate": "pnpm --filter @ove/database generate",
     "db:migrate": "pnpm --filter @ove/database migrate",

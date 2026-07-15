@@ -79,6 +79,7 @@ pnpm --filter @ove/auth test      # 認証ユーティリティの単体テス�
 pnpm --filter @ove/ledger test    # 台帳コアの単体・統合テスト (実PostgreSQL接続が必要)
 pnpm --filter @ove/api test       # APIのE2Eテスト (実PostgreSQL接続が必要)
 pnpm test:e2e                     # ブラウザE2E (Playwright、実DB+3アプリ起動が必要。tests/e2e/README.md参照)
+pnpm test:load                    # 簡易負荷・レート制限限界値テスト (apps/apiの起動が必要。docs/test-plan.md参照)
 ```
 
 事前に `.env.test` (DATABASE_URL等をテスト用DBに向けたもの) を用意し、
