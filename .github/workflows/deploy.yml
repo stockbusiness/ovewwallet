@@ -1,15 +1,26 @@
-name: Deploy (Railway API + Vercel frontends)
+name: Deploy (Railway API)
 
 # 手動実行のみ。このセッション(サンドボックス)のネットワークポリシーが
-# api.vercel.com / backboard.railway.com への直接アクセスを禁止しているため、
+# backboard.railway.com への直接アクセスを禁止しているため、
 # 実際のデプロイ操作はGitHub Actionsのランナー上で行う。
+#
+# フロントエンド(user-wallet/admin-wallet)は、Vercel CLIによるCLIデプロイが
+# pnpmモノレポとの相性問題(依存関係トレース失敗、アップロード範囲の制限等)を
+# 繰り返し起こしたため、Vercelダッシュボードの「GitHubリポジトリのインポート」
+# 機能によるGit連携デプロイに切り替えた(docs/deployment.md参照)。そのため
+# このワークフローはAPIのみをデプロイする。フロントエンドのURLが決まったら
+# 下記app_url/admin_urlを指定して再実行し、APIのCORS設定を更新する。
 on:
   workflow_dispatch:
     inputs:
-      deploy_frontends:
-        description: "フロントエンド(Vercel)もデプロイする"
-        type: boolean
-        default: true
+      app_url:
+        description: "user-walletのVercel本番URL (CORS更新用。空なら更新しない)"
+        type: string
+        default: ""
+      admin_url:
+        description: "admin-walletのVercel本番URL (CORS更新用。空なら更新しない)"
+        type: string
+        default: ""
 
 jobs:
   deploy-api:
@@ -203,76 +214,12 @@ jobs:
           railway logs --service api --deployment --lines 200 --latest || true
           exit 1
 
-  deploy-frontends:
-    needs: deploy-api
-    if: ${{ inputs.deploy_frontends }}
-    runs-on: ubuntu-latest
-    environment: RAILWAY
-    strategy:
-      matrix:
-        app: [user-wallet, admin-wallet]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Enable pnpm
-        run: corepack enable && corepack prepare pnpm@10.33.0 --activate
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Link Vercel project (creates on first run, reuses on later runs)
-        working-directory: apps/${{ matrix.app }}
-        run: vercel link --token="${{ secrets.VERCEL_TOKEN }}" --yes
-
-      - name: Set NEXT_PUBLIC_API_URL for this project
-        working-directory: apps/${{ matrix.app }}
-        run: |
-          vercel env rm NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}" --yes || true
-          echo "${{ needs.deploy-api.outputs.api_url }}" | vercel env add NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}"
-
-      - name: Move Vercel project link to repo root
-        run: |
-          # `vercel deploy`はコマンドを実行したディレクトリ配下だけをアップロードする。
-          # apps/${{ matrix.app }}の中から実行するとそのサブディレクトリの中身しか
-          # アップロードされず、リポジトリルートのpnpm-lock.yaml/pnpm-workspace.yamlや
-          # 他のワークスペースパッケージが含まれずnpmにフォールバックして失敗する
-          # (workspace:*プロトコルをnpmは解決できない)。
-          # そこで、`vercel link`で作られたプロジェクト紐付け情報(Root Directoryは
-          # 既にapps/${{ matrix.app }}に設定済み)をリポジトリルートに移動し、
-          # ルートから実行することでモノレポ全体をアップロードしつつ、Vercel側が
-          # サーバー側のRoot Directory設定に従って正しいサブディレクトリをビルドする。
-          mv "apps/${{ matrix.app }}/.vercel" .vercel
-
-      - name: Deploy to Vercel (production)
-        id: deploy
-        run: |
-          set -e
-          URL=$(vercel deploy --prod --token="${{ secrets.VERCEL_TOKEN }}")
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Deployed ${{ matrix.app }} to: $URL"
-
-      - name: Save URL as artifact
-        run: |
-          mkdir -p /tmp/urls
-          echo "${{ steps.deploy.outputs.url }}" > /tmp/urls/${{ matrix.app }}.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vercel-url-${{ matrix.app }}
-          path: /tmp/urls/${{ matrix.app }}.txt
-
   update-api-cors:
-    needs: [deploy-api, deploy-frontends]
-    if: ${{ inputs.deploy_frontends }}
+    needs: deploy-api
+    if: ${{ inputs.app_url != '' && inputs.admin_url != '' }}
     runs-on: ubuntu-latest
     environment: RAILWAY
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: vercel-url-*
-          path: /tmp/urls
-          merge-multiple: false
-
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
@@ -282,17 +229,15 @@ jobs:
         run: |
           set -e
           railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
-          USER_URL=$(cat /tmp/urls/vercel-url-user-wallet/user-wallet.txt)
-          ADMIN_URL=$(cat /tmp/urls/vercel-url-admin-wallet/admin-wallet.txt)
-          echo "APP_URL=$USER_URL"
-          echo "ADMIN_URL=$ADMIN_URL"
-          railway variable set "APP_URL=$USER_URL" --service api --skip-deploys --json
-          railway variable set "ADMIN_URL=$ADMIN_URL" --service api --json
+          echo "APP_URL=${{ inputs.app_url }}"
+          echo "ADMIN_URL=${{ inputs.admin_url }}"
+          railway variable set "APP_URL=${{ inputs.app_url }}" --service api --skip-deploys --json
+          railway variable set "ADMIN_URL=${{ inputs.admin_url }}" --service api --json
           railway service restart --service api || true
 
       - name: Summary
         run: |
-          echo "### デプロイ完了" >> "$GITHUB_STEP_SUMMARY"
-          echo "- API: ${{ needs.deploy-api.outputs.api_url || '(update-api-corsのログ参照)' }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- user-wallet: $(cat /tmp/urls/vercel-url-user-wallet/user-wallet.txt)" >> "$GITHUB_STEP_SUMMARY"
-          echo "- admin-wallet: $(cat /tmp/urls/vercel-url-admin-wallet/admin-wallet.txt)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### CORS設定を更新しました" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: ${{ needs.deploy-api.outputs.api_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- APP_URL: ${{ inputs.app_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ADMIN_URL: ${{ inputs.admin_url }}" >> "$GITHUB_STEP_SUMMARY"

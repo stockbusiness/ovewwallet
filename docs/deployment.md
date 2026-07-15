@@ -133,41 +133,74 @@ prune機能によるさらなる最小化は今回のスコープでは行って
 も実行する。初回デプロイ後は誤って再実行しないよう `RUN_SEED_ON_BOOT` を外すか
 `false` にしておくこと (実害はないが不要な処理を避けるため)。
 
-## GitHub Actions経由のデプロイ (Railway + Vercel)
+## デプロイ構成 (Railway API + Vercel フロントエンド)
 
-`.github/workflows/deploy.yml` (`workflow_dispatch` による手動実行) が、
-`apps/api` をRailwayへ、`apps/user-wallet`/`apps/admin-wallet` をVercelへデプロイする。
+APIは GitHub Actions (`.github/workflows/deploy.yml`, `workflow_dispatch` による
+手動実行) からRailwayへデプロイする。フロントエンド (`apps/user-wallet` /
+`apps/admin-wallet`) はVercel CLIによるCI経由デプロイを試みたが、pnpmモノレポとの
+相性問題 (依存関係トレース失敗、`vercel deploy`のアップロード範囲がカレント
+ディレクトリ配下に限定される問題等) を繰り返し起こしたため、**Vercelダッシュボードの
+GitHubリポジトリインポート機能によるGit連携デプロイ**に切り替えた。Vercelの
+Git連携はモノレポを丸ごとクローンしたうえでRoot Directory設定に従ってビルドする
+ため、CLIで起きていた「モノレポの一部だけがアップロードされる」問題が発生しない。
 
-**背景**: 開発コンテナのネットワークポリシーが `api.vercel.com`/`backboard.railway.com`
-への直接アクセスを禁止しているため、Claude Codeのセッション内から直接
-`vercel`/`railway` CLIでデプロイすることができない。そのため、実際のデプロイ操作は
-GitHub Actionsのランナー上 (別ネットワーク環境) で行う構成にした。
+### APIのデプロイ (GitHub Actions)
 
-### 必要なGitHub Secrets
+**背景**: 開発コンテナのネットワークポリシーが `backboard.railway.com` への
+直接アクセスを禁止しているため、Claude Codeのセッション内から直接 `railway`
+CLIでデプロイすることができない。そのため、実際のデプロイ操作はGitHub Actionsの
+ランナー上 (別ネットワーク環境) で行う構成にした。
+
+#### 必要なGitHub Secrets
 
 | Secret名 | 内容 |
 |---|---|
 | `RAILWAY_API_TOKEN` | Railwayのアカウントレベルトークン (Account Settings → Tokens) |
 | `RAILWAY_PROJECT_ID` | 初回実行後にRailwayが払い出すプロジェクトID (下記参照。初回のみ未設定でよい) |
-| `VERCEL_TOKEN` | Vercelのアカウントレベルトークン、Full Accountスコープ (Account Settings → Tokens) |
 | `SESSION_SECRET` | セッションCookie署名用のランダム値 (`openssl rand -hex 32`) |
 | `ENCRYPTION_KEY` | MFAシークレット・外部API署名シークレットの暗号化キー (`openssl rand -hex 32`) |
 | `SEED_ADMIN_PASSWORD` | 初期SUPER_ADMINのパスワード (任意の強いパスワード) |
 
-### 実行フロー
+#### 実行フロー
 
 1. **初回実行**: `RAILWAY_PROJECT_ID` 未設定の状態で実行すると、`deploy-api` ジョブが
    新規Railwayプロジェクトを作成し、ログにプロジェクトIDを出力する。このIDを
    `RAILWAY_PROJECT_ID` としてGitHub Secretsに登録する (以降の実行で同じプロジェクトを
-   再利用するために必須)。`deploy-frontends`/`update-api-cors` ジョブは
-   `RAILWAY_PROJECT_ID` が無いと失敗するが、これは想定内 (初回はプロジェクト作成のみで
-   十分)。
+   再利用するために必須)。
 2. **2回目以降の実行**: `RAILWAY_PROJECT_ID` を登録した状態で再実行すると、
    `deploy-api` (既存プロジェクトへのリンク・PostgreSQL/Redisの確認・APIのビルド&
-   デプロイ・公開ドメイン発行) → `deploy-frontends` (user-wallet/admin-walletを
-   Vercelへビルド時に `NEXT_PUBLIC_API_URL` を埋め込んでデプロイ) →
-   `update-api-cors` (VercelのURLをAPI側の `APP_URL`/`ADMIN_URL` に反映し再起動)
-   の順に一気通貫で実行される。
+   デプロイ・公開ドメイン発行・ヘルスチェック待機) が実行される。
+3. フロントエンドのVercel URLが決まったら (下記参照)、同じワークフローを
+   `app_url`/`admin_url` 入力欄にそれぞれのURLを指定して再実行する。
+   `update-api-cors` ジョブが走り、API側の `APP_URL`/`ADMIN_URL` (CORS許可オリジン)
+   を更新してAPIを再起動する。
+
+### フロントエンドのデプロイ (Vercelダッシュボード)
+
+`user-wallet`/`admin-wallet` それぞれについて、Vercelダッシュボードで以下の手順を行う
+(このリポジトリを操作するセッションからは実行できないため、ユーザー側での作業が必要)。
+
+1. [Vercel Dashboard](https://vercel.com/new) → **Add New → Project** →
+   このGitHubリポジトリ (`stockbusiness/ovewwallet`) をImport する。
+   同じリポジトリに対して**2つ**プロジェクトを作成する (user-wallet用・admin-wallet用)。
+2. インポート時の設定画面で:
+   - **Root Directory**: `apps/user-wallet` (もう一方は `apps/admin-wallet`) を指定する
+     (「Edit」→ 該当ディレクトリを選択)。
+   - **Framework Preset**: Next.js が自動検出される。
+   - **Build Command / Install Command**: デフォルトのままでよい
+     (Root Directoryにpnpm-lock.yamlがモノレポルートにあることをVercelが検出し、
+     自動的にpnpmでインストールする)。
+3. **Environment Variables** に `NEXT_PUBLIC_API_URL` を追加し、Railwayでデプロイした
+   APIのURL (例: `https://api-production-xxxx.up.railway.app`) を設定する
+   (Production環境のみでよい)。
+4. **Deploy** をクリックすると、Vercelが自動的にビルド・デプロイを行う。
+   完了後に表示される本番URL (`https://<project-name>-xxxx.vercel.app` または
+   カスタムドメイン) を控えておく。
+5. 以降、このリポジトリの対象ブランチ (Vercelプロジェクト設定の
+   **Production Branch**で指定したブランチ) にpushするたびに、Vercelが自動的に
+   再ビルド・再デプロイする (GitHub Actionsを経由する必要はない)。
+6. 2つのURLが揃ったら、上記「APIのデプロイ」手順3の通り、`deploy.yml` を
+   `app_url`/`admin_url` を指定して再実行し、APIのCORS設定を更新する。
 
 ### このデプロイの制約
 
