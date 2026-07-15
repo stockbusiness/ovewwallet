@@ -135,6 +135,12 @@ jobs:
           railway variable set "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}" --service api --skip-deploys --json
           railway variable set "RUN_SEED_ON_BOOT=true" --service api --skip-deploys --json
           railway variable set "AUTH_MODE=mock" --service api --skip-deploys --json
+          # この環境はLINE/SSO本番実装が未接続の「検証用デプロイ」なので、モック認証で動かす。
+          # DockerfileはENV NODE_ENV=productionを設定しているが、本番ガード
+          # (assertAuthModeSafeForProduction)がNODE_ENV=production + AUTH_MODE=mockの
+          # 組み合わせを意図的に起動拒否するため、ランタイム変数でNODE_ENV=stagingに
+          # 上書きし「本番ではない」ことを明示する(Railwayの変数はイメージのENVより優先)。
+          railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
           railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
           # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
           # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
