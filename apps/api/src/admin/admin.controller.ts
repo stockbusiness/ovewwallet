@@ -403,7 +403,11 @@ export class AdminController {
     return this.migration.execute(body.csvContent, body.fileName, body.batchName, req.admin.id, body.verifiedBy);
   }
 
-  /** アカウント統合 (指示書6章・13章)。高額操作に準じ SUPER_ADMIN のみ許可する。 */
+  /**
+   * アカウント統合 (指示書6章・13章)。SUPER_ADMINのみ申請可能で、金額によらず常に
+   * 二段階承認 (申請者と別の管理者による承認、`approval-requests/:id/approve`) を経てから
+   * 実際の統合が実行される。この呼び出し自体では統合は行われない。
+   */
   @Post("accounts/merge")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN")
@@ -411,10 +415,10 @@ export class AdminController {
     @Body(new ZodValidationPipe(AccountMergeSchema)) body: z.infer<typeof AccountMergeSchema>,
     @Req() req: AuthenticatedAdminRequest,
   ) {
-    return this.accountMerge.merge({ ...body, adminId: req.admin.id });
+    return this.accountMerge.requestMerge({ ...body, adminId: req.admin.id });
   }
 
-  /** 二段階承認 (指示書13章): 高額付与・高額減算の申請一覧。 */
+  /** 二段階承認 (指示書13章): 高額付与・高額減算・アカウント統合の申請一覧。 */
   @Get("approval-requests")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "OVE_OPERATOR", "AUDITOR")

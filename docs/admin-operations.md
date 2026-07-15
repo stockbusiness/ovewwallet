@@ -37,8 +37,14 @@
 
 ## アカウント統合 (指示書6章・13章)
 
-`POST /api/v1/admin/accounts/merge` (`packages/ledger/src/merge.ts` の
-`mergeAccounts()`) が以下をすべて1つのDBトランザクション内で行う:
+`POST /api/v1/admin/accounts/merge` は統合を**申請するだけ**で、即座には実行されない。
+金額によらず常に二段階承認 (下記「二段階承認」参照) の対象であり、`SUPER_ADMIN` が申請、
+別の `SUPER_ADMIN`/`OVE_OPERATOR` が承認して初めて実際の統合が実行される
+(`{ result: "PENDING_APPROVAL", approvalRequestId }` を返す)。管理画面
+(`/accounts/merge`) では申請送信後、二段階承認画面へのリンクを表示する。
+
+承認 (`POST /api/v1/admin/approval-requests/:id/approve`) が実行されると、
+`packages/ledger/src/merge.ts` の `mergeAccounts()` が以下をすべて1つのDBトランザクション内で行う:
 
 1. 統合元・統合先の両ウォレットを (デッドロック回避のためID昇順で) 行ロックする。
 2. 統合元の `available_balance` を統合先へ全額移管する
@@ -48,41 +54,48 @@
 5. 統合元 `ove_accounts.status = MERGED`, `merged_into_account_id = 統合先ID` を設定する。
 
 `idempotencyKey` は `ACCOUNT_MERGE:${sourceId}:${targetId}` で固定するため、同じ統合を
-再実行しても冪等に成功する (二重の残高移管は発生しない)。同じ統合元を**別の**統合先へ
-再度統合しようとした場合はエラーになる。管理画面では実行前に確認ダイアログを挟む
-(取り消せない操作であるため)。高額操作に準じ `SUPER_ADMIN` ロールのみ実行できる。
-E2Eテスト (`apps/api/src/e2e/account-merge.test.ts`) と、実ブラウザでの操作確認
-(残高移管・identity付け替え・整合性チェックが0件のままであること) を実施済み。
+再度申請・承認しても冪等に成功する (二重の残高移管は発生しない)。同じ統合元を**別の**
+統合先へ再度統合しようとした場合はエラーになる。
+E2Eテスト (`apps/api/src/e2e/account-merge.test.ts`、`apps/api/src/e2e/account-detail.test.ts`)
+と、実ブラウザでの操作確認 (2つの別々の管理者セッションで申請→承認まで実行し、残高移管・
+identity付け替え・整合性チェックが0件のままであることを確認) を実施済み。
 
 ## 二段階承認 (指示書13章)
 
-`packages/database` の `approval_requests` テーブルを使い、高額付与・高額減算を対象に
-基本ワークフローを実装した (`apps/api/src/admin/admin-approval.service.ts`)。
+`packages/database` の `approval_requests` テーブルを使い、高額付与・高額減算・
+アカウント統合を対象に基本ワークフローを実装した (`apps/api/src/admin/admin-approval.service.ts`)。
 
-- しきい値: `HIGH_VALUE_THRESHOLD` 環境変数 (デフォルト 50,000 OVE)。
-- `POST /api/v1/admin/wallets/grant`/`deduct` は、金額がしきい値**以上**の場合、
-  即時実行せず `approval_requests` に `status: PENDING` の申請を作成し、
-  `{ result: "PENDING_APPROVAL", approvalRequestId }` を返す (しきい値未満は従来通り
-  `{ result: "COMPLETED", transaction: {...} }` で即時実行される)。
-- `GET /api/v1/admin/approval-requests` — 一覧 (承認待ち/履歴)。
-- `POST /api/v1/admin/approval-requests/:id/approve` — 承認して実際に
-  `creditWallet`/`debitWallet` を実行する。**申請者本人は承認できない**
-  (職務分離。同一管理者IDでの承認は400エラー)。
-- `POST /api/v1/admin/approval-requests/:id/reject` — 却下 (理由必須)。ウォレットは
+- しきい値方式 (高額付与・高額減算): `HIGH_VALUE_THRESHOLD` 環境変数
+  (デフォルト 50,000 OVE)。`POST /api/v1/admin/wallets/grant`/`deduct` は、
+  金額がしきい値**以上**の場合、即時実行せず `approval_requests` に
+  `status: PENDING` の申請を作成し、`{ result: "PENDING_APPROVAL", approvalRequestId }`
+  を返す (しきい値未満は従来通り `{ result: "COMPLETED", transaction: {...} }` で
+  即時実行される)。
+- 全件対象方式 (アカウント統合): 残高・連携情報の移管を伴い取り消せない操作のため、
+  金額によらず常に承認が必要。`POST /api/v1/admin/accounts/merge` は常に
+  `{ result: "PENDING_APPROVAL", approvalRequestId }` を返し、即時実行はしない
+  (`docs/admin-operations.md` の「アカウント統合」参照)。
+- `GET /api/v1/admin/approval-requests` — 一覧 (承認待ち/履歴)。種別ごとに
+  `payload` の形が異なる (高額付与/減算は `{ kind, walletId, amount, reason }`、
+  アカウント統合は `{ kind: "ACCOUNT_MERGE", sourceAccountCode, targetAccountCode, reason }`)。
+- `POST /api/v1/admin/approval-requests/:id/approve` — `approvalRequest.requestType`
+  に応じて `creditWallet`/`debitWallet`/`mergeAccounts` のいずれかを実際に実行する。
+  **申請者本人は承認できない** (職務分離。同一管理者IDでの承認は400エラー)。
+- `POST /api/v1/admin/approval-requests/:id/reject` — 却下 (理由必須)。対象の状態は
   一切変更されない。
 - 承認・却下・申請作成はすべて監査ログに記録される
   (`APPROVAL_REQUEST_CREATED`/`APPROVED`/`REJECTED`)。
 
-E2Eテスト (`apps/api/src/e2e/approval-workflow.test.ts`) で、しきい値以上の付与が
-保留されること・残高が変化しないこと・申請者本人による承認が拒否されること・別の
-管理者が承認すると実際に残高が反映されること・却下すると残高が変化しないこと・
+E2Eテスト (`apps/api/src/e2e/approval-workflow.test.ts`、`apps/api/src/e2e/account-merge.test.ts`、
+`apps/api/src/e2e/account-detail.test.ts`) で、しきい値以上の付与・アカウント統合いずれも
+保留されること・承認までは対象の状態が変化しないこと・申請者本人による承認が拒否されること・
+別の管理者が承認すると実際に反映されること・却下すると状態が変化しないこと・
 承認済み申請の再承認が拒否されることを検証済み。加えて、2つの別々の管理者セッションで
 実ブラウザから申請→承認まで操作し、動作を確認済み。
 
-**MVPでの制約**: `approval_requests.request_type` にはアカウント統合・オンチェーン移行・
-外部ウォレット変更・APIサービス上限変更の値も用意しているが、これらを本ワークフローに
-乗せる実装 (申請→承認の強制) は未着手。アカウント統合は現状 `SUPER_ADMIN` による
-即時実行のままである (`docs/admin-operations.md` の「アカウント統合」参照)。
+**残る制約**: `approval_requests.request_type` にはオンチェーン移行・外部ウォレット変更・
+APIサービス上限変更の値も用意しているが、これらを本ワークフローに乗せる実装
+(申請→承認の強制) は未着手 (対応する機能自体が本リポジトリにまだ実装されていないため)。
 
 ## 取引一覧・取引取消 (指示書13章)
 

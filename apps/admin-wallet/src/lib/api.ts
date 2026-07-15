@@ -177,7 +177,14 @@ export interface ApprovalRequestItem {
   approvedBy: string | null;
   decidedAt: string | null;
   rejectionReason: string | null;
-  payload: { kind: string; walletId: string; amount: string; reason: string };
+  payload:
+    | { kind: "HIGH_VALUE_GRANT" | "HIGH_VALUE_DEDUCTION"; walletId: string; amount: string; reason: string }
+    | {
+        kind: "ACCOUNT_MERGE";
+        sourceAccountCode: string;
+        targetAccountCode: string;
+        reason: string;
+      };
 }
 
 export interface ReconciliationResult {

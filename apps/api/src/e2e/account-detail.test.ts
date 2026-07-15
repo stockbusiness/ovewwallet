@@ -120,10 +120,34 @@ describe("アカウント詳細画面 (指示書13章)", () => {
     const source = await createTestAccount(200);
     const target = await createTestAccount(0);
 
-    await request(app.getHttpServer())
+    // アカウント統合は二段階承認が必須 (申請者と別の管理者が承認するまで実行されない)
+    const approverEmail = `e2e-accountdetail-approver-${generateId()}@ovewallet.local`;
+    const approverPassword = "e2e-test-password-123";
+    await prisma.adminUser.create({
+      data: {
+        id: generateId(),
+        adminCode: `OVE-ADM-${generateId()}`,
+        email: approverEmail,
+        passwordHash: hashSecret(approverPassword),
+        role: "SUPER_ADMIN",
+        displayName: "E2E AccountDetail Approver",
+      },
+    });
+    const approverLoginRes = await request(app.getHttpServer())
+      .post("/api/v1/admin/login")
+      .send({ email: approverEmail, password: approverPassword })
+      .expect(201);
+    const approverCookie = approverLoginRes.headers["set-cookie"] as unknown as string[];
+
+    const mergeRequestRes = await request(app.getHttpServer())
       .post("/api/v1/admin/accounts/merge")
       .set("Cookie", adminCookie)
       .send({ sourceAccountCode: source.accountCode, targetAccountCode: target.accountCode, reason: "詳細画面テスト" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/approval-requests/${mergeRequestRes.body.approvalRequestId}/approve`)
+      .set("Cookie", approverCookie)
       .expect(201);
 
     const res = await request(app.getHttpServer())

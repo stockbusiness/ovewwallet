@@ -8,7 +8,15 @@ import { apiFetch, ApiError, type ApprovalRequestItem } from "@/lib/api";
 const KIND_LABEL: Record<string, string> = {
   HIGH_VALUE_GRANT: "高額付与",
   HIGH_VALUE_DEDUCTION: "高額減算",
+  ACCOUNT_MERGE: "アカウント統合",
 };
+
+function formatDetail(r: ApprovalRequestItem): string {
+  if (r.payload.kind === "ACCOUNT_MERGE") {
+    return `${r.payload.sourceAccountCode} → ${r.payload.targetAccountCode}`;
+  }
+  return `${Number(r.payload.amount).toLocaleString("ja-JP")} OVE`;
+}
 
 export default function ApprovalRequestsPage() {
   const router = useRouter();
@@ -62,7 +70,8 @@ export default function ApprovalRequestsPage() {
       <main className="mx-auto max-w-5xl p-6">
         <h1 className="mb-1 text-xl font-bold">二段階承認</h1>
         <p className="mb-4 text-xs text-neutral-500">
-          高額付与・高額減算 (指示書13章のしきい値以上) は申請者本人以外の管理者が承認するまで実行されません。
+          高額付与・高額減算 (指示書13章のしきい値以上) およびアカウント統合 (金額によらず常に対象) は、
+          申請者本人以外の管理者が承認するまで実行されません。
         </p>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
@@ -71,7 +80,7 @@ export default function ApprovalRequestsPage() {
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
               <th className="p-3">種別</th>
-              <th className="p-3">金額</th>
+              <th className="p-3">内容</th>
               <th className="p-3">理由</th>
               <th className="p-3">申請者</th>
               <th className="p-3">申請日時</th>
@@ -82,7 +91,7 @@ export default function ApprovalRequestsPage() {
             {pending.map((r) => (
               <tr key={r.id} className="border-t border-neutral-100">
                 <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
-                <td className="p-3">{Number(r.payload.amount).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">{formatDetail(r)}</td>
                 <td className="p-3">{r.payload.reason}</td>
                 <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
                 <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
@@ -113,7 +122,7 @@ export default function ApprovalRequestsPage() {
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>
               <th className="p-3">種別</th>
-              <th className="p-3">金額</th>
+              <th className="p-3">内容</th>
               <th className="p-3">状態</th>
               <th className="p-3">承認/却下者</th>
               <th className="p-3">日時</th>
@@ -123,7 +132,7 @@ export default function ApprovalRequestsPage() {
             {decided.map((r) => (
               <tr key={r.id} className="border-t border-neutral-100">
                 <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
-                <td className="p-3">{Number(r.payload.amount).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">{formatDetail(r)}</td>
                 <td className="p-3">
                   <span className={r.status === "APPROVED" ? "text-emerald-600" : "text-red-600"}>{r.status}</span>
                 </td>
