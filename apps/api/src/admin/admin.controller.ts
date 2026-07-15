@@ -21,6 +21,9 @@ const approvalTypeValues = Object.values(ApprovalType) as [string, ...string[]];
 const rewardRuleStatusValues = Object.values(RewardRuleStatus) as [string, ...string[]];
 
 const LoginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+const MfaLoginSchema = z.object({ mfaToken: z.string().min(1), code: z.string().min(6).max(6) });
+const MfaEnableSchema = z.object({ code: z.string().min(6).max(6) });
+const MfaDisableSchema = z.object({ password: z.string().min(1), code: z.string().min(6).max(6) });
 const GrantSchema = z.object({
   walletId: z.string().min(1),
   amount: z.number().int().positive(),
@@ -101,12 +104,30 @@ export class AdminController {
     private readonly rewardRules: AdminRewardRulesService,
   ) {}
 
+  /** MFA未設定なら即ログイン、設定済みなら `{ mfaRequired: true, mfaToken }` を返す (指示書13章 管理画面MFA)。 */
   @Post("login")
   async login(
     @Body(new ZodValidationPipe(LoginSchema)) body: z.infer<typeof LoginSchema>,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { token, expiresInSeconds } = await this.adminAuth.login(body.email, body.password);
+    const result = await this.adminAuth.login(body.email, body.password);
+    if (result.mfaRequired) {
+      return { success: false, mfaRequired: true, mfaToken: result.mfaToken };
+    }
+    res.cookie(ADMIN_SESSION_COOKIE_NAME, result.token, {
+      ...SESSION_COOKIE_OPTIONS,
+      expires: new Date(Date.now() + result.expiresInSeconds * 1000),
+    });
+    return { success: true, mfaRequired: false };
+  }
+
+  /** ログインの2段階目。パスワード認証済みの `mfaToken` と認証アプリのコードでセッションを発行する。 */
+  @Post("login/mfa")
+  async loginMfa(
+    @Body(new ZodValidationPipe(MfaLoginSchema)) body: z.infer<typeof MfaLoginSchema>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { token, expiresInSeconds } = await this.adminAuth.completeMfaLogin(body.mfaToken, body.code);
     res.cookie(ADMIN_SESSION_COOKIE_NAME, token, {
       ...SESSION_COOKIE_OPTIONS,
       expires: new Date(Date.now() + expiresInSeconds * 1000),
@@ -123,10 +144,45 @@ export class AdminController {
     return { success: true };
   }
 
+  /** MFA設定を開始し、認証アプリ用のシークレット/QRコード用URIを返す。 */
+  @Post("mfa/setup")
+  @UseGuards(AdminAuthGuard)
+  async setupMfa(@Req() req: AuthenticatedAdminRequest) {
+    return this.adminAuth.setupMfa(req.admin.id);
+  }
+
+  /** setupMfaで発行したシークレットの確認コードを検証し、MFAを有効化する。 */
+  @Post("mfa/enable")
+  @UseGuards(AdminAuthGuard)
+  async enableMfa(
+    @Req() req: AuthenticatedAdminRequest,
+    @Body(new ZodValidationPipe(MfaEnableSchema)) body: z.infer<typeof MfaEnableSchema>,
+  ) {
+    await this.adminAuth.enableMfa(req.admin.id, body.code);
+    return { success: true };
+  }
+
+  /** パスワード + 現在のTOTPコードでMFAを無効化する。 */
+  @Post("mfa/disable")
+  @UseGuards(AdminAuthGuard)
+  async disableMfa(
+    @Req() req: AuthenticatedAdminRequest,
+    @Body(new ZodValidationPipe(MfaDisableSchema)) body: z.infer<typeof MfaDisableSchema>,
+  ) {
+    await this.adminAuth.disableMfa(req.admin.id, body.password, body.code);
+    return { success: true };
+  }
+
   @Get("me")
   @UseGuards(AdminAuthGuard)
   async me(@Req() req: AuthenticatedAdminRequest) {
-    return { id: req.admin.id, email: req.admin.email, role: req.admin.role, displayName: req.admin.displayName };
+    return {
+      id: req.admin.id,
+      email: req.admin.email,
+      role: req.admin.role,
+      displayName: req.admin.displayName,
+      mfaEnabled: req.admin.mfaEnabled,
+    };
   }
 
   /** PC向け管理ダッシュボード (指示書13章) 用の集計値・過去30日推移。 */

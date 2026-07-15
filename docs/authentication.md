@@ -68,7 +68,34 @@ E2Eテスト (`apps/api/src/e2e/terms-consent.test.ts`) で、同意なしの新
 - `RolesGuard` (`apps/api/src/common/roles.guard.ts`) で `@Roles(...)` デコレータにより
   エンドポイント単位の権限分離を実現。
 
+## 管理画面MFA (TOTP二要素認証)
+
+RFC 6238準拠のTOTP実装 (`packages/auth/src/totp.ts`) を自前で実装した (外部ライブラリ非依存、
+Google Authenticator等の標準的な認証アプリと相互運用可能)。RFC 6238 Appendix Bの公式テスト
+ベクタに対する単体テストで実装の正しさを検証済み。
+
+- `admin_users.mfa_secret_encrypted` にTOTPシークレットをAES-256-GCMで可逆暗号化して保存する
+  (署名検証と同じ理由: 検証のたびに平文シークレットを再取得する必要があるため一方向ハッシュは
+  使えない)。`mfa_enabled` / `mfa_enrolled_at` で有効化状態を管理する。
+- **設定フロー**: `POST /api/v1/admin/mfa/setup` (要ログイン) が新しいシークレットを生成して
+  返す (この時点では `mfa_enabled` はfalseのまま)。認証アプリにシークレット/`otpauth://` URLを
+  登録した後、`POST /api/v1/admin/mfa/enable` に確認コードを送ると検証の上で有効化される。
+  管理画面の「セキュリティ設定」画面 (`/security`) から操作する。
+- **ログインフロー**: `POST /api/v1/admin/login` はMFA未設定の管理者にはそのままセッションを
+  発行するが、MFA設定済みの管理者にはセッションを発行せず `{ mfaRequired: true, mfaToken }`
+  を返す (Cookieもセットしない)。`mfaToken` はRedisに5分間のみ保存される使い捨てトークンで、
+  `POST /api/v1/admin/login/mfa` に `mfaToken` + 認証アプリの6桁コードを送ってはじめて
+  セッションが発行される。
+- **無効化**: `POST /api/v1/admin/mfa/disable` はパスワードと現在のTOTPコードの両方を要求する
+  (どちらか一方が漏洩しただけでは無効化できないようにするため)。
+- 有効化・無効化はいずれも監査ログ (`ADMIN_MFA_ENABLED`/`ADMIN_MFA_DISABLED`) に記録される。
+
+E2Eテスト (`apps/api/src/e2e/admin-mfa.test.ts`) で、設定→誤ったコードでの有効化拒否→
+正しいコードでの有効化→MFA必須ログイン→誤ったコードでの2段階目拒否→正しいコードでの
+セッション発行→使い捨てトークンの再利用拒否→無効化、の一連の流れを検証済み。実ブラウザでも
+QRコード用URL・シークレットキーの表示、コード誤り時のエラー表示 (日本語化済み)、
+有効化後の実ログインまで確認済み。
+
 ## 未実装/簡略化した項目 (今後の課題)
 
-- 管理画面MFA (拡張ポイントとしてのみ確保、実装なし)。
 - LINE本番連携・戦国パスポート本番SSO交換 (インターフェースとモックのみ)。

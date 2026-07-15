@@ -336,16 +336,21 @@ model UserSession {
 }
 
 model AdminUser {
-  id           String          @id
-  adminCode    String          @unique @map("admin_code")
-  email        String          @unique
-  passwordHash String          @map("password_hash")
-  role         AdminRole
-  status       AdminUserStatus @default(ACTIVE)
-  displayName  String          @map("display_name")
-  lastLoginAt  DateTime?       @map("last_login_at")
-  createdAt    DateTime        @default(now()) @map("created_at")
-  updatedAt    DateTime        @updatedAt @map("updated_at")
+  id                 String          @id
+  adminCode          String          @unique @map("admin_code")
+  email              String          @unique
+  passwordHash       String          @map("password_hash")
+  role               AdminRole
+  status             AdminUserStatus @default(ACTIVE)
+  displayName        String          @map("display_name")
+  lastLoginAt        DateTime?       @map("last_login_at")
+  /// TOTPシークレット (AES-256-GCMで可逆暗号化)。MFA未設定の間は null。
+  mfaSecretEncrypted String?         @map("mfa_secret_encrypted")
+  /// trueになるまではログイン時にMFAを要求しない (setup直後・enable確認前はfalseのまま)。
+  mfaEnabled         Boolean         @default(false) @map("mfa_enabled")
+  mfaEnrolledAt      DateTime?       @map("mfa_enrolled_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
 
   @@map("admin_users")
 }

@@ -31,6 +31,7 @@ export interface AdminMe {
   email: string;
   role: string;
   displayName: string;
+  mfaEnabled: boolean;
 }
 
 export interface DashboardStats {
