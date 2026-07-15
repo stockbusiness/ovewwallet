@@ -235,9 +235,11 @@ jobs:
         working-directory: apps/${{ matrix.app }}
         run: |
           set -e
-          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
-          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
-          URL=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          # pnpmモノレポではローカルでの`vercel build`+`vercel deploy --prebuilt`は
+          # 依存関係トレースの既知の問題(hoisted/symlinkどちらでも発生)で失敗するため、
+          # ローカルビルドはせずVercel側のクラウドビルドに任せる
+          # (Root Directoryは`vercel link`で既にapps/${{ matrix.app }}に設定済み)。
+          URL=$(vercel deploy --prod --token="${{ secrets.VERCEL_TOKEN }}")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed ${{ matrix.app }} to: $URL"
 
