@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { generateId, type PrismaClient } from "@ove/database";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { generateId, type OveTransaction, type PrismaClient } from "@ove/database";
 import {
   creditWallet,
   debitWallet,
@@ -137,6 +137,65 @@ export class AdminService {
     });
 
     return { revokedCount: count };
+  }
+
+  /**
+   * 既存ユーザー移行 (指示書15章) で残高不明のため `REVIEWING` になったアカウントを、
+   * 検証者が調査結果 (確認できた残高) をもとに解消する。推定値の自動付与は一切行わず、
+   * 検証者が確認した金額のみを人手で入力させる (残高不明ユーザーに推定残高を入れないという
+   * 移行時の原則を、事後確認の場面でも一貫させる)。
+   */
+  async resolveReview(params: {
+    accountId: string;
+    confirmedBalance: number;
+    reason: string;
+    verifiedBy: string;
+  }): Promise<unknown> {
+    const account = await this.db.oveAccount.findUnique({ where: { id: params.accountId }, include: { wallet: true } });
+    if (!account) throw new NotFoundException("account not found");
+    if (account.status !== "REVIEWING") {
+      throw new ConflictException(`account ${params.accountId} is not in REVIEWING status (status=${account.status})`);
+    }
+    if (!account.wallet) throw new NotFoundException("wallet not found for account");
+    if (!Number.isInteger(params.confirmedBalance) || params.confirmedBalance < 0) {
+      throw new BadRequestException("confirmedBalance must be a non-negative integer");
+    }
+
+    let transaction: OveTransaction | undefined;
+    if (params.confirmedBalance > 0) {
+      transaction = await creditWallet(
+        {
+          walletId: account.wallet.id,
+          amount: params.confirmedBalance,
+          transactionType: "OPENING_BALANCE",
+          idempotencyKey: `MIGRATION_REVIEW_RESOLVED:${params.accountId}`,
+          displayName: "旧システムからの移行残高 (検証者確認後)",
+          description: params.reason,
+          createdByType: "ADMIN",
+          createdById: params.verifiedBy,
+          metadata: { migrationReviewResolved: true },
+        },
+        this.db,
+      );
+    }
+
+    await this.db.oveAccount.update({ where: { id: params.accountId }, data: { status: "ACTIVE" } });
+
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "ADMIN",
+        actorId: params.verifiedBy,
+        actionType: "MIGRATION_REVIEW_RESOLVED",
+        targetType: "ove_account",
+        targetId: params.accountId,
+        result: "SUCCESS",
+        reason: params.reason,
+        afterData: { confirmedBalance: params.confirmedBalance },
+      },
+    });
+
+    return { status: "ACTIVE" as const, transaction: transaction ? serializeTransaction(transaction) : null };
   }
 
   async listWallets(params: { status?: string; limit?: number }) {

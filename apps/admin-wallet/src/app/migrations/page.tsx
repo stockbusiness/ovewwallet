@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, type AccountListItem } from "@/lib/api";
 
 interface MigrationResult {
   batchId: string;
@@ -19,6 +20,20 @@ export default function MigrationsPage() {
   const [batchName, setBatchName] = useState("");
   const [result, setResult] = useState<MigrationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewingAccounts, setReviewingAccounts] = useState<AccountListItem[]>([]);
+
+  const loadReviewingAccounts = useCallback(async () => {
+    try {
+      const list = await apiFetch<AccountListItem[]>("/api/v1/admin/accounts?status=REVIEWING&limit=200");
+      setReviewingAccounts(list);
+    } catch {
+      // ログイン切れ等はページ本体のAPI呼び出し側で処理されるため、ここでは静かに無視する
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReviewingAccounts();
+  }, [loadReviewingAccounts]);
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -39,6 +54,7 @@ export default function MigrationsPage() {
         body: JSON.stringify({ fileName, csvContent, batchName }),
       });
       setResult(res);
+      await loadReviewingAccounts();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "実行に失敗しました");
     }
@@ -77,7 +93,7 @@ export default function MigrationsPage() {
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
         {result && (
-          <section className="rounded-lg border border-neutral-200 bg-white p-4">
+          <section className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
             <div className="mb-3 grid grid-cols-4 gap-3 text-center text-xs">
               <Stat label="総件数" value={result.totalCount} />
               <Stat label="正常件数" value={result.successCount} tone="text-emerald-600" />
@@ -106,6 +122,44 @@ export default function MigrationsPage() {
             </table>
           </section>
         )}
+
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <h2 className="mb-1 text-sm font-semibold text-amber-800">
+            検証待ちアカウント (REVIEWING) — {reviewingAccounts.length}件
+          </h2>
+          <p className="mb-3 text-xs text-amber-700">
+            残高不明のまま移行されたアカウント。検証者が旧システム側の記録などで残高を調査し、
+            各アカウントの詳細画面から確認済み残高を入力して解消してください。
+          </p>
+          {reviewingAccounts.length === 0 ? (
+            <p className="text-xs text-neutral-500">検証待ちのアカウントはありません</p>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="text-neutral-500">
+                <tr>
+                  <th className="pb-1">アカウントコード</th>
+                  <th className="pb-1">メール</th>
+                  <th className="pb-1">登録日</th>
+                  <th className="pb-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {reviewingAccounts.map((a) => (
+                  <tr key={a.id} className="border-t border-amber-100">
+                    <td className="py-1">{a.accountCode}</td>
+                    <td className="py-1">{a.primaryEmail ?? "-"}</td>
+                    <td className="py-1">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
+                    <td className="py-1">
+                      <Link href={`/accounts/${a.id}`} className="text-brand-600 underline">
+                        検証する
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
       </main>
     </div>
   );

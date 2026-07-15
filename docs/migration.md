@@ -43,10 +43,39 @@ idempotencyKeyになってしまい、「同じCSVを再実行しても二重付
 E2Eテスト (`apps/api/src/e2e/migration.test.ts`) で、既知残高の付与・残高不明時の
 REVIEWING遷移・同じCSVの再実行で残高が変わらないことを確認済み。
 
+## 検証者フロー (REVIEWINGアカウントの解消)
+
+残高不明で `REVIEWING` になったアカウントは、`POST /api/v1/admin/accounts/:accountId/resolve-review`
+で解消する。検証者が旧システム側の記録などで残高を調査し、**確認できた金額のみ**を
+人手で入力する (移行時と同様、推定値は一切自動で入れない)。
+
+- 確認済み残高が0より大きい場合、`creditWallet()` を `transactionType: "OPENING_BALANCE"`
+  で実行する (`idempotencyKey: MIGRATION_REVIEW_RESOLVED:${accountId}` により、同じ
+  アカウントに対する二重解消は防止される)。
+- 確認済み残高が0の場合は取引を作成せず、アカウントを `ACTIVE` にするのみ。
+- 解消後は `ove_accounts.status = ACTIVE` になる。既に `REVIEWING` でなくなった
+  アカウントに対する再解消は409で拒否される (一度解消したら取り消せない)。
+- 解消は監査ログ (`MIGRATION_REVIEW_RESOLVED`) に記録される。
+
+管理画面:
+
+- `/migrations` — 「検証待ちアカウント (REVIEWING)」セクションで一覧表示し、
+  各アカウントの詳細画面へのリンクを提供する (`GET /api/v1/admin/accounts?status=REVIEWING`
+  を再利用)。
+- `/accounts/[accountId]` — アカウントが `REVIEWING` の間だけ「既存ユーザー移行: 検証待ち」
+  セクションが表示され、確認済み残高・調査内容を入力して解消できる。
+
+E2Eテスト (`apps/api/src/e2e/migration-review.test.ts`) で、正の確認済み残高での解消・
+残高0での解消 (取引が作成されないこと)・REVIEWING以外のアカウントへの解消要求の409拒否・
+負の確認済み残高の400拒否・未認証アクセスの401を検証済み。実ブラウザでも、
+`/migrations` 画面での一覧表示・アカウント詳細画面での解消操作・解消後のACTIVE反映と
+成功メッセージ表示を確認済み。
+
 ## 未実装・今後の課題
 
-- 検証者 (`verified_by`) の入力UIは用意しているが、実際の承認ワークフロー
-  (検証者が内容を確認してから実行を許可する、といった二段階の流れ) は未実装。
-- 移行後の `REVIEWING` アカウントを一覧・確認するための専用画面は未実装
-  (現状はアカウント一覧画面の `status` 列でのみ確認可能)。
+- 検証者 (`verified_by`、移行実行時の入力欄) と、実際に残高を確認する検証者フローの
+  権限を分離すること (現状は`SUPER_ADMIN`/`OVE_OPERATOR`であれば誰でも解消できる。
+  移行実行者本人による解消を禁止する、といった職務分離は未実装)。
+- 移行実行そのものを事前承認制にする (検証者が内容を確認してから実行を許可する) ことは
+  未実装。今回実装したのは実行後に`REVIEWING`となったアカウントの事後解消フローである。
 - 文字コード変換 (Shift_JIS等) は未対応。UTF-8のCSVのみを想定している。

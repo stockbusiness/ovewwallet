@@ -53,6 +53,10 @@ const MigrationExecuteSchema = z.object({
   batchName: z.string().min(1),
   verifiedBy: z.string().optional(),
 });
+const ResolveReviewSchema = z.object({
+  confirmedBalance: z.number().int().min(0),
+  reason: z.string().min(1),
+});
 const AccountMergeSchema = z.object({
   sourceAccountCode: z.string().min(1),
   targetAccountCode: z.string().min(1),
@@ -224,6 +228,22 @@ export class AdminController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.admin.revokeAllSessions(accountId, req.admin.id);
+  }
+
+  /**
+   * 既存ユーザー移行 (指示書15章) の検証者フロー: 残高不明で `REVIEWING` になった
+   * アカウントを、検証者が調査した確認済み残高で解消する。推定値は一切自動で
+   * 入れない (`docs/migration.md` 参照)。
+   */
+  @Post("accounts/:accountId/resolve-review")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR")
+  async resolveAccountReview(
+    @Param("accountId") accountId: string,
+    @Body(new ZodValidationPipe(ResolveReviewSchema)) body: z.infer<typeof ResolveReviewSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.admin.resolveReview({ accountId, ...body, verifiedBy: req.admin.id });
   }
 
   @Get("wallets")

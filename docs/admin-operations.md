@@ -14,12 +14,12 @@
 | 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向)・取消 |
 | CSV一括付与 | `/bulk-grants` | CSVアップロード・プレビュー・実行・結果サマリ |
 | 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
-| 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ (`docs/migration.md`) |
+| 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ・検証待ち(REVIEWING)アカウント一覧 (`docs/migration.md`) |
 | アカウント統合 | `/accounts/merge` | 統合元→統合先へ残高・連携情報を移管 |
 | 二段階承認 | `/approval-requests` | 高額付与・高額減算の承認待ち一覧、承認/却下、履歴 |
 | 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
 | APIアクセスログ | `/api-access-logs` | 外部サービスAPI (指示書11章) へのリクエスト履歴。認証失敗 (401) も含む。ステータスコードで絞り込み可 |
-| アカウント詳細 | `/accounts/[accountId]` | 基本情報・連携ID・外部サービス連携・ウォレットへのリンク・当該アカウントの操作ログ |
+| アカウント詳細 | `/accounts/[accountId]` | 基本情報・連携ID・外部サービス連携・ウォレットへのリンク・当該アカウントの操作ログ・REVIEWING時は検証者による解消フォーム (`docs/migration.md`) |
 | セキュリティ設定 | `/security` | 自分自身のMFA (二要素認証) の設定・有効化・無効化 (`docs/authentication.md` 参照) |
 | 外部連携キュー | `/outbox` | Transactional Outboxの一覧・ステータス/連携先での絞り込み・試行回数/最終エラー確認・手動再送・Feature Flag確認 (`docs/integration-outbox.md` 参照) |
 

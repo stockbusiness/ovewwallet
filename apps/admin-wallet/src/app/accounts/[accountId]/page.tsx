@@ -13,6 +13,10 @@ export default function AccountDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [confirmedBalance, setConfirmedBalance] = useState("");
+  const [reviewReason, setReviewReason] = useState("");
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [resolvingReview, setResolvingReview] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -43,6 +47,33 @@ export default function AccountDetailPage() {
       setRevokeMessage("セッションの無効化に失敗しました。");
     } finally {
       setRevoking(false);
+    }
+  }
+
+  async function resolveReview() {
+    const balance = Number(confirmedBalance);
+    if (!Number.isInteger(balance) || balance < 0 || !reviewReason) return;
+    if (
+      !window.confirm(
+        `調査済みの残高 ${balance.toLocaleString("ja-JP")} OVE で確定します。この操作の後は再度検証できません。よろしいですか？`,
+      )
+    )
+      return;
+    setResolvingReview(true);
+    setReviewMessage(null);
+    try {
+      await apiFetch(`/api/v1/admin/accounts/${params.accountId}/resolve-review`, {
+        method: "POST",
+        body: JSON.stringify({ confirmedBalance: balance, reason: reviewReason }),
+      });
+      setReviewMessage("検証結果を反映し、アカウントをACTIVEにしました。");
+      setConfirmedBalance("");
+      setReviewReason("");
+      await load();
+    } catch (err) {
+      setReviewMessage(err instanceof ApiError ? err.message : "検証結果の反映に失敗しました。");
+    } finally {
+      setResolvingReview(false);
     }
   }
 
@@ -127,6 +158,57 @@ export default function AccountDetailPage() {
           </button>
           {revokeMessage && <p className="mt-2 text-xs text-neutral-600">{revokeMessage}</p>}
         </section>
+
+        {account.status === "REVIEWING" && (
+          <section className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
+            <h2 className="mb-1 text-sm font-semibold text-amber-800">既存ユーザー移行: 検証待ち</h2>
+            <p className="mb-3 text-xs text-amber-700">
+              既存ユーザー移行時に残高が不明だったため、推定値を入れずこのアカウントを保留しています。
+              旧システム側の記録などで残高を調査したうえで、確認できた金額のみを入力してください。
+            </p>
+            <div className="flex flex-col gap-3">
+              <label className="text-xs">
+                確認済み残高 (OVE、不明な場合は調査してから入力してください)
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={confirmedBalance}
+                  onChange={(e) => setConfirmedBalance(e.target.value)}
+                  placeholder="例: 7000 (残高が無いことを確認した場合は 0)"
+                  className="mt-1 block w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="text-xs">
+                調査内容・根拠
+                <input
+                  value={reviewReason}
+                  onChange={(e) => setReviewReason(e.target.value)}
+                  placeholder="例: 旧システムの管理画面で残高7,000を確認"
+                  className="mt-1 block w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                />
+              </label>
+              <button
+                onClick={resolveReview}
+                disabled={resolvingReview || confirmedBalance === "" || !reviewReason}
+                className="self-start rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {resolvingReview ? "処理中..." : "検証結果を反映してACTIVEにする"}
+              </button>
+            </div>
+          </section>
+        )}
+        {/* 検証成功後は上のREVIEWINGセクション自体が消えるため、メッセージは
+            status変化の影響を受けない位置に独立して表示する (成功・失敗どちらも起こりうる) */}
+        {reviewMessage && (
+          <p
+            className={`mb-6 rounded-md p-3 text-sm ${
+              account.status === "REVIEWING" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {reviewMessage}
+          </p>
+        )}
 
         <section className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold">連携ID (ログイン手段)</h2>
