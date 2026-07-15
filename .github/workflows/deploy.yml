@@ -230,15 +230,23 @@ jobs:
           vercel env rm NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}" --yes || true
           echo "${{ needs.deploy-api.outputs.api_url }}" | vercel env add NEXT_PUBLIC_API_URL production --token="${{ secrets.VERCEL_TOKEN }}"
 
+      - name: Move Vercel project link to repo root
+        run: |
+          # `vercel deploy`はコマンドを実行したディレクトリ配下だけをアップロードする。
+          # apps/${{ matrix.app }}の中から実行するとそのサブディレクトリの中身しか
+          # アップロードされず、リポジトリルートのpnpm-lock.yaml/pnpm-workspace.yamlや
+          # 他のワークスペースパッケージが含まれずnpmにフォールバックして失敗する
+          # (workspace:*プロトコルをnpmは解決できない)。
+          # そこで、`vercel link`で作られたプロジェクト紐付け情報(Root Directoryは
+          # 既にapps/${{ matrix.app }}に設定済み)をリポジトリルートに移動し、
+          # ルートから実行することでモノレポ全体をアップロードしつつ、Vercel側が
+          # サーバー側のRoot Directory設定に従って正しいサブディレクトリをビルドする。
+          mv "apps/${{ matrix.app }}/.vercel" .vercel
+
       - name: Deploy to Vercel (production)
         id: deploy
-        working-directory: apps/${{ matrix.app }}
         run: |
           set -e
-          # pnpmモノレポではローカルでの`vercel build`+`vercel deploy --prebuilt`は
-          # 依存関係トレースの既知の問題(hoisted/symlinkどちらでも発生)で失敗するため、
-          # ローカルビルドはせずVercel側のクラウドビルドに任せる
-          # (Root Directoryは`vercel link`で既にapps/${{ matrix.app }}に設定済み)。
           URL=$(vercel deploy --prod --token="${{ secrets.VERCEL_TOKEN }}")
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Deployed ${{ matrix.app }} to: $URL"
