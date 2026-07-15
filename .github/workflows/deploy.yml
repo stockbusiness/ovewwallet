@@ -149,21 +149,46 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
           set -e
-          railway domain --service api --json | tee domain-output.json || true
-          DOMAIN=$(railway domain list --service api --json | node -e "
-            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-              const list = JSON.parse(d);
-              const first = Array.isArray(list) ? list[0] : list;
-              console.log((first && (first.domain || first.url)) || '');
-            });
+          # 初回はドメインを新規発行、既に存在する場合(再実行時)は一覧から取得する
+          railway domain --service api --json > domain-output.json 2>&1 || railway domain list --service api --json > domain-output.json
+          cat domain-output.json
+          DOMAIN_URL=$(node -e "
+            const fs = require('fs');
+            let data;
+            try { data = JSON.parse(fs.readFileSync('domain-output.json', 'utf8')); } catch (e) { console.log(''); process.exit(0); }
+            const list = Array.isArray(data) ? data : (data.domains || [data]);
+            const first = list[0];
+            if (!first) { console.log(''); process.exit(0); }
+            const val = (typeof first === 'string') ? first : (first.domain || first.url || '');
+            console.log(val && !val.startsWith('http') ? 'https://' + val : val);
           ")
-          if [ -z "$DOMAIN" ]; then
+          if [ -z "$DOMAIN_URL" ]; then
             echo "ドメインの取得に失敗しました。domain-output.jsonを確認してください。"
-            cat domain-output.json || true
             exit 1
           fi
-          echo "api_url=https://$DOMAIN" >> "$GITHUB_OUTPUT"
-          echo "API URL: https://$DOMAIN"
+          echo "api_url=$DOMAIN_URL" >> "$GITHUB_OUTPUT"
+          echo "API URL: $DOMAIN_URL"
+
+      - name: Wait for API to become healthy
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          URL="${{ steps.domain.outputs.api_url }}/health"
+          echo "確認先: $URL"
+          for i in $(seq 1 30); do
+            CODE=$(curl -sS -o /tmp/health-body.txt -w "%{http_code}" "$URL" || echo "000")
+            echo "試行 $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              echo "ヘルスチェック成功:"
+              cat /tmp/health-body.txt
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "5分待っても200になりませんでした。直近のデプロイログ:"
+          railway logs --service api --lines 200 || true
+          exit 1
 
   deploy-frontends:
     needs: deploy-api
