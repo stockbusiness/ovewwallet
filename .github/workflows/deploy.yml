@@ -47,7 +47,7 @@ jobs:
           fi
           railway status --json || true
 
-      - name: Ensure PostgreSQL and Redis exist
+      - name: Ensure PostgreSQL, Redis, and the api service exist
         id: databases
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
@@ -68,6 +68,20 @@ jobs:
             railway add --database redis --json | tee redis-output.json
           else
             echo "Redisは既に存在します"
+          fi
+
+          # railway up --service api で後からデプロイできるよう、空のサービスを先に作る
+          # (railway variable set --service api は、サービスが存在しないと失敗するため)
+          if ! echo "$EXISTING" | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const s = JSON.parse(d);
+              process.exit(s.some(x => x.name === 'api') ? 0 : 1);
+            });
+          "; then
+            echo "apiサービスを追加します"
+            railway add --service api --json
+          else
+            echo "apiサービスは既に存在します"
           fi
 
       - name: Wait for database services to be ready
