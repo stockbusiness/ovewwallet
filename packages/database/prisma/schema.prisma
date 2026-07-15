@@ -457,6 +457,9 @@ model WalletHold {
 // 監査・承認
 // =====================================================================
 
+/// INSERT/SELECTのみ許可。DELETE/UPDATEはマイグレーション
+/// `add_audit_logs_immutability_trigger` のBEFOREトリガーによりDBレベルで拒否される
+/// (Prismaスキーマにはトリガーを表現できないため、マイグレーションSQLで直接定義している)。
 model AuditLog {
   id         String        @id
   actorType  CreatedByType @map("actor_type")

@@ -38,8 +38,9 @@
 | `me-and-service-accounts.test.ts` | 旧`/api/v1/wallets/{oveAccountId}/*`が404になること、`/api/v1/me/*`がセッションから本人を特定し他人の残高・取引を返さないこと (取引詳細は他人のIDだと404)、`/api/v1/service/accounts/{externalUserId}/balance`が自サービスの利用者のみ照会でき他サービスの利用者は404、HMAC未署名は401 |
 | `common/assert-auth-mode.test.ts` | `NODE_ENV=production`かつ`AUTH_MODE`が`production`以外(未設定含む)なら起動ガードが例外を投げること、`AUTH_MODE=production`なら例外を投げないこと、production以外の環境ではAUTH_MODEに関わらず例外を投げないこと |
 | `outbox.test.ts` | Transactional Outbox (開発ガイドライン10章): `enqueue`が同一idempotencyKeyで二重登録しないこと、登録済みハンドラへの送信成功で`SENT`になること、失敗時に指数バックオフで再送され最大試行回数到達で`FAILED`になること、管理API経由の手動再送で`FAILED`→`PENDING`(試行回数0)にリセットされること、管理画面からのキュー一覧取得(連携先での絞り込み)・一括処理トリガー、未認証アクセスの401。Feature Flag (開発ガイドライン13章): 全フラグが既定でfalseであること、未認証アクセスの401 |
+| `audit-log-immutability.test.ts` | `audit_logs`へのDELETE/UPDATEがアプリの接続ロール(postgres特権ユーザー)でもDBトリガーにより例外で拒否されること、拒否時はトランザクションごとロールバックされ変更が一切残らないこと、通常のINSERT/SELECTは影響を受けないこと |
 
-**合計 50件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
+**合計 53件 全て成功** (最終実行時点、`--runInBand` で連続2回実行しても再現性あり)。
 
 > 注: NestJSの依存性注入・Swaggerのパラメータ型解決は `emitDecoratorMetadata` に依存するため、
 > esbuild系トランスパイラ (tsx, vitestのデフォルト変換) では正しく動作しない

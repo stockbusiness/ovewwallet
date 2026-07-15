@@ -21,7 +21,7 @@ packages/
 
 PostgreSQL 16 + Redis (KVストア、未設定時はインメモリへフォールバック) を使用。
 DBスキーマ・API・管理画面・ユーザー画面のすべてに対して、実DBに対する自動テスト
-(現時点で API 50件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計96件、すべて成功)
+(現時点で API 53件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計99件、すべて成功)
 と、実ブラウザ (Playwright) での動作確認を行っています。
 
 ## 2. 実装済み機能
@@ -151,8 +151,10 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 - 二段階承認のアカウント統合・オンチェーン移行・APIサービス上限変更への拡張
   (現状は高額付与/高額減算のみ対象、`docs/admin-operations.md` 参照)。
 - 既存ユーザー移行の検証者フロー・文字コード対応の強化。
-- インフラ整備: Dockerfile本番化、`audit_logs`のDB権限レベルでのDELETE禁止設定、
-  `ENCRYPTION_KEY`のローテーション手順、CORS本番設定、レート制限値の見直し。
+- インフラ整備: Dockerfile本番化、`ENCRYPTION_KEY`のローテーション手順、CORS本番設定、
+  レート制限値の見直し。
+  (`audit_logs`のDBレベルDELETE/UPDATE禁止はDBトリガーとして実装済み。`docs/security.md`
+  「監査ログのDBレベル不変性」参照)
 - Playwright E2Eのリポジトリ内自動化 (現状は手動実行での確認)。
 - 負荷テスト。
 

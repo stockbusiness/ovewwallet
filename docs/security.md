@@ -12,8 +12,7 @@
   `@nestjs/throttler` によるグローバルレート制限 (60秒あたり120リクエスト、MVP値)。
 - APIキー・署名シークレットの平文非保存 (`docs/database.md` 参照)。
 - 監査ログ (`audit_logs`): アプリケーション層にdelete用のAPI/UIを一切実装していない。
-  **DB権限レベルでのDELETE禁止 (REVOKE) は本番デプロイ時の運用手順として別途設定が必要**
-  (このリポジトリのマイグレーションには含めていない)。
+  さらにDBレベルでも改ざん・削除を防止している (下記「監査ログのDBレベル不変性」参照)。
 - 管理権限分離: `AdminRole` によるロールベースアクセス制御 (`RolesGuard`)。
 - 高額操作の承認: `HIGH_VALUE_THRESHOLD` 以上の個別付与・個別減算は二段階承認
   (申請者と承認者が別人であることを強制) を経なければ実行されない
@@ -69,6 +68,24 @@ E2Eテスト (`apps/api/src/e2e/me-and-service-accounts.test.ts`) で、旧エ�
 `AUTH_MODE` が `production` 以外 (未設定を含む) の場合はアプリ起動自体を失敗させる。
 LINEログイン・戦国パスポートSSOの本番実装が接続されるまでは、本番環境を起動できない。
 単体テスト (`apps/api/src/common/assert-auth-mode.test.ts`) で検証済み。
+
+## 監査ログのDBレベル不変性
+
+`audit_logs` へのDELETE/UPDATEを、アプリケーション層の実装漏れだけでなく、Postgresの
+BEFOREトリガー (`prevent_audit_logs_mutation()`、マイグレーション
+`add_audit_logs_immutability_trigger`) で常に例外を送出して拒否している。
+
+このアプリはPostgresの特権ユーザー (`postgres`) で接続しているため、
+`REVOKE DELETE/UPDATE` による権限剥奪はスーパーユーザーには効果がなく無意味である。
+そのため、接続ロールに関わらず (アプリのバグ・誤ったDB直接操作を含めて) 確実に
+拒否できるトリガー方式を採用した。トリガー自体を無効化すれば理論上は迂回できるが、
+それは通常の運用・アプリ操作の範囲外であり、DBA権限を持つ攻撃者を完全に防ぐ設計は
+本対応の範囲外とする (指示書が求める「DB権限レベルでのDELETE禁止」を、実際に効果のある
+形で満たすことを目的とした)。
+
+単体テスト (`apps/api/src/e2e/audit-log-immutability.test.ts`) で、DELETE/UPDATEが
+DBレベルで例外になりトランザクションごとロールバックされること、通常のINSERT/SELECTは
+影響を受けないことを検証済み。
 
 ## 未実装・今後の課題
 
