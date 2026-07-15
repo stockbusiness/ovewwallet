@@ -190,8 +190,11 @@ jobs:
             fi
             sleep 10
           done
-          echo "5分待っても200になりませんでした。直近のデプロイログ:"
-          railway logs --service api --lines 200 || true
+          echo "5分待っても200になりませんでした。直近のビルドログ:"
+          railway logs --service api --build --lines 100 --latest || true
+          echo "=================================================="
+          echo "直近のデプロイ(ランタイム)ログ:"
+          railway logs --service api --deployment --lines 200 --latest || true
           exit 1
 
   deploy-frontends:
