@@ -26,10 +26,16 @@ export async function createTestWallet(initialBalance: bigint = 0n) {
   return { account, wallet };
 }
 
-/** テスト間でウォレット関連テーブルを空にする。 */
+/**
+ * テスト間でウォレット関連テーブルを空にする。
+ *
+ * `audit_logs` はDBトリガーでDELETE/UPDATEを常に拒否する (指示書: 監査ログはDBレベルで
+ * 削除不可にすること。`packages/database/prisma/migrations/*_add_audit_logs_immutability_trigger`
+ * 参照) ため、ここでは削除しない。各テストは`targetId`など固有の値で自分が作成した
+ * 監査ログを検索するため、他のテスト実行で残った行と衝突することはない。
+ */
 export async function truncateLedgerTables() {
   await prisma.$transaction([
-    prisma.auditLog.deleteMany(),
     prisma.walletHold.deleteMany(),
     prisma.oveTransaction.deleteMany(),
     prisma.wallet.deleteMany(),

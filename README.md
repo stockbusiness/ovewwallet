@@ -22,7 +22,7 @@
 | データベース | PostgreSQL / Prisma ORM |
 | 補助 | Redis (レート制限・OTP・SSOコード。未設定時はインメモリへフォールバック) |
 | バリデーション | Zod (`packages/shared-types` で共通化) |
-| テスト | Vitest (`packages/*`) / Jest+ts-jest+Supertest (`apps/api`) |
+| テスト | Vitest (`packages/*`) / Jest+ts-jest+Supertest (`apps/api`) / Playwright (`tests/e2e`, ブラウザE2E) |
 
 ## ディレクトリ構成
 
@@ -38,6 +38,8 @@ packages/
   auth/          認証・暗号ユーティリティ
   ledger/        台帳コアロジック
   config/        環境変数検証
+tests/
+  e2e/           Playwright E2E (ブラウザ操作の自動テスト。`pnpm test:e2e`、詳細は`tests/e2e/README.md`)
 docs/            設計ドキュメント一式
 ```
 
@@ -72,9 +74,11 @@ pnpm --filter @ove/database migrate       # prisma migrate deploy (本番/CI)
 ## テスト方法
 
 ```bash
+pnpm test                         # packages/*・apps/api を一括実行 (tests/e2eは含まない)
 pnpm --filter @ove/auth test      # 認証ユーティリティの単体テスト
 pnpm --filter @ove/ledger test    # 台帳コアの単体・統合テスト (実PostgreSQL接続が必要)
 pnpm --filter @ove/api test       # APIのE2Eテスト (実PostgreSQL接続が必要)
+pnpm test:e2e                     # ブラウザE2E (Playwright、実DB+3アプリ起動が必要。tests/e2e/README.md参照)
 ```
 
 事前に `.env.test` (DATABASE_URL等をテスト用DBに向けたもの) を用意し、
