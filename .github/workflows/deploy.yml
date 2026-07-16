@@ -238,13 +238,13 @@ jobs:
           ADMIN_URL="${ADMIN_URL%/}"
           echo "APP_URL=$APP_URL"
           echo "ADMIN_URL=$ADMIN_URL"
-          # 両方とも--skip-deploysで設定し、暗黙の再デプロイをトリガーしない。
-          # (片方だけskip-deploysを付けないと、暗黙の再デプロイと直後のrestartが
-          # タイミング競合し、新しい変数が反映される前の古いインスタンスのまま
-          # 止まることがある。restartで明示的に1回だけ再起動して確実に反映する)
+          # 両方とも--skip-deploysで設定してから、railway upで明示的に再デプロイする。
+          # (railway service restartは「Deployment is not restartable」で失敗する
+          # ケースがあり信頼できなかったため、deploy-apiジョブと同じ確実な経路である
+          # railway upに統一した)
           railway variable set "APP_URL=$APP_URL" --service api --skip-deploys --json
           railway variable set "ADMIN_URL=$ADMIN_URL" --service api --skip-deploys --json
-          railway service restart --service api --yes
+          railway up --service api --ci --detach
           echo "app_url=$APP_URL" >> "$GITHUB_ENV"
           echo "admin_url=$ADMIN_URL" >> "$GITHUB_ENV"
 
