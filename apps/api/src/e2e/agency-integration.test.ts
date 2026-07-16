@@ -261,4 +261,92 @@ describe("戦国経済圏代理店システム外部連携 (仕様書v3.6.71 / �
       await request(app.getHttpServer()).post("/api/v1/auth/sso/agency").send({ token, termsAccepted: true }).expect(401);
     });
   });
+
+  describe("GET /api/v1/admin/agency-links (代理店連携状態一覧, 開発ガイドライン15章)", () => {
+    let adminCookie: string[];
+
+    beforeAll(async () => {
+      const adminEmail = `e2e-agency-admin-${generateId()}@ovewallet.local`;
+      const adminPassword = "e2e-test-password-123";
+      await prisma.adminUser.create({
+        data: {
+          id: generateId(),
+          adminCode: `OVE-ADM-${generateId()}`,
+          email: adminEmail,
+          passwordHash: hashSecret(adminPassword),
+          role: "SUPER_ADMIN",
+          displayName: "E2E Agency Admin",
+        },
+      });
+      const loginRes = await request(app.getHttpServer())
+        .post("/api/v1/admin/login")
+        .send({ email: adminEmail, password: adminPassword })
+        .expect(201);
+      adminCookie = loginRes.headers["set-cookie"] as unknown as string[];
+    });
+
+    it("rejects unauthenticated access", async () => {
+      await request(app.getHttpServer()).get("/api/v1/admin/agency-links").expect(401);
+    });
+
+    it("lists PENDING and ACTIVE links, filterable by status", async () => {
+      const pendingExternalId = `dir_admin_pending_${generateId()}`;
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "upsert", external_id: pendingExternalId, name: "一覧確認用代理店" })
+        .expect(201);
+
+      const activeExternalId = `dir_admin_active_${generateId()}`;
+      const token = await signAgencyJwt({ external_id: activeExternalId, agency_name: "紐付け済み代理店" });
+      await request(app.getHttpServer())
+        .post("/api/v1/auth/sso/agency")
+        .send({ token, termsAccepted: true })
+        .expect(201);
+
+      const all = await request(app.getHttpServer())
+        .get("/api/v1/admin/agency-links")
+        .set("Cookie", adminCookie)
+        .expect(200);
+      const externalIds = (all.body as Array<{ externalUserId: string }>).map((l) => l.externalUserId);
+      expect(externalIds).toContain(pendingExternalId);
+      expect(externalIds).toContain(activeExternalId);
+
+      const pendingOnly = await request(app.getHttpServer())
+        .get("/api/v1/admin/agency-links?status=PENDING")
+        .set("Cookie", adminCookie)
+        .expect(200);
+      const pendingIds = (pendingOnly.body as Array<{ externalUserId: string; status: string }>).map(
+        (l) => l.externalUserId,
+      );
+      expect(pendingIds).toContain(pendingExternalId);
+      expect(pendingIds).not.toContain(activeExternalId);
+      expect((pendingOnly.body as Array<{ status: string }>).every((l) => l.status === "PENDING")).toBe(true);
+    });
+
+    it("returns link detail including metadata, and 404s for a non-agency link id", async () => {
+      const externalId = `dir_admin_detail_${generateId()}`;
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "upsert", external_id: externalId, name: "詳細確認用代理店", contact_email: "detail@example.com" })
+        .expect(201);
+
+      const link = await prisma.accountLink.findUniqueOrThrow({
+        where: { serviceIntegrationId_externalUserId: { serviceIntegrationId, externalUserId: externalId } },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/admin/agency-links/${link.id}`)
+        .set("Cookie", adminCookie)
+        .expect(200);
+      expect((res.body.metadata as Record<string, unknown>).name).toBe("詳細確認用代理店");
+      expect((res.body.metadata as Record<string, unknown>).contactEmail).toBe("detail@example.com");
+
+      await request(app.getHttpServer())
+        .get(`/api/v1/admin/agency-links/${generateId()}`)
+        .set("Cookie", adminCookie)
+        .expect(404);
+    });
+  });
 });

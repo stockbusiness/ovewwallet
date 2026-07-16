@@ -12,6 +12,30 @@
    `POST /api/integrations/agencies` へ送信してくる。
 2. **SSOログイン** (仕様書12章): sengoku-ai.comが発行するRS256 JWTを検証し、
    OVE Walletへログインさせる。
+3. **管理画面: 代理店連携状態一覧** (開発ガイドライン15章「必須」項目):
+   `/agency-links` で `account_links` (AGENCY_SYSTEM分) を一覧・状態絞り込み・
+   詳細確認できる。
+
+## 管理画面でできること・できないこと
+
+`AGENCY_SYSTEM` は既存の `service_integrations` を再利用しているため、既存の
+「外部サービス管理」画面 (`/service-integrations`) にも自動的に表示され、
+緊急停止・再開ができる。加えて `/agency-links` で以下ができる。
+
+- 状態 (PENDING=同期のみ受信/未紐付け、ACTIVE=紐付け済み、REVOKED=解除済み)
+  での絞り込み
+- 各行の「詳細」展開で `parent_external_id` / `common_user_id` /
+  `referral_token` / ロール / 同期ステータス / 連携方法を確認
+
+以下はできない (今後の課題、または他の理由で意図的に対象外)。
+
+- APIキーの発行・閲覧・ローテーション (ハッシュ化保存のため、生成時に
+  サーバーログへ一度だけ出力される。他の外部サービス連携と同じ仕様)
+- `SENGOKU_AI_SSO_AUDIENCE` / `SENGOKU_AI_JWKS_URL` /
+  `ENABLE_AGENCY_REFERRAL_SYNC` の管理画面からの変更 (環境変数のみ)
+- FAILED/CONFLICT状態の表示・自動再送・手動再送 (`ENABLE_AGENCY_SYNC_RETRY`
+  実装時に追加予定。現在の実装ではsyncAgency/loginWithAgencySsoは常に
+  成功するかHTTPレベルで失敗するかのどちらかで、部分失敗状態が残ることはない)
 
 ## データモデル
 
@@ -95,7 +119,8 @@ SSOログインは常に失敗する（起動時にエラーにはしない安�
   (正常系、リプレイ、期限切れ、aud不一致、kid不一致、必須クレーム欠落)。
 - `apps/api/src/e2e/agency-integration.test.ts`: HTTP経由のe2eテスト
   (認証、Feature Flag、connection_test、同期upsert、SSOログイン、
-  同期→SSOの順で紐付けが完成する場合とその逆順の場合の両方)。
+  同期→SSOの順で紐付けが完成する場合とその逆順の場合の両方、
+  管理画面API `/agency-links` の一覧・絞り込み・詳細・アクセス制御)。
 
 ## 今後の課題 (範囲外)
 
@@ -104,5 +129,5 @@ SSOログインは常に失敗する（起動時にエラーにはしない安�
 - OVE Wallet側からsengoku-ai.comへの同期送信 (仕様書6章の逆方向)。
   実装する場合は既存の`integration_outbox` (`docs/integration-outbox.md`) を
   再利用する。
-- `ENABLE_AGENCY_SYNC_RETRY`を使った同期失敗の自動再送。
-- 管理画面での連携状態一覧・手動再送UI (開発ガイドライン15章)。
+- `ENABLE_AGENCY_SYNC_RETRY`を使った同期失敗の自動再送、および管理画面での
+  手動再送UI (FAILED/CONFLICT状態が実際に発生するようになった場合に追加)。

@@ -12,6 +12,7 @@ import { AdminMigrationService } from "./admin-migration.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
+import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -107,6 +108,7 @@ export class AdminController {
     private readonly accountMerge: AdminAccountMergeService,
     private readonly approvals: AdminApprovalService,
     private readonly rewardRules: AdminRewardRulesService,
+    private readonly agencyLinks: AdminAgencyLinksService,
   ) {}
 
   /**
@@ -490,5 +492,27 @@ export class AdminController {
     @Body(new ZodValidationPipe(UpdateRewardRuleSchema)) body: z.infer<typeof UpdateRewardRuleSchema>,
   ) {
     return this.rewardRules.update(ruleCode, body);
+  }
+
+  /**
+   * 代理店連携状態一覧 (開発ガイドライン15章)。sengoku-ai.com代理店システムとの
+   * account_links (PENDING=同期のみ受信/未紐付け、ACTIVE=SSOログイン済み) を確認する。
+   * docs/agency-integration.md参照。
+   */
+  @Get("agency-links")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async listAgencyLinks(
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+  ): Promise<unknown> {
+    return this.agencyLinks.list({ status, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Get("agency-links/:id")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async agencyLinkDetail(@Param("id") id: string): Promise<unknown> {
+    return this.agencyLinks.detail(id);
   }
 }

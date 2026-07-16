@@ -214,6 +214,19 @@ export interface OutboxEventItem {
   processedAt: string | null;
 }
 
+/** 代理店連携状態一覧 (開発ガイドライン15章)。account_links のうちAGENCY_SYSTEM分。 */
+export interface AgencyLinkItem {
+  id: string;
+  externalUserId: string;
+  status: "PENDING" | "ACTIVE" | "REVOKED";
+  linkMethod: string;
+  linkedAt: string;
+  verifiedAt: string | null;
+  revokedAt: string | null;
+  metadata: Record<string, unknown> | null;
+  account: { id: string; accountCode: string; displayName: string | null } | null;
+}
+
 export type FeatureFlags = Record<
   | "ENABLE_PLATFORM_USER_ID"
   | "ENABLE_WALLET_REFERRAL_TOKEN"

@@ -8,6 +8,7 @@ import { AdminMigrationService } from "./admin-migration.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
+import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AccountsModule } from "../accounts/accounts.module";
 
 @Module({
@@ -22,6 +23,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminAccountMergeService,
     AdminApprovalService,
     AdminRewardRulesService,
+    AdminAgencyLinksService,
   ],
 })
 export class AdminModule {}

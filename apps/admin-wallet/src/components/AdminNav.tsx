@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/bulk-grants", label: "CSV一括付与" },
   { href: "/reward-rules", label: "付与ルール管理" },
   { href: "/service-integrations", label: "外部サービス管理" },
+  { href: "/agency-links", label: "代理店連携状態" },
   { href: "/migrations", label: "既存ユーザー移行" },
   { href: "/approval-requests", label: "二段階承認" },
   { href: "/audit-logs", label: "操作ログ" },
