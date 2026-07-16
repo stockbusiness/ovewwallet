@@ -29,7 +29,7 @@ export class TransactionsService {
         },
       },
     });
-    if (!link) throw new NotFoundException("no OVE account linked to this external_user_id");
+    if (!link || !link.oveAccountId) throw new NotFoundException("no OVE account linked to this external_user_id");
 
     const wallet = await this.db.wallet.findUniqueOrThrow({ where: { oveAccountId: link.oveAccountId } });
 

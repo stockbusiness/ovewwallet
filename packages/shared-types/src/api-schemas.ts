@@ -55,6 +55,41 @@ export const TransactionResponseSchema = z.object({
 });
 export type TransactionResponse = z.infer<typeof TransactionResponseSchema>;
 
+/**
+ * POST /api/integrations/agencies (戦国経済圏代理店システム外部連携API仕様書
+ * v3.6.71 7章)。sengoku-ai.comから代理店情報の同期を受信する。将来の
+ * フィールド追加(仕様書付則)に備え、未知のフィールドは無視せず素通りさせる
+ * (.passthrough())。connection_test/dry_runの場合はexternal_id以外は
+ * 送られないことがあるため、external_id以外は全て任意とする。
+ */
+export const AgencySyncRequestSchema = z
+  .object({
+    event: z.string().max(50).optional(),
+    dry_run: z.boolean().optional(),
+    source: z.string().max(100).optional(),
+    external_id: z.string().min(1).max(255),
+    parent_external_id: z.string().max(255).nullable().optional(),
+    common_user_id: z.string().max(255).nullable().optional(),
+    referral_token: z.string().max(255).nullable().optional(),
+    name: z.string().max(255).nullable().optional(),
+    contact_name: z.string().max(255).nullable().optional(),
+    contact_email: z.string().email().max(255).nullable().optional(),
+    login_email: z.string().email().max(255).nullable().optional(),
+    phone: z.string().max(50).nullable().optional(),
+    role: z.string().max(50).nullable().optional(),
+    role_label: z.string().max(100).nullable().optional(),
+    status: z.string().max(50).nullable().optional(),
+  })
+  .passthrough();
+export type AgencySyncRequest = z.infer<typeof AgencySyncRequestSchema>;
+
+/** POST /api/v1/auth/sso/agency (仕様書12章)。sengoku-ai.com発行のSSO用JWTでログインする。 */
+export const AgencySsoLoginRequestSchema = z.object({
+  token: z.string().min(1),
+  termsAccepted: z.boolean().optional(),
+});
+export type AgencySsoLoginRequest = z.infer<typeof AgencySsoLoginRequestSchema>;
+
 export const BalanceResponseSchema = z.object({
   ove_account_id: z.string(),
   wallet_id: z.string(),

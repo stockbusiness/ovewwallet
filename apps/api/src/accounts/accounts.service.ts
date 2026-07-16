@@ -129,7 +129,7 @@ export class AccountsService {
       },
       include: { account: true },
     });
-    if (existingLink) return existingLink.account;
+    if (existingLink?.account) return existingLink.account;
 
     return this.db.$transaction(async (tx) => {
       const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
@@ -142,17 +142,27 @@ export class AccountsService {
         data: { id: generateId(), oveAccountId: account.id, walletCode, status: "ACTIVE" },
       });
 
-      await tx.accountLink.create({
-        data: {
-          id: generateId(),
-          oveAccountId: account.id,
-          serviceIntegrationId: params.serviceIntegrationId,
-          externalUserId: params.externalUserId,
-          status: "ACTIVE",
-          linkMethod: "API_AUTO_PROVISION",
-          verifiedAt: new Date(),
-        },
-      });
+      if (existingLink) {
+        // PENDING (代理店同期等で受信済みだがOVEアカウント未作成) の連携が既にある
+        // 場合は、新規作成したアカウントへ昇格させる (重複するaccount_links行を
+        // 作らない。serviceIntegrationId+externalUserIdの一意制約に抵触するため)。
+        await tx.accountLink.update({
+          where: { id: existingLink.id },
+          data: { oveAccountId: account.id, status: "ACTIVE", verifiedAt: new Date() },
+        });
+      } else {
+        await tx.accountLink.create({
+          data: {
+            id: generateId(),
+            oveAccountId: account.id,
+            serviceIntegrationId: params.serviceIntegrationId,
+            externalUserId: params.externalUserId,
+            status: "ACTIVE",
+            linkMethod: "API_AUTO_PROVISION",
+            verifiedAt: new Date(),
+          },
+        });
+      }
 
       await tx.auditLog.create({
         data: {

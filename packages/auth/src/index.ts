@@ -4,5 +4,6 @@ export * from "./session";
 export * from "./kv-store";
 export * from "./email-otp";
 export * from "./sso";
+export * from "./agency-sso";
 export * from "./external-api-auth";
 export * from "./totp";

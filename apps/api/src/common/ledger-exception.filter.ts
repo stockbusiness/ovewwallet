@@ -20,7 +20,7 @@ import {
   WalletNotActiveError,
   WalletNotFoundError,
 } from "@ove/ledger";
-import { ExternalApiAuthError } from "@ove/auth";
+import { ExternalApiAuthError, AgencySsoVerificationError } from "@ove/auth";
 import type { RequestWithId } from "./request-id.middleware";
 
 const NOT_FOUND_ERRORS = [WalletNotFoundError, TransactionNotFoundError, HoldNotFoundError, AccountNotFoundError];
@@ -67,7 +67,7 @@ export class LedgerExceptionFilter implements ExceptionFilter {
       }
     }
 
-    if (exception instanceof ExternalApiAuthError) {
+    if (exception instanceof ExternalApiAuthError || exception instanceof AgencySsoVerificationError) {
       response.status(HttpStatus.UNAUTHORIZED).json({
         error: exception.name,
         message: exception.message,

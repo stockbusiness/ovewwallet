@@ -98,6 +98,8 @@ pnpm test:load                    # 簡易負荷・レート制限限界値テ�
 - `docs/ledger-rules.md` — 台帳ルール・整合性チェック
 - `docs/external-api.md` — 外部サービスAPI仕様
 - `docs/integration-outbox.md` — Transactional Outbox・Feature Flag基盤
+- `docs/agency-integration.md` — 戦国経済圏代理店システム(sengoku-ai.com)外部連携
+  (同期受信API・SSOログイン、外部連携API仕様書v3.6.71対応)
 - `docs/admin-operations.md` — 管理画面操作
 - `docs/ui-design.md` — 戦国ウォレット UIデザインシステム (デザイントークン・共通コンポーネント)
 - `docs/migration.md` — 既存ユーザー移行 (設計のみ、実装は未着手)

@@ -67,6 +67,34 @@ async function main() {
     console.log(`  service_integrations: ${serviceCode} apiKey=${apiKey} signingSecret=${signingSecret}`);
   }
 
+  // 戦国経済圏代理店システム(sengoku-ai.com)向けAPIキー (外部連携API仕様書5章)。
+  // 開発ガイドライン9.1章の方針により、既存のServiceIntegrationを再利用する
+  // (ServiceCode.AGENCY_SYSTEM)。ただし相手システムはHMAC署名に対応していない
+  // ため、signingSecretは実際には検証に使わないダミー値を保存するだけになる
+  // (認証はAgencyApiKeyGuardによるx-api-key/Bearerの単純な鍵照合のみ)。
+  const existingAgencyIntegration = await prisma.serviceIntegration.findUnique({
+    where: { serviceCode: "AGENCY_SYSTEM" },
+  });
+  if (!existingAgencyIntegration) {
+    const partnerApiKey = `oveagn_${generateOpaqueToken(24)}`;
+    const unusedSigningSecret = generateOpaqueToken(32);
+    const encryptionKey = process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
+
+    await prisma.serviceIntegration.create({
+      data: {
+        id: generateId(),
+        serviceCode: "AGENCY_SYSTEM",
+        serviceName: "戦国経済圏代理店システム (sengoku-ai.com)",
+        apiKeyHash: hashSecret(partnerApiKey),
+        signingSecretEncrypted: encryptSecret(unusedSigningSecret, encryptionKey),
+        allowedIps: [],
+        dailyAmountLimit: 0,
+        perRequestAmountLimit: 0,
+      },
+    });
+    console.log(`  service_integrations: AGENCY_SYSTEM apiKey=${partnerApiKey}`);
+  }
+
   // 初期付与ルール (指示書9章)
   await prisma.rewardRule.upsert({
     where: { ruleCode: "SENGOKU_REGISTRATION_BONUS" },

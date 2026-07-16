@@ -4,6 +4,7 @@ import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
+import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/shared-types";
 import { AuthService } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
@@ -74,6 +75,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const session = await this.auth.loginWithSengokuSso(body.code, body.termsAccepted);
+    setSessionCookie(res, session.token, session.expiresAt);
+    return { ove_account_id: session.oveAccountId };
+  }
+
+  /** sengoku-ai.com代理店システムSSO (外部連携API仕様書12章)。 */
+  @Post("sso/agency")
+  async agencySsoLogin(
+    @Body(new ZodValidationPipe(AgencySsoLoginRequestSchema)) body: AgencySsoLoginRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const session = await this.auth.loginWithAgencySso(body.token, body.termsAccepted);
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }

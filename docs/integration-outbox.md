@@ -57,19 +57,22 @@
 (`apps/api/src/common/feature-flags.ts`)。DBには保存せず、環境変数のみを真実源とする
 (`HIGH_VALUE_THRESHOLD`など既存の環境変数駆動の設定と同じ考え方)。
 
-| フラグ | 用途 (将来) |
+| フラグ | 用途 |
 |---|---|
-| `ENABLE_PLATFORM_USER_ID` | 共通プラットフォームユーザーIDの利用 |
-| `ENABLE_WALLET_REFERRAL_TOKEN` | 紹介トークンの受け取り |
-| `ENABLE_AGENCY_REFERRAL_SYNC` | 代理店紹介関係の同期 |
-| `ENABLE_AGENCY_SYNC_RETRY` | 代理店同期の自動再送 |
-| `ENABLE_WALLET_REGISTRATION_BONUS` | 登録ボーナス連携 |
-| `ENABLE_EXTERNAL_REWARD_TYPES` | 外部サービス起点の付与種別 |
-| `ENABLE_ONCHAIN_MIGRATION` | オンチェーン移行 |
+| `ENABLE_PLATFORM_USER_ID` | 共通プラットフォームユーザーIDの利用 (将来) |
+| `ENABLE_WALLET_REFERRAL_TOKEN` | 紹介トークンの受け取り (将来) |
+| `ENABLE_AGENCY_REFERRAL_SYNC` | 代理店システム(sengoku-ai.com)外部連携API (`POST /api/integrations/agencies`) の有効化。`docs/agency-integration.md`参照 |
+| `ENABLE_AGENCY_SYNC_RETRY` | 代理店同期の自動再送 (将来) |
+| `ENABLE_WALLET_REGISTRATION_BONUS` | 登録ボーナス連携 (将来) |
+| `ENABLE_EXTERNAL_REWARD_TYPES` | 外部サービス起点の付与種別 (将来) |
+| `ENABLE_ONCHAIN_MIGRATION` | オンチェーン移行 (将来) |
 
-すべて既定で`false`。現時点ではどのコードもこれらのフラグを参照しておらず、
-OFFのままで既存のログイン・残高表示・取引履歴・管理画面が壊れないことを自動テストで
-確認済み (`apps/api/src/e2e/outbox.test.ts` の "Feature Flags" スイート)。
+すべて既定で`false`。`ENABLE_AGENCY_REFERRAL_SYNC`以外は現時点でどのコードも
+参照しておらず、OFFのままで既存のログイン・残高表示・取引履歴・管理画面が
+壊れないことを自動テストで確認済み (`apps/api/src/e2e/outbox.test.ts` の
+"Feature Flags" スイート)。`ENABLE_AGENCY_REFERRAL_SYNC`がOFFの場合、
+`POST /api/integrations/agencies` は503を返す
+(`apps/api/src/e2e/agency-integration.test.ts`)。
 `GET /api/v1/admin/feature-flags` で現在値を確認できる (管理画面からの変更は不可)。
 
 ## 今後 (Phase 2以降)

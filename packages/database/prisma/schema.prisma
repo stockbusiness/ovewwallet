@@ -31,6 +31,8 @@ enum IdentityType {
   BLOCKCHAIN_WALLET
   /// 既存ユーザー移行 (指示書15章) で旧システムのユーザーIDを紐付けるための識別子種別。
   LEGACY_SYSTEM
+  /// 戦国経済圏代理店システム(sengoku-ai.com)のSSO(JWT/JWKS)でログインしたユーザー。
+  SENGOKU_AGENCY
 }
 
 enum IdentityStatus {
@@ -46,6 +48,12 @@ enum ServiceCode {
   NFT_MARKET
   SENGOKU_METAVERSE
   EVENT_SYSTEM
+  /// 戦国経済圏代理店システム(sengoku-ai.com、外部連携API仕様書v3.6.71)。
+  /// x-api-key/Bearerのみの単純な鍵認証で、HMAC署名検証は行わない
+  /// (開発ガイドライン9.1章: 新しい認証方式を乱立させず既存のservice_integrationsを
+  /// 再利用する方針だが、相手システムがHMAC署名に対応していないため認証ロジック自体は
+  /// 簡易版を別途用意している。`AgencyApiKeyGuard`参照)。
+  AGENCY_SYSTEM
 }
 
 enum ServiceIntegrationStatus {
@@ -55,6 +63,9 @@ enum ServiceIntegrationStatus {
 }
 
 enum AccountLinkStatus {
+  /// OVEアカウントとまだ紐付いていない、外部側からの同期のみ受信した状態
+  /// (開発ガイドライン5.5章の"SYNC_PENDING"相当)。
+  PENDING
   ACTIVE
   REVOKED
 }
@@ -298,7 +309,9 @@ model ApiAccessLog {
 
 model AccountLink {
   id                   String            @id
-  oveAccountId         String            @map("ove_account_id")
+  /// OVEアカウントとまだ紐付いていない同期受信のみの状態 (PENDING) を表現するため
+  /// nullableにしている (開発ガイドライン5.5章のSYNC_PENDING相当)。
+  oveAccountId         String?           @map("ove_account_id")
   serviceIntegrationId String            @map("service_integration_id")
   externalUserId       String            @map("external_user_id")
   status               AccountLinkStatus @default(ACTIVE)
@@ -308,7 +321,7 @@ model AccountLink {
   revokedAt            DateTime?         @map("revoked_at")
   metadata             Json?
 
-  account            OveAccount         @relation(fields: [oveAccountId], references: [id])
+  account            OveAccount?        @relation(fields: [oveAccountId], references: [id])
   serviceIntegration ServiceIntegration @relation(fields: [serviceIntegrationId], references: [id])
 
   @@unique([serviceIntegrationId, externalUserId])
@@ -600,3 +613,13 @@ model IntegrationOutbox {
   @@index([destinationService])
   @@map("integration_outbox")
 }
+
+// =====================================================================
+// 12. 戦国経済圏代理店システム(sengoku-ai.com)外部連携
+// (外部連携API仕様書 v3.6.71、開発ガイドライン v1.0)
+//
+// 開発ガイドライン4.3章/9.1章の方針に従い、専用テーブルは持たず既存の
+// ServiceIntegration(ServiceCode.AGENCY_SYSTEM) + AccountLink を再利用する。
+// 認証ロジックのみ、sengoku-ai.com側がHMAC署名に対応していないため簡易版
+// (AgencyApiKeyGuard) を別途用意している。
+// =====================================================================

@@ -58,7 +58,7 @@ export class WalletsService {
     const link = await this.db.accountLink.findUnique({
       where: { serviceIntegrationId_externalUserId: { serviceIntegrationId, externalUserId } },
     });
-    if (!link) throw new NotFoundException("no OVE account linked to this external_user_id");
+    if (!link || !link.oveAccountId) throw new NotFoundException("no OVE account linked to this external_user_id");
     return this.getBalance(link.oveAccountId);
   }
 }

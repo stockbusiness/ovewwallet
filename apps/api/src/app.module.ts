@@ -12,6 +12,7 @@ import { TransactionsModule } from "./transactions/transactions.module";
 import { AuthModule } from "./auth/auth.module";
 import { AdminModule } from "./admin/admin.module";
 import { OutboxModule } from "./outbox/outbox.module";
+import { AgencyModule } from "./agency/agency.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -26,6 +27,7 @@ import { HealthController } from "./health.controller";
     AuthModule,
     AdminModule,
     OutboxModule,
+    AgencyModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

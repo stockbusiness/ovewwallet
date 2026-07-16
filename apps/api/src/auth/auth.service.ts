@@ -4,6 +4,7 @@ import {
   OtpVerificationError,
   SengokuSsoService,
   MockLineAuthVerifier,
+  AgencySsoVerifier,
   issueSession,
   hashSessionToken,
   type KeyValueStore,
@@ -12,20 +13,32 @@ import { generateId, type PrismaClient } from "@ove/database";
 import { KV_STORE } from "../common/kv-store.module";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
+import { AgencyService } from "../agency/agency.service";
 
 @Injectable()
 export class AuthService {
   private readonly emailOtp: EmailOtpService;
   private readonly sengokuSso: SengokuSsoService;
   private readonly lineVerifier = new MockLineAuthVerifier();
+  private readonly agencySso: AgencySsoVerifier;
 
   constructor(
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
+    private readonly agencyService: AgencyService,
   ) {
     this.emailOtp = new EmailOtpService(kv);
     this.sengokuSso = new SengokuSsoService(kv);
+    // sengoku-ai.com代理店システムのSSO(外部連携API仕様書12章)。
+    // SENGOKU_AI_SSO_AUDIENCE未設定時は実在しないプレースホルダー値を使い、
+    // (起動時にエラーにするのではなく)実際のJWT検証が必ず失敗する安全側の
+    // デフォルトにする。
+    this.agencySso = new AgencySsoVerifier(kv, {
+      issuer: process.env.SENGOKU_AI_SSO_ISSUER || "https://sengoku-ai.com",
+      audience: process.env.SENGOKU_AI_SSO_AUDIENCE || "unconfigured-sengoku-ai-sso-audience",
+      jwks: process.env.SENGOKU_AI_JWKS_URL || "https://sengoku-ai.com/api/sso/jwks.php",
+    });
   }
 
   async requestEmailOtp(email: string): Promise<{ devCode?: string }> {
@@ -81,6 +94,40 @@ export class AuthService {
       providerSubject: sengokuMemberId,
       termsAccepted,
     });
+    return this.createSessionForAccount(account.id);
+  }
+
+  /**
+   * sengoku-ai.com代理店システムのSSO (外部連携API仕様書12章)。
+   * RS256+JWKSでJWTを検証し、external_id/subでOVEアカウントを解決してログインさせる。
+   */
+  async loginWithAgencySso(token: string, termsAccepted?: boolean) {
+    const claims = await this.agencySso.verify(token);
+    const account = await this.accounts.findOrCreateByIdentity({
+      identityType: "SENGOKU_AGENCY",
+      provider: "sengoku-ai",
+      providerSubject: claims.externalId,
+      email: claims.contactEmail,
+      displayName: claims.agencyName ?? claims.contactName,
+      termsAccepted,
+    });
+    // account_links (開発ガイドライン4.3章) にexternal_id⇔OVEアカウントの紐付けを
+    // 反映する。ServiceIntegrationが未作成(seed未実行等)の場合はスキップし、
+    // ログイン自体は失敗させない(セッション発行はAccountIdentityだけで完結する)。
+    const serviceIntegrationId = await this.agencyService.getServiceIntegrationId();
+    if (serviceIntegrationId) {
+      await this.agencyService.linkAccount({
+        serviceIntegrationId,
+        externalId: claims.externalId,
+        oveAccountId: account.id,
+        claims: {
+          agencyName: claims.agencyName,
+          contactName: claims.contactName,
+          contactEmail: claims.contactEmail,
+          roleLabel: claims.roleLabel,
+        },
+      });
+    }
     return this.createSessionForAccount(account.id);
   }
 
