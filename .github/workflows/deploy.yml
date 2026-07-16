@@ -229,15 +229,24 @@ jobs:
         run: |
           set -e
           railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
-          echo "APP_URL=${{ inputs.app_url }}"
-          echo "ADMIN_URL=${{ inputs.admin_url }}"
+          # ブラウザのOriginヘッダーは末尾スラッシュを含まないため、CORSの許可リストと
+          # 比較するURLも末尾スラッシュを除去しておく(付いたままだと一致せず、
+          # Access-Control-Allow-Originが返らずCORSエラーになる)。
+          APP_URL="${{ inputs.app_url }}"
+          ADMIN_URL="${{ inputs.admin_url }}"
+          APP_URL="${APP_URL%/}"
+          ADMIN_URL="${ADMIN_URL%/}"
+          echo "APP_URL=$APP_URL"
+          echo "ADMIN_URL=$ADMIN_URL"
           # 両方とも--skip-deploysで設定し、暗黙の再デプロイをトリガーしない。
           # (片方だけskip-deploysを付けないと、暗黙の再デプロイと直後のrestartが
           # タイミング競合し、新しい変数が反映される前の古いインスタンスのまま
           # 止まることがある。restartで明示的に1回だけ再起動して確実に反映する)
-          railway variable set "APP_URL=${{ inputs.app_url }}" --service api --skip-deploys --json
-          railway variable set "ADMIN_URL=${{ inputs.admin_url }}" --service api --skip-deploys --json
-          railway service restart --service api
+          railway variable set "APP_URL=$APP_URL" --service api --skip-deploys --json
+          railway variable set "ADMIN_URL=$ADMIN_URL" --service api --skip-deploys --json
+          railway service restart --service api --yes
+          echo "app_url=$APP_URL" >> "$GITHUB_ENV"
+          echo "admin_url=$ADMIN_URL" >> "$GITHUB_ENV"
 
       - name: Wait for API to become healthy again
         run: |
@@ -261,7 +270,7 @@ jobs:
         run: |
           set -e
           API_URL="${{ needs.deploy-api.outputs.api_url }}"
-          for ORIGIN in "${{ inputs.app_url }}" "${{ inputs.admin_url }}"; do
+          for ORIGIN in "$app_url" "$admin_url"; do
             echo "確認中: Origin=$ORIGIN"
             HEADERS=$(curl -sS -i -X OPTIONS \
               -H "Origin: $ORIGIN" \
@@ -279,5 +288,5 @@ jobs:
         run: |
           echo "### CORS設定を更新しました" >> "$GITHUB_STEP_SUMMARY"
           echo "- API: ${{ needs.deploy-api.outputs.api_url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- APP_URL: ${{ inputs.app_url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- ADMIN_URL: ${{ inputs.admin_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- APP_URL: $app_url" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ADMIN_URL: $admin_url" >> "$GITHUB_STEP_SUMMARY"
