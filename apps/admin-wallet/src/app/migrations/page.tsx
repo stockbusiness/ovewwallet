@@ -10,9 +10,17 @@ interface MigrationRequestResult {
   approvalRequestId: string;
 }
 
+/** 移行CSVの文字コード選択肢。Shift_JISは古い社内システムからのエクスポートで多い。 */
+const CSV_ENCODINGS = [
+  { value: "utf-8", label: "UTF-8" },
+  { value: "shift_jis", label: "Shift_JIS" },
+] as const;
+type CsvEncoding = (typeof CSV_ENCODINGS)[number]["value"];
+
 export default function MigrationsPage() {
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState<string | null>(null);
+  const [encoding, setEncoding] = useState<CsvEncoding>("utf-8");
   const [batchName, setBatchName] = useState("");
   const [reason, setReason] = useState("");
   const [result, setResult] = useState<MigrationRequestResult | null>(null);
@@ -32,23 +40,41 @@ export default function MigrationsPage() {
     loadReviewingAccounts();
   }, [loadReviewingAccounts]);
 
+  function decodeFile(file: File, enc: CsvEncoding) {
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const buffer = reader.result as ArrayBuffer;
+        setCsvContent(new TextDecoder(enc).decode(buffer));
+      } catch {
+        setCsvContent(null);
+        setError("CSVの読み込みに失敗しました (文字コードの選択が正しいか確認してください)");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setFileName(file.name);
+    setSelectedFile(file);
     setResult(null);
-    const reader = new FileReader();
-    reader.onload = () => setCsvContent(String(reader.result));
-    reader.readAsText(file, "utf-8");
+    decodeFile(file, encoding);
+  }
+
+  function onEncodingChange(enc: CsvEncoding) {
+    setEncoding(enc);
+    if (selectedFile) decodeFile(selectedFile, enc);
   }
 
   async function requestExecution() {
-    if (!csvContent || !fileName || !batchName || !reason) return;
+    if (!csvContent || !selectedFile || !batchName || !reason) return;
     setError(null);
     try {
       const res = await apiFetch<MigrationRequestResult>("/api/v1/admin/migrations/request", {
         method: "POST",
-        body: JSON.stringify({ fileName, csvContent, batchName, reason }),
+        body: JSON.stringify({ fileName: selectedFile.name, csvContent, batchName, reason }),
       });
       setResult(res);
     } catch (err) {
@@ -63,9 +89,11 @@ export default function MigrationsPage() {
         <h1 className="mb-1 text-xl font-bold">既存ユーザー移行</h1>
         <p className="mb-4 text-xs text-neutral-500">
           形式: old_user_id,old_balance (old_balance を空欄にすると「残高不明」として扱われ、
-          推定値を入れずアカウントは REVIEWING 状態になります)。移行の実行は事前承認制であり、
-          ここでの申請だけでは実行されません。申請者本人以外の管理者が
-          「二段階承認」画面でCSVの内容を確認し承認した時点で初めて実行されます。
+          推定値を入れずアカウントは REVIEWING 状態になります)。旧システムのエクスポートが
+          Shift_JISの場合は文字コードを切り替えてください (文字化けする場合はCSVを
+          読み込み直します)。移行の実行は事前承認制であり、ここでの申請だけでは実行されません。
+          申請者本人以外の管理者が「二段階承認」画面でCSVの内容を確認し承認した時点で
+          初めて実行されます。
         </p>
 
         <div className="mb-4 space-y-3">
@@ -80,6 +108,20 @@ export default function MigrationsPage() {
               />
             </label>
             <input type="file" accept=".csv,text/csv" onChange={onFileChange} className="text-sm" />
+            <label className="text-xs">
+              文字コード
+              <select
+                value={encoding}
+                onChange={(e) => onEncodingChange(e.target.value as CsvEncoding)}
+                className="ml-2 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              >
+                {CSV_ENCODINGS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <label className="block text-xs">
             申請理由

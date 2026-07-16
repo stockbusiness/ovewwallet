@@ -22,6 +22,16 @@ old_user_id,old_balance
 `old_balance` を空欄にすると「残高不明」として扱われ、**推定残高を入れずに**
 `ove_accounts.status = REVIEWING` にする (指示書の禁止事項を遵守)。
 
+### 文字コード (UTF-8 / Shift_JIS)
+
+`/migrations` 画面でファイル選択時に文字コード (UTF-8 / Shift_JIS) を選べる
+(`apps/admin-wallet/src/app/migrations/page.tsx`)。旧システムのエクスポートが
+Shift_JISであることが多いため対応した。サーバー側はCSVの内容を常にJSON文字列
+(UTF-8) として受け取るだけなので、変換はブラウザ側で `TextDecoder` を使い、
+アップロードされたファイルを選択された文字コードでデコードしてから送信する
+形で完結する (サーバー側APIの変更は不要)。文字コードの選択を間違えると
+文字化けするため、選び直した場合はファイルを再デコードする。
+
 ## 処理内容
 
 1. CSV全体のSHA-256ハッシュを `migration_batches.source_data_hash` として保存
@@ -120,4 +130,5 @@ E2Eテスト (`apps/api/src/e2e/migration.test.ts`) で、申請だけでは実�
 
 ## 未実装・今後の課題
 
-- 文字コード変換 (Shift_JIS等) は未対応。UTF-8のCSVのみを想定している。
+現時点で把握している未実装項目はない。文字コード対応 (Shift_JIS) も含め、
+このドキュメント記載の範囲は対応済み。
