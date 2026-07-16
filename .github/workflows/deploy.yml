@@ -231,9 +231,49 @@ jobs:
           railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
           echo "APP_URL=${{ inputs.app_url }}"
           echo "ADMIN_URL=${{ inputs.admin_url }}"
+          # 両方とも--skip-deploysで設定し、暗黙の再デプロイをトリガーしない。
+          # (片方だけskip-deploysを付けないと、暗黙の再デプロイと直後のrestartが
+          # タイミング競合し、新しい変数が反映される前の古いインスタンスのまま
+          # 止まることがある。restartで明示的に1回だけ再起動して確実に反映する)
           railway variable set "APP_URL=${{ inputs.app_url }}" --service api --skip-deploys --json
-          railway variable set "ADMIN_URL=${{ inputs.admin_url }}" --service api --json
-          railway service restart --service api || true
+          railway variable set "ADMIN_URL=${{ inputs.admin_url }}" --service api --skip-deploys --json
+          railway service restart --service api
+
+      - name: Wait for API to become healthy again
+        run: |
+          set -e
+          URL="${{ needs.deploy-api.outputs.api_url }}/health"
+          for i in $(seq 1 30); do
+            CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$URL" || echo "000")
+            echo "試行 $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              echo "再起動後のヘルスチェック成功"
+              break
+            fi
+            if [ "$i" = "30" ]; then
+              echo "再起動後、5分待ってもAPIが復帰しませんでした"
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Verify CORS headers actually reflect the new APP_URL/ADMIN_URL
+        run: |
+          set -e
+          API_URL="${{ needs.deploy-api.outputs.api_url }}"
+          for ORIGIN in "${{ inputs.app_url }}" "${{ inputs.admin_url }}"; do
+            echo "確認中: Origin=$ORIGIN"
+            HEADERS=$(curl -sS -i -X OPTIONS \
+              -H "Origin: $ORIGIN" \
+              -H "Access-Control-Request-Method: GET" \
+              "$API_URL/api/v1/accounts/me")
+            echo "$HEADERS"
+            if ! echo "$HEADERS" | grep -qi "access-control-allow-origin: $ORIGIN"; then
+              echo "エラー: $ORIGIN に対して access-control-allow-origin ヘッダーが返っていません"
+              exit 1
+            fi
+            echo "OK: $ORIGIN は許可されています"
+          done
 
       - name: Summary
         run: |
