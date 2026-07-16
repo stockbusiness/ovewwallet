@@ -3,6 +3,7 @@ import { generateId, type Prisma, type PrismaClient } from "@ove/database";
 import { creditWallet, debitWallet, mergeAccounts } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { serializeTransaction } from "../wallets/wallets.service";
+import { AdminMigrationService } from "./admin-migration.service";
 
 /**
  * 高額付与/高額減算の申請しきい値 (OVE)。この値以上の個別付与・減算は即時実行されず、
@@ -28,15 +29,27 @@ export interface AccountMergePayload {
   idempotencyKey: string;
 }
 
+export interface MigrationExecutionPayload {
+  kind: "MIGRATION_EXECUTION";
+  batchName: string;
+  fileName: string;
+  csvContent: string;
+  reason: string;
+}
+
 /**
  * 二段階承認の基本ワークフロー (指示書13章)。申請者と承認者は必ず別人でなければならない。
- * 高額付与・高額減算 (金額しきい値以上のみ) に加え、アカウント統合 (常に対象、金額に
- * 関わらず全件承認制) を対象とする。オンチェーン移行・外部ウォレット変更・API上限変更は
- * `approval_requests.request_type` の値だけ用意し、ワークフロー自体は今後の拡張とする。
+ * 高額付与・高額減算 (金額しきい値以上のみ)、アカウント統合 (常に対象、金額に関わらず
+ * 全件承認制)、既存ユーザー移行の実行 (常に対象、`docs/migration.md` 参照) を対象とする。
+ * オンチェーン移行・外部ウォレット変更・API上限変更は `approval_requests.request_type`
+ * の値だけ用意し、ワークフロー自体は今後の拡張とする。
  */
 @Injectable()
 export class AdminApprovalService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly migration: AdminMigrationService,
+  ) {}
 
   async list(status?: string): Promise<unknown[]> {
     return this.db.approvalRequest.findMany({
@@ -141,6 +154,53 @@ export class AdminApprovalService {
     return approvalRequest;
   }
 
+  /**
+   * 既存ユーザー移行の実行を申請する (指示書15章)。金額によらず常に承認が必要。
+   * CSVの内容そのものを申請時点でpayloadに保存するため、承認者は実行前の内容を
+   * そのまま確認できる (承認時に別内容へ差し替えられることはない)。
+   */
+  async requestMigrationExecution(params: {
+    batchName: string;
+    fileName: string;
+    csvContent: string;
+    reason: string;
+    requestedBy: string;
+  }): Promise<unknown> {
+    const payload: MigrationExecutionPayload = {
+      kind: "MIGRATION_EXECUTION",
+      batchName: params.batchName,
+      fileName: params.fileName,
+      csvContent: params.csvContent,
+      reason: params.reason,
+    };
+
+    const approvalRequest = await this.db.approvalRequest.create({
+      data: {
+        id: generateId(),
+        requestType: "MIGRATION_EXECUTION",
+        status: "PENDING",
+        requestedBy: params.requestedBy,
+        payload: payload as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "ADMIN",
+        actorId: params.requestedBy,
+        actionType: "APPROVAL_REQUEST_CREATED",
+        targetType: "approval_request",
+        targetId: approvalRequest.id,
+        result: "SUCCESS",
+        reason: params.reason,
+        afterData: { requestType: "MIGRATION_EXECUTION", batchName: params.batchName, fileName: params.fileName },
+      },
+    });
+
+    return approvalRequest;
+  }
+
   async approve(requestId: string, approverId: string): Promise<unknown> {
     const approvalRequest = await this.db.approvalRequest.findUnique({ where: { id: requestId } });
     if (!approvalRequest) throw new NotFoundException("approval request not found");
@@ -169,6 +229,23 @@ export class AdminApprovalService {
       );
       resultPayload = mergeResult;
       auditAfterData = { transferredAmount: mergeResult.transferredAmount };
+    } else if (approvalRequest.requestType === "MIGRATION_EXECUTION") {
+      const payload = approvalRequest.payload as unknown as MigrationExecutionPayload;
+      // 実行者 = 申請者 (移行を依頼した管理者)、検証者 = 承認者 (内容を確認し実行を許可した管理者)。
+      const summary = await this.migration.execute(
+        payload.csvContent,
+        payload.fileName,
+        payload.batchName,
+        approvalRequest.requestedBy,
+        approverId,
+      );
+      resultPayload = summary;
+      auditAfterData = {
+        batchId: summary.batchId,
+        successCount: summary.successCount,
+        reviewingCount: summary.reviewingCount,
+        errorCount: summary.errorCount,
+      };
     } else {
       const payload = approvalRequest.payload as unknown as HighValueGrantPayload;
       const amount = BigInt(payload.amount);

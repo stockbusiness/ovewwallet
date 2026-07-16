@@ -16,14 +16,22 @@ import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 describe("migration review resolution (指示書15章 検証者フロー)", () => {
   let app: INestApplication;
   let adminCookie: string[];
+  let requesterCookie: string[];
+  let approverCookie: string[];
 
+  /** 移行実行は事前承認制 (指示書15章) のため、申請 → 別管理者による承認、の順に呼び出す。 */
   async function createReviewingAccount(): Promise<{ accountId: string; walletId: string }> {
     const unknownUser = `legacy-review-${generateId()}`;
     const csvContent = ["old_user_id,old_balance", `${unknownUser},`].join("\n");
+
+    const requestRes = await request(app.getHttpServer())
+      .post("/api/v1/admin/migrations/request")
+      .set("Cookie", requesterCookie)
+      .send({ fileName: "legacy.csv", csvContent, batchName: `review-test-${generateId()}`, reason: "テスト移行" })
+      .expect(201);
     await request(app.getHttpServer())
-      .post("/api/v1/admin/migrations/execute")
-      .set("Cookie", adminCookie)
-      .send({ fileName: "legacy.csv", csvContent, batchName: `review-test-${generateId()}` })
+      .post(`/api/v1/admin/approval-requests/${requestRes.body.approvalRequestId}/approve`)
+      .set("Cookie", approverCookie)
       .expect(201);
 
     const identity = await prisma.accountIdentity.findUniqueOrThrow({
@@ -33,29 +41,32 @@ describe("migration review resolution (指示書15章 検証者フロー)", () =
     return { accountId: identity.account.id, walletId: identity.account.wallet!.id };
   }
 
+  async function createAdmin(displayName: string): Promise<string[]> {
+    const email = `e2e-migration-review-${generateId()}@ovewallet.local`;
+    const password = "e2e-test-password-123";
+    await prisma.adminUser.create({
+      data: {
+        id: generateId(),
+        adminCode: `OVE-ADM-${generateId()}`,
+        email,
+        passwordHash: hashSecret(password),
+        role: "SUPER_ADMIN",
+        displayName,
+      },
+    });
+    const loginRes = await request(app.getHttpServer()).post("/api/v1/admin/login").send({ email, password }).expect(201);
+    return loginRes.headers["set-cookie"] as unknown as string[];
+  }
+
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
 
-    const adminEmail = `e2e-migration-review-${generateId()}@ovewallet.local`;
-    const adminPassword = "e2e-test-password-123";
-    await prisma.adminUser.create({
-      data: {
-        id: generateId(),
-        adminCode: `OVE-ADM-${generateId()}`,
-        email: adminEmail,
-        passwordHash: hashSecret(adminPassword),
-        role: "SUPER_ADMIN",
-        displayName: "E2E Migration Review Admin",
-      },
-    });
-    const loginRes = await request(app.getHttpServer())
-      .post("/api/v1/admin/login")
-      .send({ email: adminEmail, password: adminPassword })
-      .expect(201);
-    adminCookie = loginRes.headers["set-cookie"] as unknown as string[];
+    adminCookie = await createAdmin("E2E Migration Review Admin");
+    requesterCookie = await createAdmin("E2E Migration Review Requester");
+    approverCookie = await createAdmin("E2E Migration Review Approver");
   });
 
   afterAll(async () => {

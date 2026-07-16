@@ -184,6 +184,13 @@ export interface ApprovalRequestItem {
         sourceAccountCode: string;
         targetAccountCode: string;
         reason: string;
+      }
+    | {
+        kind: "MIGRATION_EXECUTION";
+        batchName: string;
+        fileName: string;
+        csvContent: string;
+        reason: string;
       };
 }
 

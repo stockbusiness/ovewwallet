@@ -9,11 +9,15 @@ const KIND_LABEL: Record<string, string> = {
   HIGH_VALUE_GRANT: "高額付与",
   HIGH_VALUE_DEDUCTION: "高額減算",
   ACCOUNT_MERGE: "アカウント統合",
+  MIGRATION_EXECUTION: "既存ユーザー移行の実行",
 };
 
 function formatDetail(r: ApprovalRequestItem): string {
   if (r.payload.kind === "ACCOUNT_MERGE") {
     return `${r.payload.sourceAccountCode} → ${r.payload.targetAccountCode}`;
+  }
+  if (r.payload.kind === "MIGRATION_EXECUTION") {
+    return `${r.payload.batchName} (${r.payload.fileName})`;
   }
   return `${Number(r.payload.amount).toLocaleString("ja-JP")} OVE`;
 }
@@ -70,8 +74,8 @@ export default function ApprovalRequestsPage() {
       <main className="mx-auto max-w-5xl p-6">
         <h1 className="mb-1 text-xl font-bold">二段階承認</h1>
         <p className="mb-4 text-xs text-neutral-500">
-          高額付与・高額減算 (指示書13章のしきい値以上) およびアカウント統合 (金額によらず常に対象) は、
-          申請者本人以外の管理者が承認するまで実行されません。
+          高額付与・高額減算 (指示書13章のしきい値以上)、アカウント統合、既存ユーザー移行の実行
+          (いずれも金額によらず常に対象) は、申請者本人以外の管理者が承認するまで実行されません。
         </p>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 

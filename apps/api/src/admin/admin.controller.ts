@@ -8,7 +8,6 @@ import { AdminAuthService } from "./admin-auth.service";
 import { AdminService } from "./admin.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
-import { AdminMigrationService } from "./admin-migration.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
@@ -48,11 +47,11 @@ const BulkGrantExecuteSchema = z.object({
   batchId: z.string().optional(),
 });
 const ServiceIntegrationActionSchema = z.object({ reason: z.string().min(1) });
-const MigrationExecuteSchema = z.object({
+const MigrationRequestSchema = z.object({
   fileName: z.string().min(1),
   csvContent: z.string().min(1),
   batchName: z.string().min(1),
-  verifiedBy: z.string().optional(),
+  reason: z.string().min(1),
 });
 const ResolveReviewSchema = z.object({
   confirmedBalance: z.number().int().min(0),
@@ -104,7 +103,6 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly bulkGrant: AdminBulkGrantService,
     private readonly serviceIntegrations: AdminServiceIntegrationsService,
-    private readonly migration: AdminMigrationService,
     private readonly accountMerge: AdminAccountMergeService,
     private readonly approvals: AdminApprovalService,
     private readonly rewardRules: AdminRewardRulesService,
@@ -414,15 +412,24 @@ export class AdminController {
     return this.serviceIntegrations.reactivate(id, req.admin.id, body.reason);
   }
 
-  /** 既存ユーザー移行の実行 (指示書15章)。CSV形式: old_user_id,old_balance */
-  @Post("migrations/execute")
+  /**
+   * 既存ユーザー移行の実行を申請する (指示書15章)。CSV形式: old_user_id,old_balance。
+   * 金額によらず常に二段階承認 (申請者と別の管理者による承認、
+   * `approval-requests/:id/approve`) を経てから実際の移行が実行される。
+   * この呼び出し自体では移行は行われない。
+   */
+  @Post("migrations/request")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN")
-  async executeMigration(
-    @Body(new ZodValidationPipe(MigrationExecuteSchema)) body: z.infer<typeof MigrationExecuteSchema>,
+  async requestMigrationExecution(
+    @Body(new ZodValidationPipe(MigrationRequestSchema)) body: z.infer<typeof MigrationRequestSchema>,
     @Req() req: AuthenticatedAdminRequest,
   ) {
-    return this.migration.execute(body.csvContent, body.fileName, body.batchName, req.admin.id, body.verifiedBy);
+    const approvalRequest = (await this.approvals.requestMigrationExecution({
+      ...body,
+      requestedBy: req.admin.id,
+    })) as { id: string };
+    return { result: "PENDING_APPROVAL" as const, approvalRequestId: approvalRequest.id };
   }
 
   /**

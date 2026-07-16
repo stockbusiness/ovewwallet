@@ -2,10 +2,16 @@
 
 ## 実装状況
 
-移行実行API・管理画面を実装済み。
+移行実行API・管理画面を実装済み。移行の実行そのものは常に二段階承認 (事前承認制) の
+対象であり、申請しただけでは実行されない (下記「事前承認制・職務分離」参照)。
 
-- `POST /api/v1/admin/migrations/execute` (`apps/api/src/admin/admin-migration.service.ts`)
-- 管理画面: `/migrations` (`apps/admin-wallet/src/app/migrations/page.tsx`)
+- `POST /api/v1/admin/migrations/request` (`apps/api/src/admin/admin-approval.service.ts`
+  の `requestMigrationExecution()`): CSVの内容をそのまま承認申請として保存する。
+- `POST /api/v1/admin/approval-requests/:id/approve`: 申請者本人以外の管理者が承認すると、
+  このタイミングで初めて `AdminMigrationService.execute()` (`apps/api/src/admin/admin-migration.service.ts`)
+  が呼ばれ、実際の移行が実行される。
+- 管理画面: `/migrations` (`apps/admin-wallet/src/app/migrations/page.tsx`、申請のみ) +
+  `/approval-requests` (`apps/admin-wallet/src/app/approval-requests/page.tsx`、承認・却下)。
 
 ## CSV形式
 
@@ -71,11 +77,40 @@ E2Eテスト (`apps/api/src/e2e/migration-review.test.ts`) で、正の確認済
 `/migrations` 画面での一覧表示・アカウント詳細画面での解消操作・解消後のACTIVE反映と
 成功メッセージ表示を確認済み。
 
+## 事前承認制・職務分離 (移行実行そのもの)
+
+移行の実行は、アカウント統合 (`docs/admin-operations.md` 「二段階承認」参照) と同様に
+既存の二段階承認基盤 (`ApprovalRequest`/`AdminApprovalService`) に乗せてある。金額に
+関わらず常に対象で、しきい値方式ではない。
+
+1. `POST /api/v1/admin/migrations/request` (SUPER_ADMINのみ): CSVの内容
+   (`fileName`/`csvContent`/`batchName`) と申請理由を `approval_requests`
+   (`request_type: MIGRATION_EXECUTION`) にそのまま保存する。この時点では
+   `migration_batches` は作られず、移行は一切実行されない。
+2. `POST /api/v1/admin/approval-requests/:id/approve` (SUPER_ADMIN/OVE_OPERATOR):
+   申請者本人による承認は400で拒否される (`AdminApprovalService.approve()` の
+   職務分離チェック、高額付与・アカウント統合と共通のロジック)。申請者と異なる
+   管理者が承認して初めて、承認時点で保存されているCSVの内容で
+   `AdminMigrationService.execute()` が呼ばれる。
+3. 実行時の `migration_batches.executed_by` には**申請者** (移行を依頼した管理者) を、
+   `verified_by` には**承認者** (CSVの内容を確認し実行を許可した管理者、＝検証者) を
+   記録する。これにより「検証者が内容を確認してから実行を許可する」という要件と、
+   「実行者本人が検証者を兼ねられない」という職務分離の両方を満たす。
+
+管理画面: `/migrations` で申請 (実行はしない) → `/approval-requests` で別の管理者が
+承認/却下する。承認するとその場で移行が実行され、結果 (成功件数・REVIEWING件数等) は
+承認履歴のレスポンスに含まれる (画面上には反映されないため、必要なら `/migrations` の
+「検証待ちアカウント (REVIEWING)」セクションで結果を確認する)。
+
+E2Eテスト (`apps/api/src/e2e/migration.test.ts`) で、申請だけでは実行されないこと・
+申請者本人による承認が400で拒否されること・別管理者の承認で実行され `executed_by`/
+`verified_by` が正しく記録されること・同じCSVの再申請/再承認で二重付与されないことを
+検証済み。実ブラウザ (Playwright) でも、申請→自己承認の拒否→別管理者による承認→
+実際の残高反映までの一連の流れを確認済み。
+
 ## 未実装・今後の課題
 
-- 検証者 (`verified_by`、移行実行時の入力欄) と、実際に残高を確認する検証者フローの
-  権限を分離すること (現状は`SUPER_ADMIN`/`OVE_OPERATOR`であれば誰でも解消できる。
-  移行実行者本人による解消を禁止する、といった職務分離は未実装)。
-- 移行実行そのものを事前承認制にする (検証者が内容を確認してから実行を許可する) ことは
-  未実装。今回実装したのは実行後に`REVIEWING`となったアカウントの事後解消フローである。
+- REVIEWINGアカウントの解消 (`resolve-review`) 自体は、まだ`SUPER_ADMIN`/`OVE_OPERATOR`
+  であれば誰でも実行でき、移行実行者本人による解消を禁止するといった職務分離は
+  未対応 (事前承認制の対象は「移行の実行」のみで、事後の検証者フローは対象外)。
 - 文字コード変換 (Shift_JIS等) は未対応。UTF-8のCSVのみを想定している。
