@@ -144,6 +144,12 @@ export class AdminService {
    * 検証者が調査結果 (確認できた残高) をもとに解消する。推定値の自動付与は一切行わず、
    * 検証者が確認した金額のみを人手で入力させる (残高不明ユーザーに推定残高を入れないという
    * 移行時の原則を、事後確認の場面でも一貫させる)。
+   *
+   * 職務分離: このアカウントを移行実行時にREVIEWINGにした管理者本人による解消は禁止する
+   * (`MIGRATION_SET_REVIEWING` 監査ログで実行者を特定する。移行実行そのものの事前承認制
+   * `docs/migration.md`「事前承認制・職務分離」とは別に、事後の検証者フローにも職務分離を
+   * 課す)。監査ログが存在しない (この変更より前に作られたREVIEWINGアカウント等) 場合は
+   * 実行者を特定できないため、このチェックは行わない。
    */
   async resolveReview(params: {
     accountId: string;
@@ -159,6 +165,16 @@ export class AdminService {
     if (!account.wallet) throw new NotFoundException("wallet not found for account");
     if (!Number.isInteger(params.confirmedBalance) || params.confirmedBalance < 0) {
       throw new BadRequestException("confirmedBalance must be a non-negative integer");
+    }
+
+    const setReviewingLog = await this.db.auditLog.findFirst({
+      where: { targetType: "ove_account", targetId: params.accountId, actionType: "MIGRATION_SET_REVIEWING" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (setReviewingLog && setReviewingLog.actorId === params.verifiedBy) {
+      throw new BadRequestException(
+        "the verifier must be different from the admin who executed the migration (separation of duties)",
+      );
     }
 
     let transaction: OveTransaction | undefined;

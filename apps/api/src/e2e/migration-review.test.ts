@@ -138,4 +138,24 @@ describe("migration review resolution (指示書15章 検証者フロー)", () =
       .send({ confirmedBalance: 100, reason: "no auth" })
       .expect(401);
   });
+
+  it("rejects resolving by the admin who executed the migration that created the REVIEWING account (separation of duties)", async () => {
+    const { accountId } = await createReviewingAccount();
+
+    // requesterCookie の管理者が、このアカウントを移行実行時にREVIEWINGにした本人
+    // (migration_batches.executed_by = 申請者、docs/migration.md「事前承認制・職務分離」参照)。
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/accounts/${accountId}/resolve-review`)
+      .set("Cookie", requesterCookie)
+      .send({ confirmedBalance: 100, reason: "実行者本人による解消" })
+      .expect(400);
+
+    // 承認者 (verified_by) や無関係な管理者は問題なく解消できる。
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/admin/accounts/${accountId}/resolve-review`)
+      .set("Cookie", approverCookie)
+      .send({ confirmedBalance: 100, reason: "承認者による解消" })
+      .expect(201);
+    expect(res.body.status).toBe("ACTIVE");
+  });
 });

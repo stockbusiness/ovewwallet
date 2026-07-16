@@ -108,6 +108,20 @@ export class AdminMigrationService {
         if (!row.oldBalanceRaw) {
           // 残高不明: 推定値を入れず、確認が必要な状態にする。
           await this.db.oveAccount.update({ where: { id: account.id }, data: { status: "REVIEWING" } });
+          // どの移行実行者がREVIEWINGにしたかを記録する。resolve-reviewでの職務分離
+          // (実行者本人による解消の禁止) の判定に使う (`AdminService.resolveReview` 参照)。
+          await this.db.auditLog.create({
+            data: {
+              id: generateId(),
+              actorType: "ADMIN",
+              actorId: executedBy,
+              actionType: "MIGRATION_SET_REVIEWING",
+              targetType: "ove_account",
+              targetId: account.id,
+              result: "SUCCESS",
+              afterData: { migrationBatchId: batch.id, oldUserId: row.oldUserId },
+            },
+          });
           reviewingCount++;
           results.push({ row: rowNumber, oldUserId: row.oldUserId, status: "REVIEWING" });
           continue;

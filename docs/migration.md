@@ -71,11 +71,21 @@ REVIEWING遷移・同じCSVの再実行で残高が変わらないことを確�
 - `/accounts/[accountId]` — アカウントが `REVIEWING` の間だけ「既存ユーザー移行: 検証待ち」
   セクションが表示され、確認済み残高・調査内容を入力して解消できる。
 
+### 職務分離: 実行者本人による解消の禁止
+
+このアカウントを移行実行時に `REVIEWING` にした管理者本人による解消は禁止する
+(`AdminService.resolveReview()`)。移行実行時に `MIGRATION_SET_REVIEWING` 監査ログ
+(`actorId` = 実行者、`targetId` = アカウントID) を記録しておき、解消時にこの監査ログの
+`actorId` と解消しようとしている管理者を比較する。一致する場合は400
+(`the verifier must be different from the admin who executed the migration
+(separation of duties)`) で拒否する。監査ログが存在しない (この変更より前に作られた
+REVIEWINGアカウント等、実行者を特定できない) 場合はチェックをスキップする。
+
 E2Eテスト (`apps/api/src/e2e/migration-review.test.ts`) で、正の確認済み残高での解消・
 残高0での解消 (取引が作成されないこと)・REVIEWING以外のアカウントへの解消要求の409拒否・
-負の確認済み残高の400拒否・未認証アクセスの401を検証済み。実ブラウザでも、
-`/migrations` 画面での一覧表示・アカウント詳細画面での解消操作・解消後のACTIVE反映と
-成功メッセージ表示を確認済み。
+負の確認済み残高の400拒否・未認証アクセスの401・実行者本人による解消の400拒否と
+別管理者による解消の成功を検証済み。実ブラウザでも、`/migrations` 画面での一覧表示・
+アカウント詳細画面での解消操作・解消後のACTIVE反映と成功メッセージ表示を確認済み。
 
 ## 事前承認制・職務分離 (移行実行そのもの)
 
@@ -110,7 +120,4 @@ E2Eテスト (`apps/api/src/e2e/migration.test.ts`) で、申請だけでは実�
 
 ## 未実装・今後の課題
 
-- REVIEWINGアカウントの解消 (`resolve-review`) 自体は、まだ`SUPER_ADMIN`/`OVE_OPERATOR`
-  であれば誰でも実行でき、移行実行者本人による解消を禁止するといった職務分離は
-  未対応 (事前承認制の対象は「移行の実行」のみで、事後の検証者フローは対象外)。
 - 文字コード変換 (Shift_JIS等) は未対応。UTF-8のCSVのみを想定している。
