@@ -1,4 +1,4 @@
-# 独立OVEウォレット 実装状況整理 (2026-07-15時点)
+# 独立OVEウォレット 実装状況整理 (2026-07-16時点)
 
 このドキュメントは、現時点までに実装が完了している機能・未着手の機能・今後の連携方針を
 1枚で把握できるように整理したものです。個別の詳細仕様は各 `docs/*.md` を参照してください。
@@ -21,8 +21,12 @@ packages/
 
 PostgreSQL 16 + Redis (KVストア、未設定時はインメモリへフォールバック) を使用。
 DBスキーマ・API・管理画面・ユーザー画面のすべてに対して、実DBに対する自動テスト
-(現時点で API 60件 + `packages/auth` 25件 + `packages/ledger` 21件 = 計106件、すべて成功)
+(現時点で API 73件 + `packages/auth` 31件 + `packages/ledger` 21件 = 計125件、すべて成功)
 と、実ブラウザ (Playwright) での動作確認を行っています。
+
+Railway (API) + Vercel (`user-wallet`/`admin-wallet`、Vercelダッシュボードの
+Git連携デプロイ) への動作確認用デプロイも完了し、実際にブラウザから表示・操作できる
+ことを確認済みです (詳細・制約は `docs/deployment.md` 「このデプロイの制約」参照)。
 
 ## 2. 実装済み機能
 
@@ -52,8 +56,9 @@ DBスキーマ・API・管理画面・ユーザー画面のすべてに対して
 - 連携先の緊急停止・再開機能 (即座にAPIキーを無効化)。
 - APIアクセスログ (成功・認証失敗の両方を記録、管理画面で検索可能)。
 - **この仕組みは戦国パスポート/AIアート教室などの想定連携先に限定されておらず、
-  新しい連携先 (代理店システムなど) を `service_integrations` に1行追加するだけで
-  同じ認証・上限管理・ログの仕組みに乗せられます** (下記4章を参照)。
+  新しい連携先を `service_integrations` に1行追加するだけで同じ認証・上限管理・ログの
+  仕組みに乗せられます**。実際に戦国経済圏代理店システム (sengoku-ai.com) との連携
+  (同期受信・SSOログイン) をこの仕組みの上に実装済みです (下記4章を参照)。
 
 ### 2.4 管理画面 (`apps/admin-wallet`, PC向け)
 実装済み画面: ダッシュボード (KPI・過去30日推移グラフ・最近の取引・整合性チェック、
@@ -62,7 +67,9 @@ DBスキーマ・API・管理画面・ユーザー画面のすべてに対して
 付与ルール管理、外部サービス管理、既存ユーザー移行、アカウント統合、二段階承認
 (高額操作の職務分離)、操作ログ、APIアクセスログ、セキュリティ設定 (**管理者MFA**:
 RFC 6238準拠のTOTP二要素認証、外部ライブラリ非依存で自前実装)、**外部連携キュー**
-(Transactional Outboxの一覧・ステータス/連携先での絞り込み・手動再送・Feature Flag確認)。
+(Transactional Outboxの一覧・ステータス/連携先での絞り込み・手動再送・Feature Flag確認)、
+**代理店連携状態一覧** (`account_links`のうち代理店システム分を状態絞り込み・詳細確認。
+`docs/agency-integration.md`参照)。
 
 ### 2.5 ユーザー向けウォレット画面 (`apps/user-wallet`, スマートフォン優先)
 「戦国ウォレット UIデザイン仕様 v1.0」(黒・濃紺・金・深紅を基調としたデザイン) で
@@ -89,25 +96,27 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 
 戦国パスポートSSO (`SengokuSsoService`) についても同様にモック実装のままです。
 
-## 4. 代理店システムなど外部システム連携に向けて
+## 4. 代理店システム (sengoku-ai.com) 連携 — 実装済み
 
-ご要望の「代理店システムなどとの連携」は、LINE個人向けログインとは別の話で、
-**2.3で説明した外部サービスAPI連携の仕組み (`service_integrations` + HMAC認証)** が
-そのまま使えます。想定される拡張ステップ:
+「戦国経済圏 代理店システム 外部連携API仕様書」v3.6.71と、それを踏まえた
+`docs/development-guardrails.md` (2026-07-15付) に基づき、以下を実装済みです。
+詳細・実装範囲外の項目は `docs/agency-integration.md` を参照してください。
 
-1. `service_integrations` に代理店システム用のAPIキー・署名シークレット・上限を発行
-   (`ServiceCode` enumへの追加、または既存の仕組みを流用する形での識別子追加)。
-2. 代理店システム側は、HMAC署名を付けて `/rewards/grant` (付与) や
-   `/transactions/debit` (利用消し込み) 等を呼び出すだけで連携可能。
-3. 代理店側ユーザーとOVEアカウントの対応付けは `account_links` テーブル
-   (`findOrCreateByServiceLink`) で、初回付与時に自動的にアカウント・ウォレットが
-   作られる設計のため、代理店側で個別のアカウント発行APIを別途呼ぶ必要はありません。
-4. 代理店ごとのAPIアクセスログ・緊急停止・上限管理はすでに管理画面から行えます。
+1. **同期受信** (仕様書7章): `POST /api/integrations/agencies`。専用テーブルは作らず、
+   `service_integrations` (`ServiceCode.AGENCY_SYSTEM`) + `account_links`
+   (`oveAccountId`をnullable化し、未紐付け時は`status: PENDING`で保留) を再利用。
+   認証は`x-api-key`/Bearerのみのシンプルな鍵認証 (`AgencyApiKeyGuard`、既存のHMAC
+   必須ガードとは別物)。`ENABLE_AGENCY_REFERRAL_SYNC`フラグ(既定false)でON/OFF。
+2. **SSOログイン** (仕様書12章): `POST /api/v1/auth/sso/agency`。sengoku-ai.comが
+   発行するRS256 JWTをJWKS (`SENGOKU_AI_JWKS_URL`)で検証し (`jose`ライブラリ、
+   `jti`再利用拒否あり)、`AccountIdentity` (identityType: `SENGOKU_AGENCY`) で
+   OVEアカウントを解決してログインさせる。
+3. **管理画面「代理店連携状態一覧」** (2.4節参照、ガイドライン15章の必須項目)。
 
-つまり、**代理店連携そのものの土台はすでに用意されている**状態です。実際に着手する際は、
-代理店システム側の認証方式 (HMAC方式でよいか、IPアドレス制限が必要か等) や、
-付与/消し込みの粒度・レート制限値の要件をヒアリングした上で、`service_integrations` への
-登録とドキュメント整備 (`docs/external-api.md` への連携先追加) を行う想定です。
+**範囲外 (今後の課題)**: 仕様書5章の紹介トークン・紹介セッション受け入れフロー
+(`ref_token`のURL経由登録・登録ボーナス連動)、OVE Wallet側からsengoku-ai.comへの
+同期送信 (仕様書6章の逆方向、実装時は`integration_outbox`を再利用予定)、
+同期失敗の自動再送 (`ENABLE_AGENCY_SYNC_RETRY`)。
 
 ## 5. 「OVEウォレット開発・連携上の留意事項 v1.0」への対応状況
 
@@ -139,14 +148,19 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
     自動テストで確認済み。
   - 管理画面に「外部連携キュー」画面を追加 (キュー一覧・ステータス/連携先での絞り込み・
     試行回数・最終エラー内容・手動再送・Feature Flag確認)。
-  - **紹介情報受入 (ref_token/referral_session) や代理店システムとの実際の通信は含まれない**。
-    これらはガイドライン19章の指示通り、代理店システム側の仕様が固まった時点で改めて
-    現状調査と影響範囲をMarkdownにまとめてから着手します。
-- **Phase 2以降 (紹介情報受入基盤・代理店紹介同期・登録特典連動・外部サービス本番連携) —
-  未着手**: `referral_session`/`agency_referral_links`はまだ存在しません。
+  - この時点では**紹介情報受入 (ref_token/referral_session) や代理店システムとの実際の
+    通信は含まれていなかった**が、その後代理店システム側の仕様書 (v3.6.71) が確定した
+    ため、現状調査と影響範囲の整理 (ガイドライン19章の指示通り) を経て次のPhase 2
+    (同期受信・SSOログイン) に着手・完了した。
+- **Phase 2 (代理店システム連携: 同期受信・SSOログイン) — 完了**: 4章参照。
+- **Phase 2で範囲外とした紹介情報受入基盤・登録特典連動 — 未着手**:
+  `referral_session`/`agency_referral_links`はまだ存在しません。
 
 ## 6. 未実装・今後の課題
 
+- 代理店システム連携の範囲外項目 (紹介トークン・紹介セッション受け入れフロー、
+  OVE Wallet→sengoku-ai.comへの同期送信、同期失敗の自動再送): 4章末尾・
+  `docs/agency-integration.md` 「今後の課題」参照。
 - LINE本番連携・戦国パスポート本番SSO交換 (今回保留)。
 - 二段階承認のオンチェーン移行・外部ウォレット変更・APIサービス上限変更への拡張
   (対応する機能自体が未実装のため)。アカウント統合は対応済み (`docs/admin-operations.md`
@@ -181,6 +195,7 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 | `docs/authentication.md` | 認証設計 (MFA・利用規約同意を含む) |
 | `docs/ledger-rules.md` | 台帳ルール・整合性チェック |
 | `docs/external-api.md` | 外部サービスAPI仕様 (代理店連携の土台) |
+| `docs/agency-integration.md` | 代理店システム(sengoku-ai.com)連携: 同期受信・SSOログイン |
 | `docs/integration-outbox.md` | Transactional Outbox・Feature Flag基盤 |
 | `docs/admin-operations.md` | 管理画面の全画面説明 |
 | `docs/ui-design.md` | 戦国ウォレットデザインシステム |
