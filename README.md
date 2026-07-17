@@ -112,6 +112,7 @@ pnpm test:load                    # 簡易負荷・レート制限限界値テ�
 - `docs/backup.md` — DBバックアップ・リストア手順
 - `docs/feature-list.md` — 機能一覧
 - `docs/implementation-log.md` — 時系列の実装記録
+- `docs/roadmap.md` — 次に進めるための作業手順 (順番付きチェックリスト)
 - `docs/implementation-plan.md` — 実装計画・フェーズ進行状況
 - `docs/development-guardrails.md` — 代理店システム等の外部連携に向けた開発基準
   (正式な管理元の分離・ID設計・紹介連携・セキュリティ必須項目・実装順序)
