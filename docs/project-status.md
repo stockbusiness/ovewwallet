@@ -228,6 +228,7 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/deployment.md` | デプロイ手順 |
 | `docs/monitoring.md` | 監視・アラート (エラートラッキング・ヘルスチェック・ログ収集・CI) |
 | `docs/backup.md` | DBバックアップ・リストア手順 |
+| `docs/feature-list.md` | 機能一覧 (領域ごとのカタログ形式) |
 | `docs/implementation-log.md` | 時系列の実装記録 (このドキュメントとは別に、何を・いつ・なぜ実装したかを追える) |
 | `docs/implementation-plan.md` | 初期実装計画・フェーズ進行状況 |
 | `docs/development-guardrails.md` | 代理店システム等の外部連携に向けた開発基準 (このドキュメントの元) |
