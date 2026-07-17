@@ -106,8 +106,14 @@ export class ReferralsService {
   ): Promise<void> {
     const now = new Date();
 
-    await tx.walletReferral.update({
-      where: { id: referral.id },
+    // resolvePendingSession()での確認からここまでの間に別リクエストが同じ紹介セッションを
+    // 先に消費している可能性があるため (同一Cookieでの並行リクエストなど)、
+    // status: "CAPTURED" / usedAt: null を条件に含めた条件付き更新で排他する。
+    // 影響行数が0件の場合はこのリクエスト側が競合に負けたということなので、
+    // 特典付与・outbox登録は行わず、通常の(紹介なし)新規登録として処理を継続する
+    // (実装指示書17.2章の「無効なトークンでも登録は継続する」と同じ方針)。
+    const claimed = await tx.walletReferral.updateMany({
+      where: { id: referral.id, status: "CAPTURED", usedAt: null },
       data: {
         walletUserId: account.id,
         status: "PENDING",
@@ -115,6 +121,10 @@ export class ReferralsService {
         usedAt: now,
       },
     });
+    if (claimed.count === 0) {
+      this.logger.warn("referral attach: lost race to a concurrent request, skipping benefit/outbox");
+      return;
+    }
 
     await tx.walletReferralBenefit.create({
       data: {

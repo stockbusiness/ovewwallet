@@ -8,7 +8,7 @@ import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/sh
 import { AuthService } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
-import { REFERRAL_SESSION_COOKIE_NAME } from "../referrals/referrals.controller";
+import { REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS } from "../referrals/referrals.controller";
 
 const RequestOtpSchema = z.object({ email: z.string().email() });
 const VerifyOtpSchema = z.object({
@@ -57,11 +57,18 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
-    const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted, referralCookieToken);
-    setSessionCookie(res, session.token, session.expiresAt);
-    // 紹介Cookieは新規/既存いずれの結果でも使い切りとして削除する (実装指示書12章)。
-    if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, { path: "/" });
-    return { ove_account_id: session.oveAccountId };
+    try {
+      const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted, referralCookieToken);
+      setSessionCookie(res, session.token, session.expiresAt);
+      return { ove_account_id: session.oveAccountId };
+    } finally {
+      // 紹介Cookieは新規/既存いずれの結果でも使い切りとして削除する (実装指示書12章)。
+      // セッション発行など後続処理が失敗した場合でも、紹介セッション自体は
+      // アカウント作成トランザクション内で既に消費(usedAt設定)されている可能性があるため、
+      // 成功/失敗にかかわらず削除する (finally)。発行時と同じオプション
+      // (httpOnly/secure/sameSite) を指定しないとブラウザが削除を無視しうるため揃える。
+      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS);
+    }
   }
 
   /** 開発用: 戦国パスポート側が発行するSSOコードのモック発行エンドポイント。 */

@@ -133,6 +133,44 @@ describe("two-step approval workflow (指示書13章 二段階承認)", () => {
     expect(approvalRequest.rejectionReason).toBe("申請内容に不備があるため却下");
   });
 
+  it("executes the grant exactly once when two different admins approve the same request concurrently", async () => {
+    const grantRes = await request(app.getHttpServer())
+      .post("/api/v1/admin/wallets/grant")
+      .set("Cookie", requesterCookie)
+      .send({ walletId, amount: 55000, reason: "同時承認テスト" })
+      .expect(201);
+    const requestId = grantRes.body.approvalRequestId;
+
+    const secondApprover = await createAdmin("second-approver");
+    const secondApproverLogin = await request(app.getHttpServer())
+      .post("/api/v1/admin/login")
+      .send({ email: secondApprover.email, password: secondApprover.password })
+      .expect(201);
+    const secondApproverCookie = secondApproverLogin.headers["set-cookie"] as unknown as string[];
+
+    const walletBefore = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
+
+    const [resA, resB] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/approval-requests/${requestId}/approve`)
+        .set("Cookie", approverCookie),
+      request(app.getHttpServer())
+        .post(`/api/v1/admin/approval-requests/${requestId}/approve`)
+        .set("Cookie", secondApproverCookie),
+    ]);
+
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([201, 409]); // 片方だけ成功する (TOCTOU競合の排除)
+
+    const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
+    expect(walletAfter.availableBalance).toBe(walletBefore.availableBalance + 55000n); // 一度だけ加算される
+
+    const transactionCount = await prisma.oveTransaction.count({
+      where: { walletId, transactionType: "ADMIN_GRANT", amount: 55000n },
+    });
+    expect(transactionCount).toBe(1);
+  });
+
   it("does not allow deducting below the threshold to bypass approval, and small amounts still execute immediately", async () => {
     const smallGrantRes = await request(app.getHttpServer())
       .post("/api/v1/admin/wallets/grant")

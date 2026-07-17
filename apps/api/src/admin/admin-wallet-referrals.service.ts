@@ -14,7 +14,6 @@ const SAFE_SELECT = {
   walletUserId: true,
   commonUserId: true,
   agencyId: true,
-  agencyRank: true,
   status: true,
   source: true,
   capturedAt: true,

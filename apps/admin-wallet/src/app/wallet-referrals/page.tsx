@@ -132,10 +132,6 @@ export default function WalletReferralsPage() {
                             <dd>{item.registeredAt ? new Date(item.registeredAt).toLocaleString("ja-JP") : "-"}</dd>
                           </div>
                           <div>
-                            <dt className="text-neutral-400">代理店ランク</dt>
-                            <dd>{item.agencyRank ?? "-"}</dd>
-                          </div>
-                          <div>
                             <dt className="text-neutral-400">最終エラー</dt>
                             <dd>{item.lastErrorMessage ?? "-"}</dd>
                           </div>

@@ -200,5 +200,42 @@ describe("agency referral token acceptance (実装指示書 v1.0, Phase 1)", () 
       const referralForSecond = await prisma.walletReferral.findFirst({ where: { walletUserId: secondAccountId } });
       expect(referralForSecond).toBeNull(); // 使用済みセッションでは紐付けが起きない
     });
+
+    it("attaches the referral to exactly one of two concurrent new registrations sharing the same session", async () => {
+      const referralToken = `referral-concurrent-${generateId()}`;
+      const { cookieValue, referralId } = await captureReferral(referralToken);
+      expect(cookieValue).toBeDefined();
+
+      const lineUserIdA = `e2e-line-concurrent-a-${generateId()}`;
+      const lineUserIdB = `e2e-line-concurrent-b-${generateId()}`;
+
+      const [resA, resB] = await Promise.all([
+        request(app.getHttpServer())
+          .post("/api/v1/auth/line/login")
+          .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${cookieValue}`])
+          .send({ idToken: `mock.${lineUserIdA}`, termsAccepted: true }),
+        request(app.getHttpServer())
+          .post("/api/v1/auth/line/login")
+          .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${cookieValue}`])
+          .send({ idToken: `mock.${lineUserIdB}`, termsAccepted: true }),
+      ]);
+
+      expect(resA.status).toBe(201);
+      expect(resB.status).toBe(201);
+      const accountIdA = resA.body.ove_account_id as string;
+      const accountIdB = resB.body.ove_account_id as string;
+
+      // どちらも新規登録は成功するが、紹介の紐付けは片方にしか起きない
+      // (レースに負けた側は紹介なしの通常登録として扱われる、finding #5の修正)。
+      const attachedCount = await prisma.walletReferral.count({
+        where: { id: referralId, walletUserId: { in: [accountIdA, accountIdB] } },
+      });
+      expect(attachedCount).toBe(1);
+
+      const benefitCount = await prisma.walletReferralBenefit.count({
+        where: { walletUserId: { in: [accountIdA, accountIdB] } },
+      });
+      expect(benefitCount).toBe(1); // 特典も二重付与されない
+    });
   });
 });

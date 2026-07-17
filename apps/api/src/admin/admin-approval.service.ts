@@ -211,6 +211,54 @@ export class AdminApprovalService {
       throw new BadRequestException("the approver must be different from the requester (separation of duties)");
     }
 
+    // 2人の承認者が同じ申請をほぼ同時に承認しようとした場合、上のstatus===PENDINGの確認
+    // だけでは両方が通過してしまい (TOCTOU)、資金移動や移行実行が二重に走りうる。
+    // status: "PENDING" を条件に含めた条件付き更新で先に承認済みへ確定させ、
+    // 影響行数が0件なら他方が先に処理を終えたということなので競合として弾く。
+    const claimed = await this.db.approvalRequest.updateMany({
+      where: { id: requestId, status: "PENDING" },
+      data: { status: "APPROVED", approvedBy: approverId, decidedAt: new Date() },
+    });
+    if (claimed.count === 0) {
+      throw new ConflictException(`approval request ${requestId} was already decided by another approver`);
+    }
+
+    let execution: { resultPayload: unknown; auditAfterData: Record<string, unknown> };
+
+    try {
+      execution = await this.executeApprovedRequest(approvalRequest, approverId, requestId);
+    } catch (err) {
+      // 実行に失敗した場合はPENDINGへ戻し、再承認によるやり直しを可能にする
+      // (先に確定させたAPPROVEDのままだと、実際には何も実行されていないのに
+      // 承認済みとして扱われてしまうため)。
+      await this.db.approvalRequest.update({
+        where: { id: requestId },
+        data: { status: "PENDING", approvedBy: null, decidedAt: null },
+      });
+      throw err;
+    }
+
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "ADMIN",
+        actorId: approverId,
+        actionType: "APPROVAL_REQUEST_APPROVED",
+        targetType: "approval_request",
+        targetId: requestId,
+        result: "SUCCESS",
+        afterData: execution.auditAfterData as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return execution.resultPayload;
+  }
+
+  private async executeApprovedRequest(
+    approvalRequest: { requestType: string; payload: unknown; requestedBy: string },
+    approverId: string,
+    requestId: string,
+  ): Promise<{ resultPayload: unknown; auditAfterData: Record<string, unknown> }> {
     let resultPayload: unknown;
     let auditAfterData: Record<string, unknown>;
 
@@ -284,25 +332,7 @@ export class AdminApprovalService {
       auditAfterData = { transactionId: transaction.id };
     }
 
-    await this.db.approvalRequest.update({
-      where: { id: requestId },
-      data: { status: "APPROVED", approvedBy: approverId, decidedAt: new Date() },
-    });
-
-    await this.db.auditLog.create({
-      data: {
-        id: generateId(),
-        actorType: "ADMIN",
-        actorId: approverId,
-        actionType: "APPROVAL_REQUEST_APPROVED",
-        targetType: "approval_request",
-        targetId: requestId,
-        result: "SUCCESS",
-        afterData: auditAfterData as unknown as Prisma.InputJsonValue,
-      },
-    });
-
-    return resultPayload;
+    return { resultPayload, auditAfterData };
   }
 
   async reject(requestId: string, approverId: string, reason: string): Promise<unknown> {

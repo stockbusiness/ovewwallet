@@ -194,6 +194,15 @@ export interface ApprovalRequestItem {
       };
 }
 
+export interface MigrationSummary {
+  batchId: string;
+  totalCount: number;
+  successCount: number;
+  reviewingCount: number;
+  errorCount: number;
+  results: Array<{ row: number; oldUserId: string; status: "SUCCESS" | "REVIEWING" | "ERROR"; message?: string }>;
+}
+
 export interface ReconciliationResult {
   checkedWalletCount: number;
   mismatchedWalletCount: number;
@@ -251,7 +260,6 @@ export interface WalletReferralItem {
   walletUserId: string | null;
   commonUserId: string | null;
   agencyId: string | null;
-  agencyRank: string | null;
   status: "CAPTURED" | "PENDING" | "CONFIRMED" | "REJECTED" | "MANUALLY_CONFIRMED" | "CANCELLED" | "ERROR" | "EXPIRED";
   source: string;
   capturedAt: string;

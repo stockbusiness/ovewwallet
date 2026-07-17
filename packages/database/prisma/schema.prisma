@@ -687,8 +687,9 @@ model WalletReferral {
   referralTokenHash String @map("referral_token_hash")
 
   /// Phase 2で代理店システムから確認結果を受け取った際に設定される代理店ID。
-  agencyId   String? @map("agency_id")
-  agencyRank String? @map("agency_rank")
+  /// 代理店のランク・階層情報自体はウォレット側で永続管理しない
+  /// (開発ガイドライン5.1章・18章「代理店ランクのウォレット内管理」は対象外)。
+  agencyId String? @map("agency_id")
 
   status WalletReferralStatus @default(CAPTURED)
   /// `invite_url` (通常フロー) / `admin` (管理者による後付け) / `migration`。

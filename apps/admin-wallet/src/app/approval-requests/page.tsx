@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, ApiError, type ApprovalRequestItem } from "@/lib/api";
+import { apiFetch, ApiError, type ApprovalRequestItem, type MigrationSummary } from "@/lib/api";
 
 const KIND_LABEL: Record<string, string> = {
   HIGH_VALUE_GRANT: "高額付与",
@@ -26,6 +26,7 @@ export default function ApprovalRequestsPage() {
   const router = useRouter();
   const [requests, setRequests] = useState<ApprovalRequestItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [migrationResult, setMigrationResult] = useState<MigrationSummary | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -40,10 +41,14 @@ export default function ApprovalRequestsPage() {
     load();
   }, [load]);
 
-  async function approve(id: string) {
+  async function approve(id: string, requestType: string) {
     setError(null);
+    setMigrationResult(null);
     try {
-      await apiFetch(`/api/v1/admin/approval-requests/${id}/approve`, { method: "POST" });
+      const result = await apiFetch<unknown>(`/api/v1/admin/approval-requests/${id}/approve`, { method: "POST" });
+      if (requestType === "MIGRATION_EXECUTION") {
+        setMigrationResult(result as MigrationSummary);
+      }
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "承認に失敗しました");
@@ -79,6 +84,35 @@ export default function ApprovalRequestsPage() {
         </p>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
+        {migrationResult && (
+          <div className="mb-4 rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="font-semibold">移行実行結果 (バッチ: {migrationResult.batchId})</span>
+              <button
+                onClick={() => setMigrationResult(null)}
+                className="text-xs text-neutral-500 underline"
+              >
+                閉じる
+              </button>
+            </div>
+            <p className="text-xs text-neutral-600">
+              合計 {migrationResult.totalCount}件 / 成功 {migrationResult.successCount}件 / 要確認{" "}
+              {migrationResult.reviewingCount}件 / エラー {migrationResult.errorCount}件
+            </p>
+            {migrationResult.errorCount > 0 && (
+              <ul className="mt-2 list-disc pl-5 text-xs text-red-600">
+                {migrationResult.results
+                  .filter((r) => r.status === "ERROR")
+                  .map((r) => (
+                    <li key={r.row}>
+                      行{r.row} ({r.oldUserId}): {r.message}
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <h2 className="mb-2 text-sm font-semibold">承認待ち ({pending.length})</h2>
         <table className="mb-6 w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
@@ -101,7 +135,7 @@ export default function ApprovalRequestsPage() {
                 <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
                 <td className="p-3">
                   <div className="flex gap-2">
-                    <button onClick={() => approve(r.id)} className="text-xs text-brand-600 underline">
+                    <button onClick={() => approve(r.id, r.requestType)} className="text-xs text-brand-600 underline">
                       承認
                     </button>
                     <button onClick={() => reject(r.id)} className="text-xs text-red-600 underline">

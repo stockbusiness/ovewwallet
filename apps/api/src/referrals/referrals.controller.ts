@@ -7,8 +7,10 @@ import { ReferralsService } from "./referrals.service";
 export const REFERRAL_SESSION_COOKIE_NAME = "referral_session";
 
 // フロントエンド(Vercel)とAPI(Railway)が別ドメインの構成のため、既存のセッションCookie
-// (packages/auth/src/session.ts) と同じくsameSite=noneで発行する。
-const REFERRAL_COOKIE_OPTIONS = {
+// (packages/auth/src/session.ts) と同じくsameSite=noneで発行する。clearCookie側でも
+// 同じオプションを指定する必要があるため (指定が食い違うとブラウザが削除を無視しうる)、
+// auth.controller.tsから参照できるようexportする。
+export const REFERRAL_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: true,
   sameSite: "none" as const,
@@ -44,6 +46,11 @@ export class ReferralsController {
         });
       }
     }
+
+    // このレスポンス時点ではリクエストURLにまだ生の紹介トークンがクエリパラメータとして
+    // 残っているため、Refererヘッダー経由での漏えいを防ぐ (開発ガイドライン5.4章)。
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.setHeader("Cache-Control", "no-store");
 
     // オープンリダイレクト対策: リダイレクト先は環境変数由来の固定値のみとし、
     // クエリパラメータ等の外部入力からは絶対に組み立てない。
