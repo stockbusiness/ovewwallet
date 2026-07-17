@@ -91,3 +91,58 @@ export class MockLineAuthVerifier implements LineAuthVerifier {
     return { lineUserId };
   }
 }
+
+export interface LineIdTokenVerifierOptions {
+  /** LINE Developersコンソールで発行されたチャネルID (IDトークンのaudと一致する必要がある)。 */
+  channelId: string;
+  /** LINEの「IDトークン検証」エンドポイント。テストでは差し替え可能にする。 */
+  verifyEndpoint?: string;
+  /** テストでは `fetch` のモック実装を注入できる。 */
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * LINEログインの「IDトークン検証」API
+ * (https://developers.line.biz/ja/reference/line-login/#verify-id-token) を使った本番実装。
+ * JWKSを自前で取得・検証する方式ではなく、LINE公式のサーバー間検証エンドポイントへ
+ * 問い合わせる方式を採用する — 署名アルゴリズムの選択・鍵のローテーション対応を
+ * LINE側に委ねられ、自前実装による検証バイパスのリスクを避けられるため。
+ */
+export class LineIdTokenVerifier implements LineAuthVerifier {
+  private readonly verifyEndpoint: string;
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(private readonly options: LineIdTokenVerifierOptions) {
+    if (!options.channelId) {
+      throw new Error("LineIdTokenVerifier requires a non-empty channelId (LINE_CHANNEL_ID)");
+    }
+    this.verifyEndpoint = options.verifyEndpoint ?? "https://api.line.me/oauth2/v2.1/verify";
+    this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  async verifyIdToken(idToken: string): Promise<LineIdTokenClaims> {
+    if (!idToken) throw new Error("invalid LINE id token");
+
+    const res = await this.fetchImpl(this.verifyEndpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ id_token: idToken, client_id: this.options.channelId }).toString(),
+    });
+
+    if (!res.ok) {
+      // レスポンス本体にエラー詳細が含まれるが、IDトークンの生値は絶対にログへ出さない。
+      throw new Error(`LINE ID token verification failed (status=${res.status})`);
+    }
+
+    const body = (await res.json()) as { sub?: string; email?: string; aud?: string };
+    if (!body.sub) {
+      throw new Error("LINE ID token verification response is missing sub");
+    }
+    // audはLINE側で既にclient_id指定検証されているはずだが、念のため二重に確認する。
+    if (body.aud && body.aud !== this.options.channelId) {
+      throw new Error("LINE ID token aud mismatch");
+    }
+
+    return { lineUserId: body.sub, email: body.email };
+  }
+}

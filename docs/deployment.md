@@ -204,11 +204,15 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 
 ### このデプロイの制約
 
-- `AUTH_MODE=mock` で起動する。LINE/戦国パスポートSSOは本番連携が未実装のため、
-  `NODE_ENV=production` は設定しない (`assertAuthModeSafeForProduction` のガードに
-  引っかかるうえ、`AUTH_MODE=production` にしても実装自体はモックのままで実態と
-  合わなくなるため)。つまりこのデプロイは動作確認用であり、実ユーザー向けの
-  本番公開ではない。
+- `AUTH_MODE=mock` で起動する。戦国パスポートSSOは相手方のAPI仕様が未確定のため
+  本番連携が未実装 (`docs/authentication.md`参照)。LINEログインは本番実装
+  (`LineIdTokenVerifier`) をコードとしては実装済みだが、実LINEチャネルでの結合
+  テストが未実施のため、`NODE_ENV=production` は設定しない
+  (`assertAuthModeSafeForProduction` のガードに引っかかるうえ、戦国パスポートSSOは
+  `AUTH_MODE=production` にしても実装自体はモックのままで実態と合わなくなるため)。
+  つまりこのデプロイは動作確認用であり、実ユーザー向けの本番公開ではない。
+  実チャネルでのLINE結合テストが済み、戦国パスポートSSOも実装され次第、
+  `AUTH_MODE=production` + `LINE_CHANNEL_ID` 設定への切り替えを検討する。
 - PostgreSQL/Redisのサービス名検出 (`postgres`/`redis` を含む名前で判定) や
   変数名 (`DATABASE_URL`/`REDIS_URL`) は、Railwayの標準テンプレートの命名を
   前提にしている。将来Railway側の命名規則が変わった場合はワークフローの調整が

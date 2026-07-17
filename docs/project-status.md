@@ -83,18 +83,22 @@ RFC 6238準拠のTOTP二要素認証、外部ライブラリ非依存で自前�
 レート制限・監査ログ (削除不可)・高額操作の二段階承認・管理者MFA・全セッション無効化まで
 実装済み。詳細と既知の残課題は `docs/security.md`。
 
-## 3. LINE連携について (現在保留)
+## 3. LINE連携について
 
-LINEログインは指示書に基づき **モック実装** の状態です
-(`packages/auth/src/sso.ts` の `MockLineAuthVerifier`。`mock.<lineUserId>` 形式の
-IDトークンをそのまま信用する開発用の仮実装で、LINE Platform APIとの実通信は行っていません)。
+LINEログインは `AUTH_MODE` で実装を切り替える構成です
+(`packages/auth/src/sso.ts`)。
 
-インターフェース (`LineAuthVerifier`) は確定済みで、本番実装は実装クラスの差し替えのみで
-対応可能な設計にしていますが、**LINE本番連携(LIFF/LINE Login SDK・実際のチャネル発行等)
-は、今回の方針転換によりいったん着手を保留**しています。ユーザー向けログイン画面の
-「LINEでログイン」ボタン自体は残していますが、引き続きモック接続のままです。
+- `AUTH_MODE=mock` (既定): `MockLineAuthVerifier`。`mock.<lineUserId>` 形式のIDトークンを
+  そのまま信用する開発用の仮実装で、LINE Platform APIとの実通信は行わない。
+- `AUTH_MODE=production` かつ `LINE_CHANNEL_ID` 設定時: `LineIdTokenVerifier` (本番実装)。
+  LINEの「IDトークン検証」API (`POST https://api.line.me/oauth2/v2.1/verify`) へ
+  問い合わせて `sub`/`email`/`aud` を取得する。単体テスト (`fetch`モック) のみ検証済みで、
+  **実LINEチャネル・実IDトークンを使った結合テストは未実施**。本番投入前に
+  LINE Developersでチャネルを発行し、実際のLIFF/LINE Login SDK経由のログインで
+  一度は確認する必要がある。
 
-戦国パスポートSSO (`SengokuSsoService`) についても同様にモック実装のままです。
+戦国パスポートSSO (`SengokuSsoService`) については、相手方のAPI仕様がまだ確定していない
+(sengoku-ai.com側からの仕様共有待ち) ため、引き続きモック実装のままで着手を保留している。
 
 ## 4. 代理店システム (sengoku-ai.com) 連携 — 実装済み
 

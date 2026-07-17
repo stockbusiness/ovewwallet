@@ -7,9 +7,12 @@ import "./common/bigint-json";
 import { AppModule } from "./app.module";
 import { LedgerExceptionFilter } from "./common/ledger-exception.filter";
 import { assertAuthModeSafeForProduction } from "./common/assert-auth-mode";
+import { initSentry } from "./common/sentry";
 
 async function bootstrap() {
   assertAuthModeSafeForProduction();
+  // SENTRY_DSN未設定時は何もしない (`docs/monitoring.md` 参照)。
+  initSentry();
 
   const app = await NestFactory.create(AppModule);
 

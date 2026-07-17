@@ -22,11 +22,24 @@
 
 ## LINEログイン
 
-`packages/auth/src/sso.ts` の `LineAuthVerifier` インターフェースと
-`MockLineAuthVerifier` (開発用モック、`mock.<lineUserId>` 形式のIDトークンを検証)。
-本番実装はLINE Platform APIでIDトークンを検証する実装に差し替える (インターフェースは
-確定済みなので実装の追加のみで対応可能)。LINEから受け取ったプロフィールをそのまま
-信用しない方針を維持している。
+`packages/auth/src/sso.ts` の `LineAuthVerifier` インターフェースに対し、以下の2実装がある。
+
+- `MockLineAuthVerifier` (開発・テスト用、`mock.<lineUserId>` 形式のIDトークンを検証)。
+- `LineIdTokenVerifier` (本番実装)。LINEの「IDトークン検証」API
+  (`POST https://api.line.me/oauth2/v2.1/verify`) へ `id_token`/`client_id` を渡し、
+  LINE側で署名検証済みのクレーム (`sub`/`email`/`aud`) を受け取る方式。JWKSを自前で
+  取得・検証する方式は採用していない (署名アルゴリズムの選択・鍵ローテーション対応を
+  LINE側に委ね、自前実装による検証バイパスのリスクを避けるため)。
+
+`apps/api/src/auth/auth.service.ts` は `AUTH_MODE=production` かつ `LINE_CHANNEL_ID` が
+設定されている場合のみ `LineIdTokenVerifier` を使い、それ以外は `MockLineAuthVerifier` を
+使う。`AUTH_MODE=production` で `LINE_CHANNEL_ID` が空の場合は起動時ではなくクラス構築時に
+例外を投げる (安全側に倒し、無認証で通ってしまうことを防ぐ)。
+
+**注意**: `LineIdTokenVerifier` は単体テスト (`packages/auth/src/line.test.ts`、`fetch`を
+モック化) のみで検証済みであり、実際のLINEチャネル・実IDトークンを使った結合テストは
+未実施。本番投入前に実チャネルでの動作確認が必須。LINEから受け取ったプロフィールを
+そのまま信用しない方針(サーバー側検証必須)は維持している。
 
 ## 戦国パスポートSSO
 
@@ -102,4 +115,7 @@ QRコード用URL・シークレットキーの表示、コード誤り時のエ
 
 ## 未実装/簡略化した項目 (今後の課題)
 
-- LINE本番連携・戦国パスポート本番SSO交換 (インターフェースとモックのみ)。
+- LINE本番連携: `LineIdTokenVerifier` を実装済みだが、実チャネルでの結合テストは未実施
+  (上記「LINEログイン」節参照)。
+- 戦国パスポート本番SSO交換: インターフェースとモックのみ。相手方のAPI仕様が未確定のため
+  未着手 (`docs/project-status.md` 参照)。

@@ -22,6 +22,7 @@ import {
 } from "@ove/ledger";
 import { ExternalApiAuthError, AgencySsoVerificationError } from "@ove/auth";
 import type { RequestWithId } from "./request-id.middleware";
+import { captureException } from "./sentry";
 
 const NOT_FOUND_ERRORS = [WalletNotFoundError, TransactionNotFoundError, HoldNotFoundError, AccountNotFoundError];
 const CONFLICT_ERRORS = [
@@ -99,6 +100,8 @@ export class LedgerExceptionFilter implements ExceptionFilter {
     }
 
     this.logger.error(exception instanceof Error ? exception.stack : exception);
+    // 想定外の例外 (4xx/既知の業務例外を除く) のみSentryへ送る。SENTRY_DSN未設定時はno-op。
+    captureException(exception);
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       error: "InternalServerError",
       message: "unexpected error",

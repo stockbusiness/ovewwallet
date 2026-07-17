@@ -4,10 +4,12 @@ import {
   OtpVerificationError,
   SengokuSsoService,
   MockLineAuthVerifier,
+  LineIdTokenVerifier,
   AgencySsoVerifier,
   issueSession,
   hashSessionToken,
   type KeyValueStore,
+  type LineAuthVerifier,
 } from "@ove/auth";
 import { generateId, type PrismaClient } from "@ove/database";
 import { KV_STORE } from "../common/kv-store.module";
@@ -20,7 +22,13 @@ import { ReferralsService } from "../referrals/referrals.service";
 export class AuthService {
   private readonly emailOtp: EmailOtpService;
   private readonly sengokuSso: SengokuSsoService;
-  private readonly lineVerifier = new MockLineAuthVerifier();
+  // AUTH_MODE=production では実際のLINE Platform APIへ問い合わせる本番実装を使う
+  // (開発ガイドライン12.2章)。LINE_CHANNEL_ID未設定のままAUTH_MODE=productionにすると
+  // 起動時に例外となる (assertAuthModeSafeForProductionと同じ「安全側で起動を止める」方針)。
+  private readonly lineVerifier: LineAuthVerifier =
+    process.env.AUTH_MODE === "production"
+      ? new LineIdTokenVerifier({ channelId: process.env.LINE_CHANNEL_ID || "" })
+      : new MockLineAuthVerifier();
   private readonly agencySso: AgencySsoVerifier;
 
   constructor(

@@ -31,6 +31,9 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().optional().default(""),
   AUDIT_LOG_RETENTION_DAYS: z.coerce.number().int().positive().default(365),
 
+  // エラートラッキング (Sentry, docs/monitoring.md)。未設定時は初期化しない。
+  SENTRY_DSN: z.string().optional().default(""),
+
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   // 開発ガイドライン12.2章: LINE/戦国パスポートSSOの本番実装が未接続の間、
   // NODE_ENV=production では AUTH_MODE=production の明示指定を必須とする
