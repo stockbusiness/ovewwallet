@@ -113,10 +113,12 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
    OVEアカウントを解決してログインさせる。
 3. **管理画面「代理店連携状態一覧」** (2.4節参照、ガイドライン15章の必須項目)。
 
-**範囲外 (今後の課題)**: 仕様書5章の紹介トークン・紹介セッション受け入れフロー
-(`ref_token`のURL経由登録・登録ボーナス連動)、OVE Wallet側からsengoku-ai.comへの
-同期送信 (仕様書6章の逆方向、実装時は`integration_outbox`を再利用予定)、
-同期失敗の自動再送 (`ENABLE_AGENCY_SYNC_RETRY`)。
+**範囲外 (今後の課題)**: OVE Wallet側からsengoku-ai.comへの同期送信 (仕様書6章の
+逆方向)、同期失敗の自動再送 (`ENABLE_AGENCY_SYNC_RETRY`)。紹介トークン・紹介セッション
+受け入れフロー (`ref_token`のURL経由登録・登録ボーナス連動) は、実装指示書v1.0を受けて
+Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保留まで) を実装済み
+(`docs/agency-referral.md`参照)。代理店システムへの実際の同期送信・特典確定はPhase 2、
+管理者による手動確定・取消はPhase 3として今後対応する。
 
 ## 5. 「OVEウォレット開発・連携上の留意事項 v1.0」への対応状況
 
@@ -153,14 +155,19 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
     ため、現状調査と影響範囲の整理 (ガイドライン19章の指示通り) を経て次のPhase 2
     (同期受信・SSOログイン) に着手・完了した。
 - **Phase 2 (代理店システム連携: 同期受信・SSOログイン) — 完了**: 4章参照。
-- **Phase 2で範囲外とした紹介情報受入基盤・登録特典連動 — 未着手**:
-  `referral_session`/`agency_referral_links`はまだ存在しません。
+- **Phase 2で範囲外とした紹介情報受入基盤・登録特典連動**: その後「代理店紹介連携機能
+  実装指示書」v1.0を受けて、外部APIキー不要な範囲 (Phase 1) を実装済み。
+  `wallet_referrals`/`wallet_referral_benefits`テーブルが存在する
+  (`docs/agency-referral.md`参照)。実際の代理店システムへの同期送信・特典確定は
+  引き続き未着手 (Phase 2)。
 
 ## 6. 未実装・今後の課題
 
-- 代理店システム連携の範囲外項目 (紹介トークン・紹介セッション受け入れフロー、
-  OVE Wallet→sengoku-ai.comへの同期送信、同期失敗の自動再送): 4章末尾・
-  `docs/agency-integration.md` 「今後の課題」参照。
+- 代理店紹介トークン受け入れのPhase 2・3 (代理店システムへの実際の同期送信・
+  登録特典3,000 OVEの確定付与・管理者による手動確定/取消): `docs/agency-referral.md`
+  「今後の課題」参照。外部APIキー不要なPhase 1 (受付・紐付け・特典保留) は対応済み。
+- 代理店システム連携 (12章) の範囲外項目: OVE Wallet→sengoku-ai.comへの同期送信、
+  同期失敗の自動再送。4章末尾・`docs/agency-integration.md` 「今後の課題」参照。
 - LINE本番連携・戦国パスポート本番SSO交換 (今回保留)。
 - 二段階承認のオンチェーン移行・外部ウォレット変更・APIサービス上限変更への拡張
   (対応する機能自体が未実装のため)。アカウント統合は対応済み (`docs/admin-operations.md`
@@ -197,6 +204,8 @@ IDトークンをそのまま信用する開発用の仮実装で、LINE Platfor
 | `docs/ledger-rules.md` | 台帳ルール・整合性チェック |
 | `docs/external-api.md` | 外部サービスAPI仕様 (代理店連携の土台) |
 | `docs/agency-integration.md` | 代理店システム(sengoku-ai.com)連携: 同期受信・SSOログイン |
+| `docs/agency-referral.md` | 代理店紹介トークン受け入れ・登録特典 (Phase 1) |
+| `docs/agency-referral-decisions.md` | 紹介トークン受け入れの残論点 (非エンジニア向け) |
 | `docs/integration-outbox.md` | Transactional Outbox・Feature Flag基盤 |
 | `docs/admin-operations.md` | 管理画面の全画面説明 |
 | `docs/ui-design.md` | 戦国ウォレットデザインシステム |

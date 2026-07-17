@@ -236,10 +236,11 @@ model OveAccount {
   mergedIntoAccount OveAccount?  @relation("AccountMerge", fields: [mergedIntoAccountId], references: [id])
   mergedAccounts    OveAccount[] @relation("AccountMerge")
 
-  identities AccountIdentity[]
-  links      AccountLink[]
-  wallet     Wallet?
-  sessions   UserSession[]
+  identities      AccountIdentity[]
+  links           AccountLink[]
+  wallet          Wallet?
+  sessions        UserSession[]
+  walletReferrals WalletReferral[]
 
   @@map("ove_accounts")
 }
@@ -624,3 +625,139 @@ model IntegrationOutbox {
 // 認証ロジックのみ、sengoku-ai.com側がHMAC署名に対応していないため簡易版
 // (AgencyApiKeyGuard) を別途用意している。
 // =====================================================================
+
+// =====================================================================
+// 13. 代理店紹介トークン受け入れ・登録特典 (実装指示書 v1.0)
+//
+// 代理店紹介URL (/invite/{token}) 経由の新規登録者について、紹介関係の記録と
+// 初回登録特典3,000 OVEの保留・確定を管理する。12章のAGENCY_SYSTEM連携とは別に、
+// 実装指示書10章の方針通り専用テーブルを持つ (紹介関係はservice_integrations等の
+// 既存の外部サービス連携の仕組みでは表現できないため)。
+// =====================================================================
+
+/// 紹介トークンの受付から登録・外部確認までの状態。単純な真偽値では管理しない
+/// (実装指示書7章)。
+enum WalletReferralStatus {
+  /// /invite/{token} で受け付け、登録セッションCookieを発行した直後 (登録未完了)。
+  CAPTURED
+  /// 新規登録が完了し、代理店システムからの確認待ち。
+  PENDING
+  /// 代理店システム側で有効な紹介関係と確認済み。
+  CONFIRMED
+  /// トークン無効・期限切れ・対象外等で否認。
+  REJECTED
+  /// 管理者が根拠を確認して手動確定 (Phase 3で追加する管理操作の対象)。
+  MANUALLY_CONFIRMED
+  /// 誤登録等により管理者が取消。
+  CANCELLED
+  /// 通信・システムエラーで処理継続不能。
+  ERROR
+  /// 登録に使われないままセッション有効期限が切れた。
+  EXPIRED
+}
+
+enum WalletReferralBenefitStatus {
+  /// 紹介確認または本人条件の確認待ち。
+  PENDING
+  /// 3,000 OVEを確定付与済み。
+  CONFIRMED
+  /// 条件不成立により未付与。
+  REJECTED
+  /// 一度付与した後に取消済み。
+  REVOKED
+}
+
+/// 紹介トークンの受付 (登録前の一時セッション) と、登録後の紹介関係を
+/// 同一テーブルで管理する (実装指示書5.5章の「紹介トークン」「紹介セッション」を
+/// status/walletUserIdの有無で表現し、別テーブルへ分割しない)。
+model WalletReferral {
+  id     String @id
+  /// 登録完了までnull。登録完了時にOVEアカウントIDを設定する。
+  walletUserId String? @map("wallet_user_id")
+  /// 将来 `ENABLE_PLATFORM_USER_ID` が有効になった場合の共通ID。Phase 1では未設定。
+  commonUserId String? @map("common_user_id")
+
+  /// /invite/{token} のCookie発行に使う不透明トークンのハッシュ (このテーブル自体を
+  /// セッションストアとして使う)。SHA-256 (`sha256Hex`、セッショントークンと同じ方式)。
+  sessionTokenHash String @unique @map("session_token_hash")
+  /// 代理店システムが発行した紹介トークンの本体。Phase 2の外部送信時に平文が必要なため
+  /// 可逆暗号化 (`encryptSecret`) で保存する。ログには絶対に出さない。
+  referralTokenEncrypted String @map("referral_token_encrypted")
+  /// 検索用の一方向ハッシュ。
+  referralTokenHash String @map("referral_token_hash")
+
+  /// Phase 2で代理店システムから確認結果を受け取った際に設定される代理店ID。
+  agencyId   String? @map("agency_id")
+  agencyRank String? @map("agency_rank")
+
+  status WalletReferralStatus @default(CAPTURED)
+  /// `invite_url` (通常フロー) / `admin` (管理者による後付け) / `migration`。
+  source String @default("invite_url")
+
+  capturedAt   DateTime  @default(now()) @map("captured_at")
+  /// セッションの有効期限 (既定24時間、実装指示書2種の目安7日/24時間のうち短い方を採用)。
+  expiresAt    DateTime  @map("expires_at")
+  /// 登録に使われた日時 (このセッションはこれ以降再利用できない)。
+  usedAt       DateTime? @map("used_at")
+  registeredAt DateTime? @map("registered_at")
+  confirmedAt  DateTime? @map("confirmed_at")
+  rejectedAt   DateTime? @map("rejected_at")
+  revokedAt    DateTime? @map("revoked_at")
+
+  lastErrorCode    String? @map("last_error_code")
+  lastErrorMessage String? @map("last_error_message")
+  /// IP/UAは生値を保存せず、監査目的の一方向ハッシュのみ保存する (実装指示書16章)。
+  createdIpHash  String? @map("created_ip_hash")
+  userAgentHash  String? @map("user_agent_hash")
+  reason         String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account  OveAccount?             @relation(fields: [walletUserId], references: [id])
+  benefits WalletReferralBenefit[]
+
+  // walletUserIdがnullの行 (登録前セッション) は複数存在しうるが、登録完了後は
+  // 1アカウントにつき有効な紹介関係は1件のみとする (実装指示書10.1章)。
+  // Postgresのunique indexはNULLを複数許容するため、この制約で両立できる。
+  @@unique([walletUserId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("wallet_referrals")
+}
+
+model WalletReferralBenefit {
+  id             String @id
+  walletUserId   String @map("wallet_user_id")
+  /// LINEユーザーIDの一方向ハッシュ (生値は保存しない、実装指示書9章条件5)。
+  lineUserIdHash String? @map("line_user_id_hash")
+  referralId     String  @map("referral_id")
+
+  /// 今回は "REFERRAL_SIGNUP_BONUS" のみ。将来の特典種別追加を見越して文字列で持つ。
+  benefitType String                      @default("REFERRAL_SIGNUP_BONUS") @map("benefit_type")
+  /// 実際に付与する額。REFERRAL_SIGNUP_BONUS_AMOUNT設定を変更しても過去の記録は変わらない。
+  amount      BigInt
+  status      WalletReferralBenefitStatus @default(PENDING)
+
+  /// 台帳への冪等キー (`REFERRAL_SIGNUP_BONUS:{walletUserId}`)。
+  idempotencyKey      String  @unique @map("idempotency_key")
+  ledgerTransactionId String? @map("ledger_transaction_id")
+
+  confirmedAt DateTime? @map("confirmed_at")
+  rejectedAt  DateTime? @map("rejected_at")
+  revokedAt   DateTime? @map("revoked_at")
+  reason      String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  referral WalletReferral @relation(fields: [referralId], references: [id])
+
+  // 同一アカウント・同一LINEユーザーIDへの二重付与をDB制約でも防止する
+  // (実装指示書9.1章)。lineUserIdHashがnullの行は複数存在しうるが問題ない
+  // (LINE未連携の紹介ではそもそも特典を確定しないため)。
+  @@unique([benefitType, walletUserId])
+  @@unique([benefitType, lineUserIdHash])
+  @@index([walletUserId])
+  @@map("wallet_referral_benefits")
+}

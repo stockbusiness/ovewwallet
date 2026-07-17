@@ -6,6 +6,7 @@ import {
   WALLET_CODE_COUNTER,
   type IdentityType,
   type OveAccount,
+  type Prisma,
   type PrismaClient,
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
@@ -22,6 +23,12 @@ export interface FindOrCreateIdentityParams {
   displayName?: string;
   /** 新規アカウント作成時のみ必須 (指示書: 利用規約同意の永続化)。既存アカウントのログインでは不要。 */
   termsAccepted?: boolean;
+  /**
+   * 新規アカウント作成時のみ、アカウント作成と同一トランザクション内で呼ばれる。
+   * 代理店紹介の紐付け (`ReferralsService`) など、アカウント作成に付随する処理を
+   * 「作成した場合だけ」実行するためのフック (既存ユーザーのログインでは呼ばれない)。
+   */
+  onNewAccountCreated?: (tx: Prisma.TransactionClient, account: OveAccount) => Promise<void>;
 }
 
 @Injectable()
@@ -107,6 +114,10 @@ export class AccountsService {
           },
         },
       });
+
+      if (params.onNewAccountCreated) {
+        await params.onNewAccountCreated(tx, account);
+      }
 
       return account;
     });

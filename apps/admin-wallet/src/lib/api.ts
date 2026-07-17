@@ -234,6 +234,41 @@ export interface AgencyLinkItem {
   account: { id: string; accountCode: string; displayName: string | null } | null;
 }
 
+/** 代理店紹介トークン受け入れ (実装指示書 v1.0)。/invite/{token} 受付〜登録特典の確認用。 */
+export interface WalletReferralBenefitItem {
+  id: string;
+  benefitType: string;
+  amount: string;
+  status: "PENDING" | "CONFIRMED" | "REJECTED" | "REVOKED";
+  confirmedAt: string | null;
+  rejectedAt: string | null;
+  revokedAt: string | null;
+  reason: string | null;
+}
+
+export interface WalletReferralItem {
+  id: string;
+  walletUserId: string | null;
+  commonUserId: string | null;
+  agencyId: string | null;
+  agencyRank: string | null;
+  status: "CAPTURED" | "PENDING" | "CONFIRMED" | "REJECTED" | "MANUALLY_CONFIRMED" | "CANCELLED" | "ERROR" | "EXPIRED";
+  source: string;
+  capturedAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  registeredAt: string | null;
+  confirmedAt: string | null;
+  rejectedAt: string | null;
+  revokedAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  reason: string | null;
+  createdAt: string;
+  account: { id: string; accountCode: string; displayName: string | null } | null;
+  benefits: WalletReferralBenefitItem[];
+}
+
 export type FeatureFlags = Record<
   | "ENABLE_PLATFORM_USER_ID"
   | "ENABLE_WALLET_REFERRAL_TOKEN"

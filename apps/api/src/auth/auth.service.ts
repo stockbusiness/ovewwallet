@@ -14,6 +14,7 @@ import { KV_STORE } from "../common/kv-store.module";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { AgencyService } from "../agency/agency.service";
+import { ReferralsService } from "../referrals/referrals.service";
 
 @Injectable()
 export class AuthService {
@@ -27,6 +28,7 @@ export class AuthService {
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
     private readonly agencyService: AgencyService,
+    private readonly referrals: ReferralsService,
   ) {
     this.emailOtp = new EmailOtpService(kv);
     this.sengokuSso = new SengokuSsoService(kv);
@@ -69,14 +71,24 @@ export class AuthService {
     return this.createSessionForAccount(account.id);
   }
 
-  async loginWithLineMock(idToken: string, termsAccepted?: boolean) {
+  /**
+   * `referralCookieToken` は `/invite/{token}` 経由で発行された紹介セッションCookieの値
+   * (実装指示書 v1.0)。無効・期限切れ・未指定の場合は通常のログインとして処理を続ける
+   * (紹介なしでも登録自体は止めない)。新規アカウント作成時のみ、紹介関係の紐付けを
+   * アカウント作成と同一トランザクションで行う。
+   */
+  async loginWithLineMock(idToken: string, termsAccepted?: boolean, referralCookieToken?: string) {
     const claims = await this.lineVerifier.verifyIdToken(idToken);
+    const referral = await this.referrals.resolvePendingSession(referralCookieToken);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "LINE",
       provider: "LINE",
       providerSubject: claims.lineUserId,
       email: claims.email,
       termsAccepted,
+      onNewAccountCreated: referral
+        ? (tx, newAccount) => this.referrals.attachToNewAccount(tx, referral, newAccount, claims.lineUserId)
+        : undefined,
     });
     return this.createSessionForAccount(account.id);
   }

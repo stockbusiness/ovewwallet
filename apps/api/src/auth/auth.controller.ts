@@ -8,6 +8,7 @@ import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/sh
 import { AuthService } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
+import { REFERRAL_SESSION_COOKIE_NAME } from "../referrals/referrals.controller";
 
 const RequestOtpSchema = z.object({ email: z.string().email() });
 const VerifyOtpSchema = z.object({
@@ -52,10 +53,14 @@ export class AuthController {
   @Post("line/login")
   async lineLogin(
     @Body(new ZodValidationPipe(LineLoginSchema)) body: z.infer<typeof LineLoginSchema>,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted);
+    const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
+    const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted, referralCookieToken);
     setSessionCookie(res, session.token, session.expiresAt);
+    // 紹介Cookieは新規/既存いずれの結果でも使い切りとして削除する (実装指示書12章)。
+    if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, { path: "/" });
     return { ove_account_id: session.oveAccountId };
   }
 

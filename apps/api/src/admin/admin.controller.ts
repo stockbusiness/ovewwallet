@@ -12,6 +12,7 @@ import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
+import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -107,6 +108,7 @@ export class AdminController {
     private readonly approvals: AdminApprovalService,
     private readonly rewardRules: AdminRewardRulesService,
     private readonly agencyLinks: AdminAgencyLinksService,
+    private readonly walletReferrals: AdminWalletReferralsService,
   ) {}
 
   /**
@@ -521,5 +523,26 @@ export class AdminController {
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
   async agencyLinkDetail(@Param("id") id: string): Promise<unknown> {
     return this.agencyLinks.detail(id);
+  }
+
+  /**
+   * 代理店紹介トークン受け入れの確認画面 (実装指示書 v1.0 14章)。Phase 1のため
+   * 確認のみで、管理者による手動確定・取消 (14.3章) はPhase 3で追加する。
+   */
+  @Get("wallet-referrals")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async listWalletReferrals(
+    @Query("status") status?: string,
+    @Query("limit") limit?: string,
+  ): Promise<unknown> {
+    return this.walletReferrals.list({ status, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Get("wallet-referrals/:id")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async walletReferralDetail(@Param("id") id: string): Promise<unknown> {
+    return this.walletReferrals.detail(id);
   }
 }

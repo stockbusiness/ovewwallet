@@ -100,9 +100,11 @@ pnpm test:load                    # 簡易負荷・レート制限限界値テ�
 - `docs/integration-outbox.md` — Transactional Outbox・Feature Flag基盤
 - `docs/agency-integration.md` — 戦国経済圏代理店システム(sengoku-ai.com)外部連携
   (同期受信API・SSOログイン、外部連携API仕様書v3.6.71対応)
+- `docs/agency-referral.md` — 代理店紹介トークン受け入れ・登録特典 (Phase 1: `/invite/{token}`
+  受付・LINEログイン時の紐付け・特典保留まで)
 - `docs/admin-operations.md` — 管理画面操作
 - `docs/ui-design.md` — 戦国ウォレット UIデザインシステム (デザイントークン・共通コンポーネント)
-- `docs/migration.md` — 既存ユーザー移行 (設計のみ、実装は未着手)
+- `docs/migration.md` — 既存ユーザー移行 (事前承認制・職務分離・Shift_JIS対応まで実装済み)
 - `docs/security.md` — セキュリティ対策と既知の課題
 - `docs/test-plan.md` — テスト計画と実施結果
 - `docs/deployment.md` — デプロイ手順
