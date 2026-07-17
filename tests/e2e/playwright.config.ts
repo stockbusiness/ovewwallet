@@ -45,6 +45,10 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: "../..",
       timeout: 60_000,
+      // ENABLE_WALLET_REFERRAL_TOKEN はこのAPIプロセスにだけ立てる (`.env.test` 本体には
+      // 追加しない。apps/api の jest e2e (`outbox.test.ts`) が「未設定時は全フラグfalse」を
+      // 検証しており、.env.test 側で有効化するとそちらが壊れるため)。
+      env: { ENABLE_WALLET_REFERRAL_TOKEN: "true" },
     },
     {
       command: "pnpm --filter @ove/user-wallet start",

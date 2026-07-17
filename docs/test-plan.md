@@ -161,6 +161,20 @@ DB/Redis・3アプリの起動が前提となり、他のテストと性質が�
     **教訓: DBスキーマ・トリガーレベルの変更を行った際は、そのタスクに直接関係する
     テストスイートだけでなく、ルートの`pnpm test`で全ワークスペースを横断的に
     再実行して確認すること。**
+15. (テストDBの状態汚染) 代理店紹介トークン受け入れ (`docs/agency-referral.md`) の
+    Playwright E2E追加後、`outbox.test.ts`の
+    「`processPendingEvents`が登録済み宛先ハンドラへ送信しSENTにする」テストが
+    断続的に失敗するようになった。`OutboxService.processPendingEvents()`は
+    作成日時の古い順に既定20件までしか処理しないため、宛先ハンドラが存在しない
+    `AGENCY_SYSTEM`宛のイベント (Playwright E2Eの手動テスト実行を繰り返すたびに
+    `ove_wallet_test`のDBへ積み上がっていた) が20件を超えると、このテストが新規に
+    作成した (ハンドラ登録済みの) イベントまで処理が到達せず`result.processed`が
+    0のままアサーションに失敗する。`integration_outbox`テーブルの残存行を削除して
+    復旧した。**教訓: ローカルの`ove_wallet_test`は使い回すと`take(limit)`方式の
+    処理を前提にしたテストが壊れうる。CIのように毎回まっさらなDBへ
+    `migrate deploy`する運用であれば本来発生しない問題だが、ローカルで
+    `pnpm test:e2e`とAPIのjest e2eを同じDBに対して繰り返し実行する場合は、
+    定期的に`integration_outbox`等の蓄積するテーブルをクリアすること。**
 
 いずれも実際にAPIを呼び出して初めて発覚したものであり、修正後に自動テスト
 (回帰テストを追加したものを含む) と手動確認の両方で解消を確認済み。
