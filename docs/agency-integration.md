@@ -124,8 +124,9 @@ SSOログインは常に失敗する（起動時にエラーにはしない安�
 
 ## 今後の課題 (範囲外)
 
-- 仕様書5章の紹介トークン・紹介セッション受け入れフロー
-  (`ref_token`のURL除去、`referral_session`テーブル、登録ボーナス連動)。
+- 紹介トークン・紹介セッション受け入れフロー (`ref_token`のURL除去、`referral_session`
+  テーブル、登録ボーナス連動)。着手前に確認が必要な事項を
+  `docs/agency-referral-decisions.md` (非エンジニア向け) にまとめてある。
 - OVE Wallet側からsengoku-ai.comへの同期送信 (仕様書6章の逆方向)。
   実装する場合は既存の`integration_outbox` (`docs/integration-outbox.md`) を
   再利用する。
