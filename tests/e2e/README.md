@@ -47,16 +47,19 @@ OVE_E2E_CHROMIUM_PATH=/opt/pw-browsers/chromium pnpm test
 |---|---|
 | `specs/user-wallet.spec.ts` | LINEモックログイン → ウォレットホーム表示 → 取引履歴ページ (空状態) |
 | `specs/admin-wallet.spec.ts` | 管理者ログイン → 個別付与 → 残高・取引一覧への反映確認 |
+| `specs/account-merge-approval.spec.ts` | アカウント統合の二段階承認 (2管理者セッション、申請者本人による承認拒否を含む) |
+| `specs/migration-approval.spec.ts` | 既存ユーザー移行の事前承認制・検証者フロー (2管理者セッション、実行者本人によるREVIEWING解消拒否を含む) |
 
 `support/seed.ts` はテストデータ投入用のヘルパー (`@ove/database`/`@ove/auth` を直接使い、
 テストごとにユニークなアカウント/管理者を作成する。テスト同士が状態を共有しない)。
+`migration-approval.spec.ts`は`support/seed.ts`経由ではなく`@ove/database`の`prisma`を
+直接使ってREVIEWINGアカウントを特定している (一覧画面が他テストのデータとも混在するため)。
 
 ## 今後の拡張候補
 
-このセッションで手動確認した以下のフローは、今回は自動化していない (今後の課題):
+以下のフローは、今回も自動化していない (今後の課題):
 
 - 管理者MFAのセットアップ→ログイン
-- アカウント統合の二段階承認 (2管理者セッション)
-- 既存ユーザー移行の検証者フロー
 - 外部連携キュー画面
+- 代理店連携状態一覧・紹介トークン受け入れ画面
 - 戦国ウォレットデザインのレスポンシブ確認 (375/768/1280px)
