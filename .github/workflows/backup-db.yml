@@ -1,0 +1,70 @@
+name: Backup Database (Railway)
+
+# 実運用ギャップ対応 (docs/backup.md「残作業」1.): scripts/backup-db.shの定期実行を
+# 自動化する。deploy.ymlと同じくRailway CLI経由で本番PostgreSQLの接続情報をその場で
+# 取得し、新しいDATABASE_URL用シークレットは追加しない(deploy.ymlが使う既存の
+# RAILWAY_API_TOKEN/RAILWAY_PROJECT_IDのみを再利用する)。
+#
+# 取得したバックアップはワークフローのartifactとしてアップロードする。これはアプリ本体と
+# 同じコンテナ/ディスクに保存しないという要件(docs/backup.md)は満たすが、S3等の恒久的な
+# オブジェクトストレージへの保存ではない(GitHub Actionsのartifact保持期間の制約を受ける)。
+# 恒久保存が必要な場合は、下記のアップロードステップをS3等へのアップロードに置き換えること。
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 毎日 18:00 UTC (日本時間 翌3:00)。トラフィックの少ない時間帯を想定。
+    - cron: "0 18 * * *"
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: RAILWAY
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Install PostgreSQL client (pg_dump)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Link to Railway project
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+
+      - name: Fetch DATABASE_URL from Railway and run backup
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          echo "サービス一覧を確認します:"
+          railway service list --json | tee services.json
+
+          POSTGRES_SERVICE=$(node -e "
+            const s = require('./services.json');
+            const found = s.find(x => /postgres/i.test(x.name));
+            if (!found) { console.error('postgres service not found'); process.exit(1); }
+            console.log(found.name);
+          ")
+          echo "postgres service: $POSTGRES_SERVICE"
+
+          DATABASE_URL=$(railway variable list --service "$POSTGRES_SERVICE" --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const v = JSON.parse(d);
+              console.log(v.DATABASE_PUBLIC_URL || v.DATABASE_URL || '');
+            });
+          ")
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URLの取得に失敗しました"
+            exit 1
+          fi
+
+          DATABASE_URL="$DATABASE_URL" ./scripts/backup-db.sh ./backups
+
+      - name: Upload backup as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ove-wallet-db-backup-${{ github.run_id }}
+          path: backups/*.dump
+          retention-days: 30

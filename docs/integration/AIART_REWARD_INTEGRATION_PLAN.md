@@ -31,13 +31,34 @@
    `COMPLETED`件数を`rule.perEventLimit`(seed値: 1)と比較しており、同一`event_id`+
    同一ウォレットへの二重付与は既に防止されている。`event_id`(`request.event_id`)は
    `sourceReferenceId`として必須で渡す設計になっている。
-2. **(実際の不足点)** 付与金額が`reward_rules.rewardAmount`から決定されていない:
-   `RewardsService.grant()`は`amount`を`request.amount`(呼び出し元が自由に指定する値)
-   から取っており(41行目付近)、`enforceRuleLimits()`は件数上限のみ検証して金額の
-   妥当性は検証していない。指示書7.3章は「外部側がルールコードとイベント情報を送り、
-   金額はOVE側の`reward_rules`から決定する方式」を推奨しており、現状はこれに反する
-   (呼び出し元がバグ・改ざんで10,000以外の値を送っても、`perRequestAmountLimit`
-   以下であれば通ってしまう)。
+2. **(実際の不足点、ただし設計判断が必要)** 付与金額が`reward_rules.rewardAmount`から
+   決定されていない: `RewardsService.grant()`は`amount`を`request.amount`(呼び出し元が
+   自由に指定する値)から取っており、`enforceRuleLimits()`は件数上限
+   (`perUserLimit`/`perEventLimit`/`monthlyCountLimit`)のみ検証して金額の妥当性は
+   検証していない。指示書7.3章は「外部側がルールコードとイベント情報を送り、金額は
+   OVE側の`reward_rules`から決定する方式」を推奨しており、字義通りには現状はこれに反する。
+
+   ただし、既存テスト(`apps/api/src/e2e/rewards-limits.test.ts`)を実際に確認したところ、
+   `monthlyAmountLimit`/`globalAmountLimit`(SUM金額上限)のテストは、境界値を精密に
+   検証するためにわざと`rewardAmount`(10,000)とは異なる金額(1000/1500/3000)を
+   複数回に分けて送信する設計になっている。これは**`amount`が呼び出し元ごとに可変で
+   あることを前提にした既存設計**であり、「`amount`は常に`rewardAmount`と完全一致
+   でなければならない」という単純な検証を追加すると、この既存テストの前提と衝突する
+   (作り直しが必要になる)。
+
+   このため、対応方針は以下のいずれかを選ぶ必要があり、**業務判断が必要**:
+   - (a) `amount`は`rewardAmount`以下であることのみを検証する(上限としてのみ機能させ、
+     `monthlyAmountLimit`等の可変SUM設計は維持する)。既存テストへの影響は無いと見込む。
+     AIアート教室連携が「開催回への参加確定で常に定額10,000 OVE」である前提なら、
+     この方式でも実質的に10,000固定運用は可能(呼び出し元が正しく10,000を送る限り)。
+   - (b) `AIART_ATTENDANCE`のような「1回の付与額が固定であるべき」取引タイプに限り
+     `amount === rewardAmount`の完全一致を要求し、`SENGOKU_REGISTRATION_BONUS`等
+     可変SUM設計が必要な取引タイプは対象外にする(取引タイプごとに検証方式を分ける)。
+   - (c) 現状維持し、AIアート教室側のAPI実装レビュー(相手方が正しい金額を送ることの
+     確認)で担保する(OVE側では検証しない)。
+
+   本ドキュメントでは(a)または(b)を推奨するが、最終的な採否はAIアート教室連携の
+   実装着手時にユーザーへ確認する。
 3. 出席状態の確認: 「予約」だけでは付与せず「実参加確定」を確認するロジックは、
    OVE側には存在しない(呼び出されれば無条件に付与するAPIのため、AIアート教室側が
    実際に出席確定後にだけ呼び出す実装になっているかに完全に依存している)。
@@ -52,13 +73,9 @@
 ## 対象ファイル・対象クラス/関数 (想定)
 
 - 変更: `apps/api/src/rewards/rewards.service.ts` — `enforceRuleLimits()`または
-  `grant()`に、`RULE_CODE_BY_TRANSACTION_TYPE`にマッピングが存在する取引タイプについては
-  `request.amount`を無条件に信用せず、`rule.rewardAmount`と一致するか検証する処理を追加
-  (不一致なら`BadRequestException`)。これはAIアート教室固有の変更ではなく、既存の
-  `SENGOKU_REGISTRATION_BONUS`にも同じリスクがあるため、`RULE_CODE_BY_TRANSACTION_TYPE`に
-  登録されている取引タイプ全般への横展開として実装する (Feature Flag
-  `ENABLE_EXTERNAL_REWARD_TYPES`等で段階的に有効化し、既存の外部連携を壊さないことを
-  確認しながら適用する)。
+  `grant()`に金額検証を追加(上記「不足機能」2.の(a)/(b)いずれかの方針が決まってから)。
+  `SENGOKU_REGISTRATION_BONUS`の可変SUM設計 (`apps/api/src/e2e/rewards-limits.test.ts`)
+  を壊さない実装にする必要がある。
 - 新規または変更: CSV一括連携が必要な場合、`apps/api/src/admin/admin-bulk-grants.service.ts`
   相当の既存CSV一括付与サービスを参考に、AIアート教室専用のCSVパーサーを追加するか、
   汎用フォーマットへの変換層を追加するか検討する。
@@ -77,9 +94,7 @@
 - 既存の`POST /api/v1/rewards/grant`を再利用する方針(指示書7.3章「新しい残高更新APIを
   作らない」)。`event_id`は既に必須パラメータとして機能している(`sourceReferenceId`
   として保存・`perEventLimit`判定に使用)ため、追加のバリデーションは不要と見込む。
-- `amount`を外部から自由指定させず`reward_rules.rewardAmount`から決定する検証を追加する
-  (上記「不足機能」2.参照。既存の`SENGOKU_REGISTRATION_BONUS`を含む既存連携への影響を
-  確認しながら段階的に適用する)。
+- `amount`の検証方式は上記「不足機能」2.の業務判断待ち。
 
 ## Feature Flag
 
@@ -95,11 +110,13 @@
 
 ## 回帰リスク
 
-- `amount`のreward_rules照合を追加する変更は`RULE_CODE_BY_TRANSACTION_TYPE`に登録済みの
-  既存の取引タイプ(`SENGOKU_REGISTRATION_BONUS`)にも影響するため、既存のE2Eテスト
-  (`apps/api/src/e2e/rewards-limits.test.ts`等)が想定するリクエストの`amount`が
-  `reward_rules.rewardAmount`と一致しているかを事前に確認し、一致しない既存テストが
-  あれば意図的な差なのか見落としなのかを切り分けてから適用する。
+- 実際に`apps/api/src/e2e/rewards-limits.test.ts`を確認したところ、
+  `monthlyAmountLimit`/`globalAmountLimit`の境界値テストは`rewardAmount`(10,000)とは
+  異なる金額(1000/1500/3000)を意図的に使っている。「不足機能」2.で(a)または(b)の
+  方針を採る場合、この既存テストとの整合性を保った実装にする必要がある
+  ((a)の上限方式なら1000/1500/3000はいずれも10,000以下のため無改修で両立可能、
+  (b)の取引タイプ限定完全一致方式でも`SENGOKU_REGISTRATION_BONUS`を対象外にすれば
+  無改修で両立可能)。
 
 ## テスト項目 (指示書7.8章の受入試験に対応)
 
