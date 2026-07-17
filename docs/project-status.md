@@ -4,6 +4,20 @@
 1枚で把握できるように整理したものです。個別の詳細仕様は各 `docs/*.md` を参照してください。
 時系列の作業記録 (何をいつ・なぜ実装したか) は `docs/implementation-log.md` を参照してください。
 
+## 0. 状態表記ルール
+
+「OVEウォレット 今後の実装・運用指示書 v1.0」3章の表記ルールに従い、以降の記述では
+以下の状態ラベルを使う。「コードが存在する」だけでは`IMPLEMENTED`と記載しない。
+
+| 状態 | 意味 |
+|---|---|
+| `IMPLEMENTED` | コード、テスト、画面またはAPIまで完成し、動作確認済み |
+| `CONFIGURATION_REQUIRED` | コードは完成しているが、外部サービス設定や本番環境設定が必要 |
+| `PARTIALLY_IMPLEMENTED` | 共通基盤または途中工程のみ完成し、業務フローが最後までつながっていない |
+| `NOT_IMPLEMENTED` | 未着手 |
+| `BUSINESS_DECISION_REQUIRED` | 業務ルール、契約、外部API仕様等の確定待ち |
+| `BLOCKED` | 外部依存や重大問題により着手・完了できない |
+
 ## 1. 全体構成
 
 ```
@@ -98,8 +112,14 @@ LINEログインは `AUTH_MODE` で実装を切り替える構成です
   LINE Developersでチャネルを発行し、実際のLIFF/LINE Login SDK経由のログインで
   一度は確認する必要がある。
 
+  **状態: `CONFIGURATION_REQUIRED`** (コードは完成しているが、LINE Developersでの
+  チャネル発行・実チャネルでの結合試験が必要。設定一覧は
+  `docs/implementation/PRODUCTION_READINESS_PLAN.md`「P0-2」参照)。
+
 戦国パスポートSSO (`SengokuSsoService`) については、相手方のAPI仕様がまだ確定していない
 (sengoku-ai.com側からの仕様共有待ち) ため、引き続きモック実装のままで着手を保留している。
+
+**状態: `BUSINESS_DECISION_REQUIRED`** (相手方API仕様の確定待ち)。
 
 ## 4. 代理店システム (sengoku-ai.com) 連携 — 実装済み
 
@@ -118,12 +138,19 @@ LINEログインは `AUTH_MODE` で実装を切り替える構成です
    OVEアカウントを解決してログインさせる。
 3. **管理画面「代理店連携状態一覧」** (2.4節参照、ガイドライン15章の必須項目)。
 
+**状態: `IMPLEMENTED`** (同期受信・SSOログイン・管理画面いずれも動作確認済み)。
+
 **範囲外 (今後の課題)**: OVE Wallet側からsengoku-ai.comへの同期送信 (仕様書6章の
 逆方向)、同期失敗の自動再送 (`ENABLE_AGENCY_SYNC_RETRY`)。紹介トークン・紹介セッション
 受け入れフロー (`ref_token`のURL経由登録・登録ボーナス連動) は、実装指示書v1.0を受けて
 Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保留まで) を実装済み
 (`docs/agency-referral.md`参照)。代理店システムへの実際の同期送信・特典確定はPhase 2、
 管理者による手動確定・取消はPhase 3として今後対応する。
+
+**状態: `PARTIALLY_IMPLEMENTED`** (Phase 1のみ完了。Phase 2実装計画は
+`docs/integration/AGENCY_REFERRAL_PHASE2_PLAN.md`、外部API仕様の未確認項目は
+`docs/integration/EXTERNAL_API_GAPS.md`参照。実送信先の正式契約が
+`BUSINESS_DECISION_REQUIRED`のため、Phase 2自体もこの確定が前提)。
 
 ## 5. 「OVEウォレット開発・連携上の留意事項 v1.0」への対応状況
 
@@ -168,6 +195,13 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 
 ## 6. 未実装・今後の課題
 
+- **AIアート教室連携 (実参加確認→開催回単位10,000 OVE付与)**: `AIART`サービスコード・
+  `AIART_ATTENDANCE_REWARD`付与ルール・外部付与API・HMAC認証・開催回単位の重複防止
+  (`perEventLimit`) は既に動作するが、出席状態の確認 (予約だけでは付与しない) や
+  付与金額の`reward_rules`照合はAIアート教室固有のフローとして未実装。
+  **状態: `PARTIALLY_IMPLEMENTED`** (実装計画:
+  `docs/integration/AIART_REWARD_INTEGRATION_PLAN.md`、外部仕様の未確認項目:
+  `docs/integration/EXTERNAL_API_GAPS.md`)。
 - 代理店紹介トークン受け入れのPhase 2・3 (代理店システムへの実際の同期送信・
   登録特典3,000 OVEの確定付与・管理者による手動確定/取消): `docs/agency-referral.md`
   「今後の課題」参照。外部APIキー不要なPhase 1 (受付・紐付け・特典保留) は対応済み。
@@ -232,3 +266,8 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/implementation-log.md` | 時系列の実装記録 (このドキュメントとは別に、何を・いつ・なぜ実装したかを追える) |
 | `docs/implementation-plan.md` | 初期実装計画・フェーズ進行状況 |
 | `docs/development-guardrails.md` | 代理店システム等の外部連携に向けた開発基準 (このドキュメントの元) |
+| `docs/implementation/PRODUCTION_READINESS_PLAN.md` | 本番基盤の確認 (P0) 実装計画 |
+| `docs/integration/EXTERNAL_API_GAPS.md` | 外部API仕様ギャップ調査 (代理店紹介・AIアート教室) |
+| `docs/integration/AGENCY_REFERRAL_PHASE2_PLAN.md` | 代理店紹介連携Phase 2実装計画 |
+| `docs/integration/AIART_REWARD_INTEGRATION_PLAN.md` | AIアート教室10,000 OVE連携実装計画 |
+| `docs/test/LIMITED_RELEASE_TEST_PLAN.md` | 限定公開フェーズ試験計画 |

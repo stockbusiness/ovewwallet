@@ -17,6 +17,8 @@
 - APIキー・署名シークレットの平文非保存 (`docs/database.md` 参照)。
 - 監査ログ (`audit_logs`): アプリケーション層にdelete用のAPI/UIを一切実装していない。
   さらにDBレベルでも改ざん・削除を防止している (下記「監査ログのDBレベル不変性」参照)。
+- 台帳 (`ove_transactions`): DELETE禁止・COMPLETED取引の主要項目の変更禁止をDBレベルで
+  強制 (下記「ove_transactionsのDBレベル保護」参照)。
 - 管理権限分離: `AdminRole` によるロールベースアクセス制御 (`RolesGuard`)。
 - 高額操作の承認: `HIGH_VALUE_THRESHOLD` 以上の個別付与・個別減算は二段階承認
   (申請者と承認者が別人であることを強制) を経なければ実行されない
@@ -90,6 +92,27 @@ BEFOREトリガー (`prevent_audit_logs_mutation()`、マイグレーション
 単体テスト (`apps/api/src/e2e/audit-log-immutability.test.ts`) で、DELETE/UPDATEが
 DBレベルで例外になりトランザクションごとロールバックされること、通常のINSERT/SELECTは
 影響を受けないことを検証済み。
+
+## ove_transactionsのDBレベル保護
+
+台帳の中核テーブル`ove_transactions`についても、同じ理由(特権ユーザー接続のため
+REVOKEが無意味)でBEFOREトリガー(マイグレーション`add_ove_transactions_immutability_trigger`)
+により以下を拒否している(実装指示書「OVEウォレット 今後の実装・運用指示書 v1.0」5.1章)。
+
+- DELETE (常に拒否。取消は必ずREVERSAL取引の追加で行う設計のため)
+- COMPLETED状態の取引の`amount`/`direction`/`wallet_id`/`transaction_type`/
+  `idempotency_key`の変更
+
+`status`のみの変更(COMPLETED → REVERSED、`packages/ledger/src/reversal.ts`が行う
+唯一のUPDATE)は許可している。単体テスト(`apps/api/src/e2e/ove-transactions-immutability.test.ts`)
+で、DELETE拒否・保護対象フィールドの変更拒否・唯一許可されるステータス遷移・通常の
+INSERT/SELECTへの無影響を検証済み。
+
+この変更に伴い、`packages/ledger/src/test-helpers.ts`の`truncateLedgerTables()`は
+`oveTransaction`(および外部キーで参照される`wallet`/`oveAccount`等)のテーブル削除を
+やめ、`walletHold`のみを削除する方式に変更した。各テストは`walletId`など固有の値で
+自分が作成した取引を検索するため、他のテスト実行で残った行と衝突しない
+(audit_logsのテストが既に採用している方針と同じ)。
 
 ## レート制限値の見直し
 

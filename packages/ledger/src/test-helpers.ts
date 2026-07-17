@@ -29,19 +29,19 @@ export async function createTestWallet(initialBalance: bigint = 0n) {
 /**
  * テスト間でウォレット関連テーブルを空にする。
  *
- * `audit_logs` はDBトリガーでDELETE/UPDATEを常に拒否する (指示書: 監査ログはDBレベルで
- * 削除不可にすること。`packages/database/prisma/migrations/*_add_audit_logs_immutability_trigger`
- * 参照) ため、ここでは削除しない。各テストは`targetId`など固有の値で自分が作成した
- * 監査ログを検索するため、他のテスト実行で残った行と衝突することはない。
+ * `audit_logs`・`ove_transactions` はDBトリガーでDELETE (と`ove_transactions`は
+ * COMPLETED取引の主要項目のUPDATE) を常に拒否する (実装指示書「OVEウォレット
+ * 今後の実装・運用指示書 v1.0」5.1章。`packages/database/prisma/migrations/
+ * *_add_audit_logs_immutability_trigger`・`*_add_ove_transactions_immutability_trigger`
+ * 参照) ため、どちらもここでは削除しない。各テストは`walletId`など固有の値
+ * (`createTestWallet()`が毎回新規生成するアカウント/ウォレットID) で自分が作成した
+ * 取引を検索するため、他のテスト実行で残った行と衝突することはない。
+ *
+ * `wallet`/`oveAccount`は`oveTransaction.walletId`から外部キー参照されているため、
+ * `oveTransaction`を削除しない以上、こちらも削除できない (削除すると外部キー制約違反に
+ * なる)。同じ理由で`accountLink`/`accountIdentity`/`userSession`も対象外とする。
+ * `walletHold`のみ`oveTransaction`から参照されないため引き続き削除する。
  */
 export async function truncateLedgerTables() {
-  await prisma.$transaction([
-    prisma.walletHold.deleteMany(),
-    prisma.oveTransaction.deleteMany(),
-    prisma.wallet.deleteMany(),
-    prisma.accountLink.deleteMany(),
-    prisma.accountIdentity.deleteMany(),
-    prisma.userSession.deleteMany(),
-    prisma.oveAccount.deleteMany(),
-  ]);
+  await prisma.walletHold.deleteMany();
 }

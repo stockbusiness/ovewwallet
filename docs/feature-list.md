@@ -4,6 +4,11 @@
 `docs/implementation-log.md`、現状の実装状況の解説は `docs/project-status.md`、
 各機能の詳細仕様は該当する `docs/*.md` を参照してください。
 
+状態ラベル (`docs/project-status.md`「0. 状態表記ルール」参照) を明記していない項目は
+`IMPLEMENTED` (コード・テスト・画面/APIまで完成し動作確認済み) を意味します。それ以外の
+状態 (`CONFIGURATION_REQUIRED`/`PARTIALLY_IMPLEMENTED`/`BUSINESS_DECISION_REQUIRED`等)
+の項目のみ、明示的にラベルを付けています。
+
 ## 1. 台帳・ウォレット基盤
 
 - OVEアカウント・ウォレットの自動作成
@@ -23,8 +28,9 @@
 
 - メールワンタイムコード (6桁・有効期限10分・試行5回まで、本番相当で実装済み)
 - LINEログイン (本番実装 `LineIdTokenVerifier` はコードとして実装済みだが、実LINE
-  チャネルでの結合テストは未実施。既定はモック実装)
-- 戦国パスポートSSO (モック実装、相手方API仕様待ちで本番連携は未着手)
+  チャネルでの結合テストは未実施。既定はモック実装) — **`CONFIGURATION_REQUIRED`**
+- 戦国パスポートSSO (モック実装、相手方API仕様待ちで本番連携は未着手) —
+  **`BUSINESS_DECISION_REQUIRED`**
 - 戦国経済圏代理店システム(sengoku-ai.com)SSOログイン (RS256 JWT + JWKS検証、本番相当)
 - OVE独自セッション (HttpOnly Cookie、DBにはハッシュのみ保存)
 - 利用規約同意の永続化 (新規登録時に必須化、バージョン・日時を記録)
@@ -88,6 +94,11 @@
   後から差し込み可能な設計 (現時点で実際に登録されているハンドラは無く、管理画面からの
   手動ディスパッチのみ)
 - Feature Flag基盤 (7種、すべて既定false。OFFのままで既存機能に影響しないことを確認済み)
+- AIアート教室連携: `AIART`サービスコード・`AIART_ATTENDANCE_REWARD`付与ルール
+  (開催回単位の重複防止`perEventLimit`込み)は上記共通基盤の上に登録済みで技術的には
+  呼び出し可能。ただし出席状態の確認・付与金額の`reward_rules`照合などアート教室固有の
+  業務フローは未実装。**状態: `PARTIALLY_IMPLEMENTED`** (実装計画:
+  `docs/integration/AIART_REWARD_INTEGRATION_PLAN.md`)
 
 詳細: `docs/external-api.md`, `docs/integration-outbox.md`
 
@@ -98,7 +109,8 @@
 - SSOログイン (`POST /api/v1/auth/sso/agency`): RS256 JWT + JWKS検証、jti再利用拒否
 - 管理画面「代理店連携状態一覧」
 
-範囲外 (未着手): OVE Wallet→sengoku-ai.comへの同期送信、同期失敗の自動再送。
+**状態: `IMPLEMENTED`**。範囲外 (未着手): OVE Wallet→sengoku-ai.comへの同期送信、
+同期失敗の自動再送。
 
 詳細: `docs/agency-integration.md`
 
@@ -111,8 +123,10 @@
 - 代理店システムへの同期をoutboxへ登録 (実送信はPhase 2で未着手)
 - 管理画面での確認 (`/wallet-referrals`)
 
-範囲外 (未着手): 代理店システムへの実際の同期送信・特典確定(Phase 2)、管理者による
-手動確定・取消・紹介者訂正(Phase 3)。
+**状態: `PARTIALLY_IMPLEMENTED`** (Phase 1のみ完了、Phase 2の実送信先契約は
+`BUSINESS_DECISION_REQUIRED`)。範囲外 (未着手): 代理店システムへの実際の同期送信・
+特典確定(Phase 2)、管理者による手動確定・取消・紹介者訂正(Phase 3)。実装計画:
+`docs/integration/AGENCY_REFERRAL_PHASE2_PLAN.md`
 
 詳細: `docs/agency-referral.md`
 
