@@ -1,7 +1,8 @@
-# 独立OVEウォレット 実装状況整理 (2026-07-16時点)
+# 独立OVEウォレット 実装状況整理 (2026-07-17時点)
 
 このドキュメントは、現時点までに実装が完了している機能・未着手の機能・今後の連携方針を
 1枚で把握できるように整理したものです。個別の詳細仕様は各 `docs/*.md` を参照してください。
+時系列の作業記録 (何をいつ・なぜ実装したか) は `docs/implementation-log.md` を参照してください。
 
 ## 1. 全体構成
 
@@ -181,12 +182,18 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
   CSVの文字コード対応 (UTF-8/Shift_JIS、ブラウザ側`TextDecoder`のみで対応しサーバー側API
   は無変更) まですべて対応済み (`docs/migration.md` 参照)。
 - インフラ整備は一通り対応済み: `audit_logs`のDBレベルDELETE/UPDATE禁止、ログイン系
-  エンドポイントのレート制限強化、`ENCRYPTION_KEY`ローテーション手順・CORS本番設定の
-  文書化、3アプリの本番用Dockerfile。ただし本番用Dockerfileは、このリポジトリの開発
+  エンドポイントのレート制限強化、CORS本番設定、3アプリの本番用Dockerfile、
+  `ENCRYPTION_KEY`ローテーションスクリプト (`packages/database/src/rotate-encryption-key.ts`、
+  DBの複製に対して実際に実行し動作確認済み)、エラートラッキング(Sentry、DSN未設定時は
+  no-op)、DBバックアップ/リストアスクリプト (`scripts/backup-db.sh`/`restore-db.sh`、
+  実際にバックアップ→別DBへのリストアを行い行数の完全一致まで確認済み)、push/PR時の
+  CI自動化 (`.github/workflows/ci.yml`)。ただし本番用Dockerfileは、このリポジトリの開発
   コンテナにDockerデーモンが無く `docker build`/`docker run` そのものは未実行
   (各ビルドステップに相当する処理は個別に成功確認済み。`docs/deployment.md`
   「Dockerイメージ (本番)」の「検証状況」参照)。実際にDockerが使える環境での
-  エンドツーエンド検証が必要。詳細は`docs/security.md`・`docs/deployment.md`参照。
+  エンドツーエンド検証が必要。監視のうちSentryプロジェクト作成・外部死活監視・ログ収集
+  基盤の契約は未着手 (`docs/monitoring.md`「残作業」参照)。詳細は`docs/security.md`・
+  `docs/deployment.md`・`docs/monitoring.md`・`docs/backup.md`参照。
 - Playwright E2Eのリポジトリ内自動化: `tests/e2e`として土台を整備し、4フロー
   (ユーザーのLINEログイン→ウォレット表示、管理者の個別付与→残高反映、アカウント統合の
   二段階承認、既存ユーザー移行の事前承認制・検証者フロー) を自動化した (`pnpm test:e2e`)。
@@ -219,5 +226,8 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/test-plan.md` | テスト計画と実施結果 |
 | `docs/migration.md` | 既存ユーザー移行 |
 | `docs/deployment.md` | デプロイ手順 |
+| `docs/monitoring.md` | 監視・アラート (エラートラッキング・ヘルスチェック・ログ収集・CI) |
+| `docs/backup.md` | DBバックアップ・リストア手順 |
+| `docs/implementation-log.md` | 時系列の実装記録 (このドキュメントとは別に、何を・いつ・なぜ実装したかを追える) |
 | `docs/implementation-plan.md` | 初期実装計画・フェーズ進行状況 |
 | `docs/development-guardrails.md` | 代理店システム等の外部連携に向けた開発基準 (このドキュメントの元) |

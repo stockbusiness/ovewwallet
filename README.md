@@ -110,6 +110,7 @@ pnpm test:load                    # 簡易負荷・レート制限限界値テ�
 - `docs/deployment.md` — デプロイ手順
 - `docs/monitoring.md` — 監視・アラート (エラートラッキング・ヘルスチェック・ログ収集)
 - `docs/backup.md` — DBバックアップ・リストア手順
+- `docs/implementation-log.md` — 時系列の実装記録
 - `docs/implementation-plan.md` — 実装計画・フェーズ進行状況
 - `docs/development-guardrails.md` — 代理店システム等の外部連携に向けた開発基準
   (正式な管理元の分離・ID設計・紹介連携・セキュリティ必須項目・実装順序)
