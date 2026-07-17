@@ -1,0 +1,83 @@
+name: CI
+
+# push/PR時にlint(型チェック)・build・testを自動実行する。
+# 実運用ギャップ対応 (docs/project-status.md参照): これまでdeploy.ymlの手動実行のみで、
+# push/PRごとの自動チェックが存在しなかった状態への対応。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ove_wallet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # .env.test はシークレットを含まないダミー値のみのため、リポジトリにはコミットせず
+      # (.gitignore対象)、CIではこのステップで都度生成する (ローカル開発と同じ値、
+      # docs/deployment.md「ローカル開発」章参照)。
+      - name: Write .env.test
+        run: |
+          cat > .env.test <<'EOF'
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ove_wallet_test
+          REDIS_URL=redis://localhost:6379
+          NODE_ENV=test
+          APP_URL=http://localhost:3000
+          API_URL=http://localhost:4000
+          ADMIN_URL=http://localhost:3100
+          SESSION_SECRET=test-session-secret-please-change-32chars-min
+          COOKIE_DOMAIN=localhost
+          ENCRYPTION_KEY=test-only-insecure-encryption-key
+          EOF
+
+      - name: Apply migrations to the test database
+        run: pnpm db:migrate:test
+
+      - name: Build (packages + apps, includes typecheck for Next.js apps)
+        run: pnpm build
+
+      # apps/admin-wallet・apps/user-wallet の `lint` (`next lint`) はESLint未設定のため
+      # 対話プロンプトを要求してCIでは失敗する (`docs/monitoring.md`「残作業」参照)。
+      # 型チェック自体は上のbuildステップ (`next build`) で行われているため、
+      # ここではtscベースのlintスクリプトを持つワークスペースのみを明示的に対象にする
+      # (ルートの`pnpm lint`は内部で`pnpm -r lint`を再度呼ぶため、`--filter=!...`による
+      # 除外では回避できない。ワークスペースを直接指定する)。
+      - name: Lint (typecheck)
+        run: pnpm -r --filter=./packages/* --filter=./apps/api lint
+
+      - name: Test (jest e2e + vitest unit tests)
+        run: pnpm test

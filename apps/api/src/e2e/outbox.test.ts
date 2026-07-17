@@ -19,6 +19,14 @@ let app: INestApplication;
 let outbox: OutboxService;
 
 beforeAll(async () => {
+  // 他のe2eテストファイル (agency-referral.test.ts等) がAGENCY_SYSTEM宛のイベントを
+  // enqueueするが、そちらにはハンドラが登録されないため永久にPENDINGのまま残る。
+  // 共有DBに対して繰り返しテストを実行するとこうした行が積み上がり、
+  // processPendingEvents()のデフォルト取得件数(20件)を古い行が埋めてしまい、
+  // このファイル自身が新規登録したイベントが処理対象に入らなくなる不具合があった。
+  // このファイルの前提を決定的にするため、開始時に一度だけ全件クリアする。
+  await prisma.integrationOutbox.deleteMany({});
+
   app = await NestFactory.create(AppModule, { logger: false });
   app.use(cookieParser());
   app.useGlobalFilters(new LedgerExceptionFilter());

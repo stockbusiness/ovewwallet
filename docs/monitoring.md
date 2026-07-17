@@ -43,7 +43,20 @@
   契約・設定する。監査ログ (`audit_logs` テーブル、DBレベルで削除・変更不可) とは別物であり、
   こちらはアプリケーションの動作ログ (エラー・警告・アクセスログ) が対象。
 
-## 4. 対象外・意図的に見送ったもの
+## 4. CI (push/PR時の自動lint・build・test) — 実装済み
+
+- `.github/workflows/ci.yml`: `push` (main) / `pull_request` のたびに、テスト用
+  PostgreSQL/Redis (GitHub Actions services) を使って `pnpm db:migrate:test` →
+  `pnpm build` → `pnpm lint` → `pnpm test` を自動実行する。これまで`.github/workflows/deploy.yml`
+  (手動実行のみ) しか無かった状態への対応。
+- `apps/admin-wallet`・`apps/user-wallet` の `lint` (`next lint`) はESLint設定
+  (`eslint-config-next`等) が未導入のため、対話プロンプトを要求してCIでは失敗する。
+  CIのlintステップはこの2アプリを除外して実行している (型チェック自体は同じCI内の
+  `pnpm build` に含まれる `next build` で行われるため、型の安全性は担保されている)。
+  **残作業**: 2アプリへESLint設定を追加し、`next lint` を実際に有効化する
+  (未着手・既存コードに対する指摘件数が未知数のため、別タスクとして切り出す)。
+
+## 5. 対象外・意図的に見送ったもの
 
 - APM (レイテンシ・スループットの継続計測): `tracesSampleRate: 0` でSentryのトレース機能は
   無効化している。トラフィック規模が明確になってから必要性を再検討する。

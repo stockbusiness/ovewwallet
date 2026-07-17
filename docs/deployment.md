@@ -28,7 +28,9 @@ pnpm dev:admin          # apps/admin-wallet を http://localhost:3100 で起動
   エンドポイント (管理者ログイン・MFA・メールOTP検証) は総当たり対策として全体既定
   (60秒120回) より厳しい60秒10回に個別設定した (`docs/security.md`
   「レート制限値の見直し」参照)。外部サービスAPIについては下記「レート制限 (外部API)」を参照。
-- `ENCRYPTION_KEY` のローテーション手順 → 下記「ENCRYPTION_KEYのローテーション」参照。
+- ~~`ENCRYPTION_KEY` の再暗号化スクリプトが無い~~ → **対応済み**。
+  `packages/database/src/rotate-encryption-key.ts` を実装した (下記
+  「ENCRYPTION_KEYのローテーション」参照)。
 - CORS本番設定 → 下記「CORS本番設定」参照。
 - ~~コンテナ化 (Dockerfile) は本リポジトリには未整備~~ → **対応済み**。3アプリそれぞれに
   本番用Dockerfileを用意した (下記「Dockerイメージ (本番)」参照)。`docker-compose.yml` は
@@ -37,26 +39,30 @@ pnpm dev:admin          # apps/admin-wallet を http://localhost:3100 で起動
 
 ## ENCRYPTION_KEYのローテーション
 
-`ENCRYPTION_KEY` はAES-256-GCMで以下の2種類のシークレットを暗号化して保存するために使う
+`ENCRYPTION_KEY` はAES-256-GCMで以下の3種類のシークレットを暗号化して保存するために使う
 (`packages/auth/src/encryption.ts`)。
 
-- `admin_users.mfaSecretEncrypted` (管理者MFAのTOTPシークレット)
+- `admin_users.mfaSecretEncrypted` (管理者MFAのTOTPシークレット、nullable)
 - `service_integrations.signingSecretEncrypted` (外部サービスAPIのHMAC署名シークレット)
+- `wallet_referrals.referralTokenEncrypted` (代理店紹介トークン。Phase 2の外部送信用、
+  `docs/agency-referral.md` 参照)
 
 **現状の実装は鍵バージョニングに対応していない** (暗号文に鍵のバージョン情報を含めていない、
 単一の `ENCRYPTION_KEY` のみを保持する設計)。そのため `ENCRYPTION_KEY` の値を単純に
 差し替えると、既存の暗号文がすべて復号不能になる (管理者は全員MFAが壊れ、外部サービスは
-全て署名検証に失敗する)。ローテーションする際は、鍵を差し替える前に **旧鍵でいったん
-全件復号し、新鍵で再暗号化してDBを更新する** 一括移行を無停止(またはメンテナンス時間内)で
-行う必要がある。
+全て署名検証に失敗し、紹介トークンも復号できなくなる)。ローテーションする際は、鍵を
+差し替える前に **旧鍵でいったん全件復号し、新鍵で再暗号化してDBを更新する** 一括移行を
+無停止(またはメンテナンス時間内)で行う必要がある。
 
 1. 新しい `ENCRYPTION_KEY` の値を生成する (例: `openssl rand -base64 32`)。
-2. アプリを旧鍵のまま起動した状態で、以下を1回実行するメンテナンススクリプトを用意する
-   (このリポジトリにはまだ実装していない。実装する場合は
-   `packages/auth` の `decryptSecret`/`encryptSecret` を再利用し、`admin_users` と
-   `service_integrations` の対象カラムを1行ずつ 旧鍵で復号→新鍵で暗号化→更新 する):
-   - `admin_users.mfaSecretEncrypted` が非NULLの行すべて
-   - `service_integrations.signingSecretEncrypted` が非NULLの行すべて
+2. アプリを旧鍵のまま起動した状態で、以下を1回実行する
+   (`packages/database/src/rotate-encryption-key.ts`。1件でも復号に失敗した場合は
+   DBを一切更新せず中断する安全設計。ローカルDBに対して実際に実行し、新鍵での復号・
+   旧鍵での復号拒否・失敗時の未更新を確認済み):
+   ```
+   OLD_ENCRYPTION_KEY=<旧鍵> NEW_ENCRYPTION_KEY=<新鍵> \
+     pnpm --filter @ove/database rotate-encryption-key
+   ```
 3. 移行スクリプトの実行が完了してから (DB上のすべての暗号文が新鍵に対応してから)、
    環境変数 `ENCRYPTION_KEY` を新しい値に切り替えてアプリを再起動する。
 4. 手順2と3の間にアプリが稼働し続けると、新規のMFA設定/外部サービス登録は旧鍵で
