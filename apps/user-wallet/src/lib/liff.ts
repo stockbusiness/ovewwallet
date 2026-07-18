@@ -43,13 +43,17 @@ export interface LiffLoginResult {
 }
 
 /**
- * LIFFを初期化し、未ログインならLINEのログイン画面へ遷移する (呼び出し元には戻らない)。
- * 既にログイン済み(=LIFFのアクセストークンがまだ有効な状態でボタンを押した場合。
- * 例えば直前のテストの続きで、ページ再読み込みなしに再度ボタンを押した場合等)は、
- * LINEへ遷移せずその場でIDトークンを返す (以前はこのケースで何もせず無言で
- * 終了してしまい、ボタンを押しても反応が無いように見える不具合があった)。
+ * LIFFを初期化し、LINEのログイン画面へ遷移する (呼び出し元には戻らない)。
+ *
+ * 既にLIFFのログイン状態(アクセストークン)が残っている場合でも、そのIDトークン
+ * 自体は期限切れになっている可能性がある(実チャネルでの結合試験(2026-07-18)で、
+ * 同じ端末で長時間・複数回テストを繰り返した際に「IdToken expired」でAPI側の
+ * 検証が失敗する事象を確認した — LIFFの「ログイン済み」判定とIDトークン自体の
+ * 有効期限は別物で、前者が有効でも後者が期限切れになりうる)。そのため、ボタンを
+ * 押した時点で常に一度ログアウトしてから改めてLINEへ遷移し、必ず新しいIDトークンを
+ * 取得し直す方式にしている。
  */
-export async function ensureLiffLogin(termsAccepted: boolean): Promise<LiffLoginResult | null> {
+export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
   if (!LIFF_ID) throw new Error("LIFF is not configured (NEXT_PUBLIC_LINE_LIFF_ID is unset)");
 
   const liff = (await import("@line/liff")).default;
@@ -59,19 +63,14 @@ export async function ensureLiffLogin(termsAccepted: boolean): Promise<LiffLogin
     throw new Error(describeLiffError(err));
   }
 
-  if (!liff.isLoggedIn()) {
-    window.localStorage.setItem(PENDING_KEY, "1");
-    window.localStorage.setItem(TERMS_KEY, termsAccepted ? "1" : "0");
-    liff.login();
-    // login()はブラウザを遷移させるため、通常ここには到達しない。
-    return null;
+  if (liff.isLoggedIn()) {
+    liff.logout();
   }
 
-  const idToken = liff.getIDToken();
-  if (!idToken) {
-    throw new Error("LINEのIDトークンを取得できませんでした (liff.getIDToken()がnull)");
-  }
-  return { idToken, termsAccepted };
+  window.localStorage.setItem(PENDING_KEY, "1");
+  window.localStorage.setItem(TERMS_KEY, termsAccepted ? "1" : "0");
+  liff.login();
+  // login()はブラウザを遷移させるため、ここには到達しない。
 }
 
 /**
