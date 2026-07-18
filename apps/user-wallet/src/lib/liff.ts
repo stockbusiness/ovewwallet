@@ -39,6 +39,32 @@ function describeLiffError(err: unknown): string {
 
 type Liff = (typeof import("@line/liff"))["default"];
 
+const LIFF_INIT_TIMEOUT_MS = 10_000;
+
+/**
+ * `liff.init()`はLINEのサーバーへの通信(コンテキスト取得等)を含むため、
+ * ネットワーク状況によっては応答が返らないまま無反応になりうる。実チャネルでの
+ * 結合試験(2026-07-18)で、画面が「ログイン中...」のまま(エラー表示も無く)
+ * 固まったまま戻らない事象を確認したため、一定時間で強制的にタイムアウトさせ、
+ * 必ず何らかのエラーメッセージが表示されるようにする (原因の切り分けのためにも、
+ * 無反応のまま固まるより明示的な失敗の方が良い)。
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 /**
  * `liff.init()`は1ページ読み込みにつき1回のみ呼ばれることを想定した設計になっており
  * (LIFF SDK自身が「liff.init is not expected to be called more than once」と警告する)、
@@ -56,7 +82,11 @@ async function getInitializedLiff(): Promise<Liff> {
   if (!liffInitPromise) {
     liffInitPromise = (async () => {
       const liff = (await import("@line/liff")).default;
-      await liff.init({ liffId: LIFF_ID });
+      await withTimeout(
+        liff.init({ liffId: LIFF_ID }),
+        LIFF_INIT_TIMEOUT_MS,
+        "LIFFの初期化がタイムアウトしました (LINEサーバーからの応答がありませんでした)",
+      );
       return liff;
     })();
   }
