@@ -1,5 +1,3 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -11,12 +9,14 @@ export class ApiError extends Error {
 }
 
 /**
- * ブラウザから直接NestJS APIを呼び出すクライアント側フェッチャー。
- * OVE独自セッションCookieは `credentials: "include"` で送受信する
- * (localhostではポートをまたいでも同一ドメインとしてCookieが共有される)。
+ * ブラウザから直接NestJS APIを呼び出すクライアント側フェッチャー。絶対URLではなく
+ * 常に相対パスで呼び出す (`next.config.mjs`のrewritesが同一オリジンに見せかけて
+ * 実際のAPIへ転送する)。iOS Safari/WebKitのITPがクロスサイトのセッションCookie
+ * (SameSite=None)を制限する問題を避けるため(2026-07-18、詳細はnext.config.mjs参照)。
+ * OVE独自セッションCookieは `credentials: "include"` で送受信する。
  */
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(path, {
     ...options,
     credentials: "include",
     headers: { "Content-Type": "application/json", ...options.headers },
