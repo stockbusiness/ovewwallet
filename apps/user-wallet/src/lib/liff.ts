@@ -4,18 +4,37 @@
  * 従来通りの疑似ID直接送信のモック実装を使う (`apps/api`側の`AUTH_MODE`と対になる
  * フロントエンド側の切り替え)。
  *
- * LIFFの`login()`はページ全体をLINEのログイン画面へ遷移させ、認証後に同じURLへ
- * 戻ってくる方式のため、状態はsessionStorageではなく`redirectUri`のクエリ
- * パラメータで引き継ぐ。実チャネルでの結合試験(2026-07-18)で、モバイルブラウザが
- * LINEアプリへの切り替えを挟むとsessionStorageが失われるケースを確認したため
- * (Safari/Chromeいずれでも再現)、ブラウザの一時記憶に依存しないこの方式に変更した。
+ * 実チャネルでの結合試験(2026-07-18)で、`liff.login({redirectUri})`にクエリ
+ * パラメータ付きの独自URLを渡すと、LINE側とのトークン交換が失敗する(画面に
+ * "unexpected error"と表示される)ことを確認した。LIFF SDKのソース
+ * (`@liff/init`)を確認したところ、`redirectUri`はそのままOAuthの`redirect_uri`
+ * として認可リクエスト・トークン交換の両方に使われる設計であり、登録済みの
+ * Endpoint URL以外の(クエリパラメータ付き)値を渡すのはSDKの想定用途から外れる
+ * と判断した。そのため`redirectUri`のカスタマイズ自体をやめ、独自の状態
+ * (利用規約同意フラグ)は`localStorage`に持たせる方式に変更した。外部ブラウザ
+ * (`liff.isInClient()`がfalse)ではLIFF SDK自身もPKCEの`code_verifier`を
+ * `localStorage`に保存する設計になっており、ページ全体のリダイレクトを
+ * またいで実際に読み出せていることを確認済み(トークン交換のリクエスト自体は
+ * 発生している)ため、同じ仕組みに乗せるのが最も安全と判断した。
  */
 const LIFF_ID = process.env.NEXT_PUBLIC_LINE_LIFF_ID;
-const PENDING_PARAM = "ove_liff_pending";
-const TERMS_PARAM = "ove_liff_terms";
+const PENDING_KEY = "ove-liff-pending";
+const TERMS_KEY = "ove-liff-terms";
 
 export function isLiffConfigured(): boolean {
   return Boolean(LIFF_ID);
+}
+
+/**
+ * LiffErrorはcodeプロパティを持つため、表示用にメッセージへ付記する
+ * (次回以降の切り分けのため、原因を特定できるだけの情報を画面に残す)。
+ */
+function describeLiffError(err: unknown): string {
+  if (err instanceof Error) {
+    const code = (err as { code?: string }).code;
+    return code ? `${err.message || "(no message)"} [code: ${code}]` : err.message;
+  }
+  return "LINEログインに失敗しました";
 }
 
 /**
@@ -26,13 +45,16 @@ export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
   if (!LIFF_ID) throw new Error("LIFF is not configured (NEXT_PUBLIC_LINE_LIFF_ID is unset)");
 
   const liff = (await import("@line/liff")).default;
-  await liff.init({ liffId: LIFF_ID });
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (err) {
+    throw new Error(describeLiffError(err));
+  }
 
   if (!liff.isLoggedIn()) {
-    const redirectUrl = new URL(window.location.href);
-    redirectUrl.searchParams.set(PENDING_PARAM, "1");
-    redirectUrl.searchParams.set(TERMS_PARAM, termsAccepted ? "1" : "0");
-    liff.login({ redirectUri: redirectUrl.toString() });
+    window.localStorage.setItem(PENDING_KEY, "1");
+    window.localStorage.setItem(TERMS_KEY, termsAccepted ? "1" : "0");
+    liff.login();
     // login()はブラウザを遷移させるため、ここには到達しない。
     return;
   }
@@ -47,22 +69,31 @@ export interface LiffLoginResult {
  * LINEからのリダイレクト直後かどうかを判定する。
  *
  * - LIFF未設定: 常にnull (モック実装のまま)。
- * - 初回訪問 (ログイン開始前): URLに`ove_liff_pending`が無い → 通常の初回訪問として
- *   nullを返す (エラーではない)。
- * - ログイン遷移後に戻ってきたが失敗: `ove_liff_pending=1`が付いているのに
+ * - 初回訪問 (ログイン開始前): `localStorage`に`ove-liff-pending`が無い → 通常の
+ *   初回訪問としてnullを返す (エラーではない)。
+ * - ログイン遷移後に戻ってきたが失敗: `ove-liff-pending=1`が付いているのに
  *   `liff.isLoggedIn()`がfalse、またはIDトークンが取得できない → 例外を投げて
  *   呼び出し元にエラー表示させる。
  * - 成功: IDトークンとtermsAcceptedを返す。
+ *
+ * いずれの場合も`localStorage`のフラグは読み取り後すぐに消す
+ * (次回以降の通常訪問が「復帰後」と誤認識されないようにするため)。
  */
 export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null> {
   if (!LIFF_ID) return null;
 
-  const currentUrl = new URL(window.location.href);
-  const wasPending = currentUrl.searchParams.get(PENDING_PARAM) === "1";
-  const termsAccepted = currentUrl.searchParams.get(TERMS_PARAM) === "1";
+  const wasPending = window.localStorage.getItem(PENDING_KEY) === "1";
+  const termsAccepted = window.localStorage.getItem(TERMS_KEY) === "1";
+  window.localStorage.removeItem(PENDING_KEY);
+  window.localStorage.removeItem(TERMS_KEY);
 
   const liff = (await import("@line/liff")).default;
-  await liff.init({ liffId: LIFF_ID });
+  try {
+    await liff.init({ liffId: LIFF_ID });
+  } catch (err) {
+    if (wasPending) throw new Error(describeLiffError(err));
+    return null;
+  }
 
   if (!liff.isLoggedIn()) {
     if (wasPending) {
