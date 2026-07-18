@@ -12,7 +12,6 @@ import {
   getDebugLog,
   clearDebugLog,
   appendDebugLog,
-  savePendingSubmission,
   getPendingSubmission,
   clearPendingSubmission,
 } from "@/lib/liff";
@@ -74,7 +73,8 @@ export default function LoginPage() {
           }
           return;
         }
-        if (result) savePendingSubmission(result);
+        // 送信待ちとしての保存はgetLiffIdTokenIfLoggedIn()内部で(呼び出し元に
+        // 返る前に)即座に行われる。ここで改めて保存する必要はない。
       }
       if (isLiffConfigured()) setDebugLog(getDebugLog());
       if (!result || cancelled) return;

@@ -260,6 +260,10 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
     return null;
   }
 
-  appendDebugLog("getLiffIdTokenIfLoggedIn成功");
+  // 呼び出し元に返ってから保存するまでの一瞬の間にpageshowリロードが発生し、
+  // 保存されないまま次のループに入ってしまう事象を確認したため(2026-07-18)、
+  // 呼び出し元を経由せずこの場で即座に保存する。
+  savePendingSubmission({ idToken, termsAccepted });
+  appendDebugLog("getLiffIdTokenIfLoggedIn成功 (送信待ちとして保存済み)");
   return { idToken, termsAccepted };
 }
