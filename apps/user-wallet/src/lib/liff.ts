@@ -171,6 +171,21 @@ export function getPendingSubmission(): LiffLoginResult | null {
 
 export function clearPendingSubmission(): void {
   window.localStorage.removeItem(PENDING_SUBMIT_KEY);
+  window.localStorage.removeItem(PENDING_SUBMIT_ATTEMPTS_KEY);
+}
+
+const PENDING_SUBMIT_ATTEMPTS_KEY = "ove-liff-pending-submit-attempts";
+export const MAX_PENDING_SUBMIT_ATTEMPTS = 5;
+
+/**
+ * API送信が本当に(トークン失効等で)恒久的に失敗し続けるケースで、送信待ちの
+ * IDトークンを無限に再送し続けることを防ぐための上限カウンタ。
+ */
+export function incrementPendingSubmitAttempts(): number {
+  const raw = window.localStorage.getItem(PENDING_SUBMIT_ATTEMPTS_KEY);
+  const count = (raw ? Number.parseInt(raw, 10) : 0) + 1;
+  window.localStorage.setItem(PENDING_SUBMIT_ATTEMPTS_KEY, String(count));
+  return count;
 }
 
 /**

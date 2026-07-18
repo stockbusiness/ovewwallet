@@ -14,6 +14,8 @@ import {
   appendDebugLog,
   getPendingSubmission,
   clearPendingSubmission,
+  incrementPendingSubmitAttempts,
+  MAX_PENDING_SUBMIT_ATTEMPTS,
 } from "@/lib/liff";
 
 type View = "choose" | "email-request" | "email-code" | "sengoku";
@@ -78,17 +80,40 @@ export default function LoginPage() {
       }
       if (isLiffConfigured()) setDebugLog(getDebugLog());
       if (!result || cancelled) return;
+
+      // トークン失効等でAPI送信が恒久的に失敗し続けるケースで、送信待ちの
+      // IDトークンを無限に再送し続けないよう上限を設ける。
+      const attempts = incrementPendingSubmitAttempts();
+      appendDebugLog(`API送信試行 ${attempts}/${MAX_PENDING_SUBMIT_ATTEMPTS}回目`);
+      if (attempts > MAX_PENDING_SUBMIT_ATTEMPTS) {
+        clearPendingSubmission();
+        if (!cancelled) {
+          setError("LINEログインの送信が繰り返し失敗しました。もう一度最初からお試しください。");
+          setDebugLog(getDebugLog());
+        }
+        return;
+      }
+
       setLoading("line");
       try {
         await apiFetch("/api/v1/auth/line/login", {
           method: "POST",
           body: JSON.stringify({ idToken: result.idToken, termsAccepted: result.termsAccepted }),
         });
+        appendDebugLog("API送信成功、/walletへ遷移開始");
+        // 送信・遷移が両方完了して初めて送信待ちを消す。この間にリロードが割り込んだ
+        // 場合は消さずに残しておき、次の読み込みで(liff.init()を経由せず)同じ
+        // IDトークンで送信をやり直せるようにする (2026-07-18、pageshowリロード対策)。
         clearPendingSubmission();
         router.push("/wallet");
       } catch (err) {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
-        clearPendingSubmission();
+        const message = err instanceof ApiError ? err.message : String(err);
+        appendDebugLog(`API送信失敗: ${message}`);
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
+          setDebugLog(getDebugLog());
+        }
+        // ここでは送信待ちを消さない (上記コメント参照)。
       } finally {
         if (!cancelled) setLoading(null);
       }
