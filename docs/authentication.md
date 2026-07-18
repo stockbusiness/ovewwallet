@@ -41,6 +41,25 @@
 未実施。本番投入前に実チャネルでの動作確認が必須。LINEから受け取ったプロフィールを
 そのまま信用しない方針(サーバー側検証必須)は維持している。
 
+### フロントエンド (`apps/user-wallet`) 側のLINEログイン (2026-07-18実装)
+
+`apps/user-wallet/src/lib/liff.ts` が `@line/liff` を使ったLIFFログインフローを実装する。
+`NEXT_PUBLIC_LINE_LIFF_ID` (Next.jsのビルド時公開環境変数) が未設定の場合は一切呼ばれず、
+`login/page.tsx` は従来通り疑似ID (`mock.<uuid>`) を直接`/api/v1/auth/line/login`へ送る
+モック実装のまま動作する (ローカル開発・CI・Playwright E2Eはこの経路のまま無改修で成功)。
+
+設定済みの場合のフロー:
+1. 「LINEでログイン」クリック時に `liff.init()` → `liff.isLoggedIn()` が false なら
+   `liff.login({ redirectUri: 現在のURL })` でLINEのログイン画面へ遷移 (利用規約同意状態は
+   ページ遷移をまたぐため `sessionStorage` に一時保存する)。
+2. LINE側の認証後、同じ`/login`URLへリダイレクトされて戻ってくる。
+3. ページ読み込み時の `useEffect` で `liff.isLoggedIn()` を再確認し、trueなら
+   `liff.getIDToken()` で実際のIDトークンを取得して `/api/v1/auth/line/login` へ送信する。
+
+**未着手**: LINE Developersコンソールでの実際のLIFFアプリ作成 (Endpoint URLに実デプロイ
+先の`/login`URLを設定する必要があるため、デプロイ先確定後)。詳細:
+`docs/implementation/PRODUCTION_READINESS_PLAN.md`「P0-2」参照。
+
 ## 戦国パスポートSSO
 
 `SengokuSsoService`:

@@ -20,21 +20,23 @@ AIアート教室連携を本番運用する前に確認・完了すべき項目
   - 既存テストがすべて通る — 満たす (apps/api 91件・packages/ledger 21件・
     packages/auth 37件、いずれも成功)
 
-## P0-2. LINE実チャネル結合試験 — 進行中 (2026-07-18: チャネル発行完了、フロントエンド未対応と判明)
+## P0-2. LINE実チャネル結合試験 — 進行中 (2026-07-18: チャネル発行・フロントエンド実装完了、LIFFアプリ発行待ち)
 
 `LineIdTokenVerifier`(`packages/auth/src/sso.ts`)はコードとして実装済みだが、実際の
 LINEチャネルでの結合試験は未実施 (`docs/authentication.md`参照)。試験に必要な設定・
 確認項目を以下に整理する。
 
-**2026-07-18時点の進捗**: LINE Developersでチャネルを発行済み (channel_id: 2010749243)、
-`LINE_CHANNEL_ID`をRailway環境変数に設定済み (`deploy.yml`)。ただし、その過程で
-`apps/user-wallet`のログイン画面が実際のLIFF/LINE Login SDKを一切呼んでいないことが
-判明した (現状はブラウザ内で生成した疑似IDをそのまま`/api/v1/auth/line/login`へ送る
-モック専用の実装)。そのため、下記「事前に用意するもの」1-5が揃っても、
-**フロントエンドへのLIFF/LINE Login SDK組み込みが完了するまでは実チャネルでの
-結合試験自体を開始できない**。この作業は指示書の対象外だった「LINE本番連携
-(LIFF/LINE Login SDK)」の実装そのものであり、`docs/project-status.md`「3. LINE連携に
-ついて」が以前「今回の方針転換によりいったん着手を保留」としていた部分に当たる。
+**2026-07-18時点の進捗**:
+- LINE Developersでチャネルを発行済み (channel_id: 2010749243)、`LINE_CHANNEL_ID`を
+  Railway環境変数に設定済み (`deploy.yml`)。
+- `apps/user-wallet`のログイン画面がLIFF/LINE Login SDKを一切呼んでいなかった
+  (疑似IDを直接送信するモック専用実装だった) ことが判明したため、`@line/liff`を
+  導入しLIFF経由の本番ログインフローを実装した (`apps/user-wallet/src/lib/liff.ts`、
+  `apps/user-wallet/src/app/login/page.tsx`)。`NEXT_PUBLIC_LINE_LIFF_ID`が未設定の
+  環境 (ローカル開発・CI・Playwright) では従来通りモック実装のまま動作し、既存の
+  Playwright E2E (`tests/e2e/specs/user-wallet.spec.ts`) が無改修で成功することを確認済み。
+- **未着手**: 下表項目3・4 (LIFFアプリ自体の作成、Endpoint URLの登録)。LIFFアプリは
+  実際にデプロイされたuser-walletのURLが確定してからでないと作成できない。
 
 ### 事前に用意するもの
 
@@ -42,10 +44,10 @@ LINEチャネルでの結合試験は未実施 (`docs/authentication.md`参照)�
 |---|---|---|---|
 | 1 | LINE Developersでのチャネル作成 | LINEログインチャネルを作成し、`channel_id`を取得する | `IMPLEMENTED` |
 | 2 | `LINE_CHANNEL_ID`環境変数 | 上記チャネルIDを設定 (`.env.example`に既存項目あり) | `IMPLEMENTED` |
-| 3 | コールバックURL登録 | LINE Developersコンソールで、ステージング/本番のコールバックURLを登録 | `NOT_IMPLEMENTED` (コールバックURLの実装自体がまだ無い) |
-| 4 | LIFF ID (LINE内ブラウザで開く場合) | `LINE_LIFF_ID`環境変数 (既存項目あり) | `NOT_IMPLEMENTED` |
+| 3 | LIFFアプリの作成 | 同じチャネル配下にLIFFアプリを追加し、Endpoint URLに実際の`apps/user-wallet`の`/login`URLを設定、scopeに`openid`/`profile`を含める | `NOT_IMPLEMENTED` (デプロイ先URL確定待ち) |
+| 4 | `NEXT_PUBLIC_LINE_LIFF_ID`環境変数 | 上記LIFFアプリのIDを`apps/user-wallet`のビルド時環境変数に設定 (Vercel) | `NOT_IMPLEMENTED` (3待ち) |
 | 5 | Cookieドメイン設定 | `COOKIE_DOMAIN`が実際のドメインと一致しているか確認 | `NOT_IMPLEMENTED` (本番ドメイン未確定のため) |
-| 6 | **(新規)** `apps/user-wallet`へのLIFF/LINE Login SDK組み込み | ログイン画面を、疑似ID直接送信ではなく実際のLINEログインフロー (LIFF `liff.login()`、またはLINE Login Web版のOAuth認可コードフロー) 経由でIDトークンを取得する実装に変更する | `NOT_IMPLEMENTED` |
+| 6 | `apps/user-wallet`へのLIFF/LINE Login SDK組み込み | ログイン画面を、疑似ID直接送信ではなく実際のLIFF `liff.login()`経由でIDトークンを取得する実装に変更する | `IMPLEMENTED` (2026-07-18) |
 
 ### 確認する項目 (指示書5.2章)
 
@@ -118,7 +120,7 @@ Sentryプロジェクトの作成は、いずれも外部サービスのアカ�
 | 項目 | 状態 |
 |---|---|
 | P0-1 `ove_transactions`DB保護 | `IMPLEMENTED` |
-| P0-2 LINE実チャネル結合試験 | `PARTIALLY_IMPLEMENTED` (チャネル発行・環境変数設定は完了。フロントエンドのLIFF/LINE Login SDK組み込みが未着手のため試験自体は未開始) |
+| P0-2 LINE実チャネル結合試験 | `PARTIALLY_IMPLEMENTED` (チャネル発行・フロントエンドのLIFF SDK組み込みは完了。LIFFアプリ自体の作成 (デプロイ先URL確定待ち) と実チャネルでの結合試験が未着手) |
 | P0-3 ステージング環境 | `BUSINESS_DECISION_REQUIRED` (外部アカウント作成の判断が必要) |
 | P0-4 Sentry設定 | `CONFIGURATION_REQUIRED` (コードは`IMPLEMENTED`、外部設定が未着手) |
 | P0-5 定期バックアップ・復旧試験 | `CONFIGURATION_REQUIRED` (スクリプトは`IMPLEMENTED`、運用が未着手) |

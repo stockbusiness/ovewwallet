@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
+import { isLiffConfigured, ensureLiffLogin, getLiffIdTokenIfLoggedIn } from "@/lib/liff";
 
 type View = "choose" | "email-request" | "email-code" | "sengoku";
 
-/** ブラウザ内で安定させた擬似LINEユーザーID (指示書10章: LINE本番連携までのモック用)。 */
+/** ブラウザ内で安定させた擬似LINEユーザーID (LIFF未設定のローカル開発・CI環境専用)。 */
 function getMockLineUserId(): string {
   const key = "ove-mock-line-user-id";
   const existing = window.localStorage.getItem(key);
@@ -29,6 +30,34 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"line" | "email" | "sengoku" | null>(null);
 
+  // LIFFの login() はページ全体をLINEのログイン画面へ遷移させ、認証後にこの同じURLへ
+  // 戻ってくる。戻ってきた直後にLIFFがログイン済みと判定できるので、その場合だけ
+  // ここでログインを完了させる (LIFF未設定の環境ではgetLiffIdTokenIfLoggedIn()は
+  // 常にnullを返し、何もしない)。
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await getLiffIdTokenIfLoggedIn();
+      if (!result || cancelled) return;
+      setLoading("line");
+      try {
+        await apiFetch("/api/v1/auth/line/login", {
+          method: "POST",
+          body: JSON.stringify({ idToken: result.idToken, termsAccepted: result.termsAccepted }),
+        });
+        router.push("/wallet");
+      } catch (err) {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
+      } finally {
+        if (!cancelled) setLoading(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function loginWithLine() {
     if (!termsAccepted) {
       setError("利用規約への同意が必要です");
@@ -37,6 +66,12 @@ export default function LoginPage() {
     setError(null);
     setLoading("line");
     try {
+      if (isLiffConfigured()) {
+        // ensureLiffLogin()は通常ページ遷移してここへは戻らない。
+        // (既にLIFFログイン済みの場合のみ戻るが、そのケースは上のuseEffectが処理する)
+        await ensureLiffLogin(termsAccepted);
+        return;
+      }
       const idToken = `mock.${getMockLineUserId()}`;
       await apiFetch("/api/v1/auth/line/login", {
         method: "POST",

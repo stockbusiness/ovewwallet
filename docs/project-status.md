@@ -112,9 +112,11 @@ LINEログインは `AUTH_MODE` で実装を切り替える構成です
   LINE Developersでチャネルを発行し、実際のLIFF/LINE Login SDK経由のログインで
   一度は確認する必要がある。
 
-  **状態: `CONFIGURATION_REQUIRED`** (コードは完成しているが、LINE Developersでの
-  チャネル発行・実チャネルでの結合試験が必要。設定一覧は
-  `docs/implementation/PRODUCTION_READINESS_PLAN.md`「P0-2」参照)。
+  **状態: `PARTIALLY_IMPLEMENTED`** (2026-07-18: LINE Developersでのチャネル発行、
+  `apps/user-wallet`へのLIFF SDK組み込みは完了。LIFFアプリ自体の作成 (デプロイ先URL
+  確定待ち) と実チャネルでの結合試験が未着手。詳細:
+  `docs/implementation/PRODUCTION_READINESS_PLAN.md`「P0-2」、`docs/authentication.md`
+  「フロントエンド側のLINEログイン」参照)。
 
 戦国パスポートSSO (`SengokuSsoService`) については、相手方のAPI仕様がまだ確定していない
 (sengoku-ai.com側からの仕様共有待ち) ため、引き続きモック実装のままで着手を保留している。
