@@ -132,9 +132,9 @@ export class LineIdTokenVerifier implements LineAuthVerifier {
     if (!res.ok) {
       // IDトークンの生値は絶対にログへ出さないが、LINE側が返すerror/error_descriptionは
       // トークンを含まない一般的なOAuthエラー種別なので、切り分けのためメッセージに含める。
-      const errorBody = await res
-        .json()
-        .catch(() => undefined as { error?: string; error_description?: string } | undefined);
+      const errorBody = (await res.json().catch(() => undefined)) as
+        | { error?: string; error_description?: string }
+        | undefined;
       const detail = errorBody?.error_description ?? errorBody?.error;
       throw new Error(`LINE ID token verification failed (status=${res.status})${detail ? `: ${detail}` : ""}`);
     }
