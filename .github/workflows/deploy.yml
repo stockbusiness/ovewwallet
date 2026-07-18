@@ -145,12 +145,16 @@ jobs:
           railway variable set "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" --service api --skip-deploys --json
           railway variable set "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}" --service api --skip-deploys --json
           railway variable set "RUN_SEED_ON_BOOT=true" --service api --skip-deploys --json
-　        railway variable set "AUTH_MODE=production" --service api --skip-deploys --json
-          # この環境はLINE/SSO本番実装が未接続の「検証用デプロイ」なので、モック認証で動かす。
+          railway variable set "AUTH_MODE=production" --service api --skip-deploys --json
+          # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認できたため、
+          # AUTH_MODE=productionに切り替え済み(LINE_CHANNEL_ID設定と合わせてLineIdTokenVerifier
+          # が使われる、docs/authentication.md参照)。戦国パスポート/代理店SSOは元々モック/未接続の
+          # ままのため、この環境は依然として「検証用デプロイ」の位置づけ。
           # DockerfileはENV NODE_ENV=productionを設定しているが、本番ガード
-          # (assertAuthModeSafeForProduction)がNODE_ENV=production + AUTH_MODE=mockの
-          # 組み合わせを意図的に起動拒否するため、ランタイム変数でNODE_ENV=stagingに
-          # 上書きし「本番ではない」ことを明示する(Railwayの変数はイメージのENVより優先)。
+          # (assertAuthModeSafeForProduction)はNODE_ENV=production + AUTH_MODE!==productionの
+          # 組み合わせのみを拒否する。AUTH_MODE=productionへ切り替えた今はこの組み合わせに
+          # 該当しないため理論上NODE_ENV=stagingの上書きは不要になったが、他の未検証の
+          # 本番判定分岐への影響を避けるため、この検証用デプロイでは引き続きstagingのままにする。
           railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
           railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
           # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
@@ -158,10 +162,8 @@ jobs:
           # 挙動なので、シークレット未登録でもデプロイ自体は失敗しない。
           railway variable set "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" --service api --skip-deploys --json
           # LINE Developersで発行したチャネルID (シークレットではない、LIFF初期化等で
-          # クライアント側にも露出する値のため直接埋め込む)。AUTH_MODE=mockのままでは
-          # 参照されない (apps/api/src/auth/auth.service.ts) ため、設定するだけでは
-          # 動作は変わらない。実際にLINE本番ログインを有効化するには、AUTH_MODEを
-          # productionへ切り替える対応が別途必要 (docs/roadmap.md「P0」参照)。
+          # クライアント側にも露出する値のため直接埋め込む)。上記でAUTH_MODE=productionへ
+          # 切り替えたため、この値がLineIdTokenVerifierの検証先として実際に参照される。
           railway variable set "LINE_CHANNEL_ID=2010749243" --service api --skip-deploys --json
           # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
           # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
