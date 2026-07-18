@@ -20,23 +20,37 @@ AIアート教室連携を本番運用する前に確認・完了すべき項目
   - 既存テストがすべて通る — 満たす (apps/api 91件・packages/ledger 21件・
     packages/auth 37件、いずれも成功)
 
-## P0-2. LINE実チャネル結合試験 — 進行中 (2026-07-18: チャネル発行・フロントエンド実装完了、LIFFアプリ発行待ち)
+## P0-2. LINE実チャネル結合試験 — 完了 (2026-07-18〜19)
 
-`LineIdTokenVerifier`(`packages/auth/src/sso.ts`)はコードとして実装済みだが、実際の
-LINEチャネルでの結合試験は未実施 (`docs/authentication.md`参照)。試験に必要な設定・
-確認項目を以下に整理する。
+`LineIdTokenVerifier`(`packages/auth/src/sso.ts`)の実チャネルでの結合試験が完了した。
+iPhone実機のChrome/SafariからLINEログイン→ウォレット画面表示までの一連の動作を
+確認済み (`docs/authentication.md`参照)。
 
-**2026-07-18時点の進捗**:
-- LINE Developersでチャネルを発行済み (channel_id: 2010749243)、`LINE_CHANNEL_ID`を
-  Railway環境変数に設定済み (`deploy.yml`)。
+**経緯**:
+- LINE Developersでチャネル・LIFFアプリを発行 (channel_id: 2010749243、
+  LIFF ID: 2010749243-Zu7AV5nR)、`LINE_CHANNEL_ID`/`NEXT_PUBLIC_LINE_LIFF_ID`を
+  それぞれRailway/Vercelに設定済み。
 - `apps/user-wallet`のログイン画面がLIFF/LINE Login SDKを一切呼んでいなかった
   (疑似IDを直接送信するモック専用実装だった) ことが判明したため、`@line/liff`を
   導入しLIFF経由の本番ログインフローを実装した (`apps/user-wallet/src/lib/liff.ts`、
   `apps/user-wallet/src/app/login/page.tsx`)。`NEXT_PUBLIC_LINE_LIFF_ID`が未設定の
   環境 (ローカル開発・CI・Playwright) では従来通りモック実装のまま動作し、既存の
   Playwright E2E (`tests/e2e/specs/user-wallet.spec.ts`) が無改修で成功することを確認済み。
-- **未着手**: 下表項目3・4 (LIFFアプリ自体の作成、Endpoint URLの登録)。LIFFアプリは
-  実際にデプロイされたuser-walletのURLが確定してからでないと作成できない。
+- `AUTH_MODE`を`production`に切り替え、実チャネルでの結合試験を実施。試験の過程で
+  以下3件の不具合が見つかり、いずれも対応済み:
+  1. `liff.login({redirectUri})`にクエリパラメータ付きの独自URLを渡すとLINE側との
+     トークン交換が失敗する問題 → `redirectUri`のカスタマイズをやめ、状態は
+     `localStorage`で引き継ぐ方式に変更。
+  2. iOS上のLIFF SDKが`pageshow`イベントで無条件に`window.location.reload()`する
+     挙動により、API送信・画面遷移が完了する前にリロードが繰り返されるループが
+     発生 → IDトークン取得後は`liff.init()`を再度呼ばず、保存済みのIDトークンで
+     直接送信し直す方式に変更。
+  3. ログインAPI自体は成功するのに、直後の`/wallet`でのAPI呼び出しでセッション
+     Cookieが送信されず401→`/login`への差し戻しが発生 → 原因はVercel(フロント
+     エンド)とRailway(API)が別ドメインのため`SameSite=None`で発行していた
+     セッションCookieを、iOS Safari/WebKitのIntelligent Tracking Prevention(ITP)が
+     制限していたため。`apps/user-wallet/next.config.mjs`の`rewrites()`で`/api/*`を
+     同一オリジンに見せかけてAPIへ転送する方式に変更し解決。
 
 ### 事前に用意するもの
 
@@ -44,29 +58,29 @@ LINEチャネルでの結合試験は未実施 (`docs/authentication.md`参照)�
 |---|---|---|---|
 | 1 | LINE Developersでのチャネル作成 | LINEログインチャネルを作成し、`channel_id`を取得する | `IMPLEMENTED` |
 | 2 | `LINE_CHANNEL_ID`環境変数 | 上記チャネルIDを設定 (`.env.example`に既存項目あり) | `IMPLEMENTED` |
-| 3 | LIFFアプリの作成 | 同じチャネル配下にLIFFアプリを追加し、Endpoint URLに実際の`apps/user-wallet`の`/login`URLを設定、scopeに`openid`/`profile`を含める | `NOT_IMPLEMENTED` (デプロイ先URL確定待ち) |
-| 4 | `NEXT_PUBLIC_LINE_LIFF_ID`環境変数 | 上記LIFFアプリのIDを`apps/user-wallet`のビルド時環境変数に設定 (Vercel) | `NOT_IMPLEMENTED` (3待ち) |
-| 5 | Cookieドメイン設定 | `COOKIE_DOMAIN`が実際のドメインと一致しているか確認 | `NOT_IMPLEMENTED` (本番ドメイン未確定のため) |
-| 6 | `apps/user-wallet`へのLIFF/LINE Login SDK組み込み | ログイン画面を、疑似ID直接送信ではなく実際のLIFF `liff.login()`経由でIDトークンを取得する実装に変更する | `IMPLEMENTED` (2026-07-18) |
+| 3 | LIFFアプリの作成 | 同じチャネル配下にLIFFアプリを追加し、Endpoint URLに実際の`apps/user-wallet`の`/login`URLを設定、scopeに`openid`/`profile`を含める | `IMPLEMENTED` |
+| 4 | `NEXT_PUBLIC_LINE_LIFF_ID`環境変数 | 上記LIFFアプリのIDを`apps/user-wallet`のビルド時環境変数に設定 (Vercel) | `IMPLEMENTED` |
+| 5 | Cookieドメイン設定 | `COOKIE_DOMAIN`が実際のドメインと一致しているか確認 | `NOT_IMPLEMENTED` (本番ドメイン未確定のため。現状はVercelのrewriteによる同一オリジン化で回避しているため、`vercel.app`ドメインのままでも動作する) |
+| 6 | `apps/user-wallet`へのLIFF/LINE Login SDK組み込み | ログイン画面を、疑似ID直接送信ではなく実際のLIFF `liff.login()`経由でIDトークンを取得する実装に変更する | `IMPLEMENTED` |
 
 ### 確認する項目 (指示書5.2章)
 
-- LINE内LIFFブラウザでのログイン
-- Safari/ChromeからのLINE Login (通常のWebブラウザ経由)
+- ~~LINE内LIFFブラウザでのログイン~~ — 未確認 (今回試験したのは外部ブラウザ経由のみ。
+  LINEアプリのトーク画面等からLIFF URLを開いた場合の動作は別途確認が必要)
+- Safari/ChromeからのLINE Login (通常のWebブラウザ経由) — `IMPLEMENTED` (iPhone実機で確認済み)
 - IDトークン検証が実際に成功すること (`LineIdTokenVerifier`が本物のLINE APIに問い合わせて
-  `sub`/`email`/`aud`を正しく取得できるか)
-- audience(`aud`)不一致時の拒否が実際に機能すること (誤ったチャネル向けのトークンを
-  弾けるか)
-- 有効期限切れトークンの拒否
-- コールバックURLの実際の動作確認
-- Cookieドメインが正しく機能すること (セッションCookie・紹介Cookieの両方)
-- 紹介URLからLINEログイン後、紹介情報が維持されること
-  (`REFERRAL_SESSION_COOKIE_NAME`が正しく読み書きされるか、実ブラウザで確認)
-- LINE認証失敗時に紹介Cookieが削除されること (`apps/api/src/auth/auth.controller.ts`の
-  `finally`ブロックが実際に動作するか)
-- 同一LINEアカウントで重複OVEアカウントが作成されないこと
-  (`AccountsService.findOrCreateByIdentity`の一意制約が実際のLINEユーザーIDに対して
-  機能するか)
+  `sub`/`email`/`aud`を正しく取得できるか) — `IMPLEMENTED` (確認済み)
+- audience(`aud`)不一致時の拒否が実際に機能すること — 未確認 (異常系は本番チャネル
+  でのみ発生しうるため未実施。単体テストでは検証済み)
+- 有効期限切れトークンの拒否 — `IMPLEMENTED` (試験中に実際に「IdToken expired」で
+  拒否される事象を確認した)
+- コールバックURLの実際の動作確認 — `IMPLEMENTED` (確認済み)
+- Cookieドメインが正しく機能すること (セッションCookie・紹介Cookieの両方) — `IMPLEMENTED`
+  (セッションCookieはVercelのrewriteによる同一オリジン化で対応。紹介Cookieは別途確認が必要)
+- 紹介URLからLINEログイン後、紹介情報が維持されること — 未確認 (今回の試験範囲外)
+- LINE認証失敗時に紹介Cookieが削除されること — 未確認 (今回の試験範囲外)
+- 同一LINEアカウントで重複OVEアカウントが作成されないこと — 未確認 (今回の試験範囲外、
+  ロジック自体は`findOrCreateByIdentity`の一意制約で担保)
 
 ### 完了条件
 
@@ -120,7 +134,7 @@ Sentryプロジェクトの作成は、いずれも外部サービスのアカ�
 | 項目 | 状態 |
 |---|---|
 | P0-1 `ove_transactions`DB保護 | `IMPLEMENTED` |
-| P0-2 LINE実チャネル結合試験 | `PARTIALLY_IMPLEMENTED` (チャネル発行・フロントエンドのLIFF SDK組み込みは完了。LIFFアプリ自体の作成 (デプロイ先URL確定待ち) と実チャネルでの結合試験が未着手) |
+| P0-2 LINE実チャネル結合試験 | `IMPLEMENTED` (2026-07-18〜19完了。iPhone実機でログイン→ウォレット画面表示までを確認済み) |
 | P0-3 ステージング環境 | `BUSINESS_DECISION_REQUIRED` (外部アカウント作成の判断が必要) |
 | P0-4 Sentry設定 | `CONFIGURATION_REQUIRED` (コードは`IMPLEMENTED`、外部設定が未着手) |
 | P0-5 定期バックアップ・復旧試験 | `CONFIGURATION_REQUIRED` (スクリプトは`IMPLEMENTED`、運用が未着手) |

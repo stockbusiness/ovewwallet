@@ -28,9 +28,9 @@
 
 - メールワンタイムコード (6桁・有効期限10分・試行5回まで、本番相当で実装済み)
 - LINEログイン (バックエンド`LineIdTokenVerifier`・フロントエンドLIFF SDK統合とも
-  コード実装済み。LINE Developersでのチャネル発行も完了。LIFFアプリ自体の作成
-  (デプロイ先URL確定待ち) と実チャネルでの結合テストが未実施。既定はモック実装) —
-  **`PARTIALLY_IMPLEMENTED`**
+  実チャネル(実LIFFアプリ・実LINEアカウント)でのログイン→ウォレット画面表示までの
+  結合試験を完了。本番相当で動作確認済み。既定はモック実装、`AUTH_MODE=production`
+  かつ`NEXT_PUBLIC_LINE_LIFF_ID`設定時のみ本番実装が使われる)
 - 戦国パスポートSSO (モック実装、相手方API仕様待ちで本番連携は未着手) —
   **`BUSINESS_DECISION_REQUIRED`**
 - 戦国経済圏代理店システム(sengoku-ai.com)SSOログイン (RS256 JWT + JWKS検証、本番相当)

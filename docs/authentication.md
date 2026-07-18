@@ -36,12 +36,12 @@
 使う。`AUTH_MODE=production` で `LINE_CHANNEL_ID` が空の場合は起動時ではなくクラス構築時に
 例外を投げる (安全側に倒し、無認証で通ってしまうことを防ぐ)。
 
-**注意**: `LineIdTokenVerifier` は単体テスト (`packages/auth/src/line.test.ts`、`fetch`を
-モック化) のみで検証済みであり、実際のLINEチャネル・実IDトークンを使った結合テストは
-未実施。本番投入前に実チャネルでの動作確認が必須。LINEから受け取ったプロフィールを
-そのまま信用しない方針(サーバー側検証必須)は維持している。
+単体テスト (`packages/auth/src/line.test.ts`、`fetch`をモック化) に加え、実チャネルでの
+結合試験(2026-07-18、`AUTH_MODE=production`・実LIFFアプリ・実LINEアカウント)でも
+実際のIDトークン検証→アカウント作成→ウォレット画面表示までの動作を確認済み。LINEから
+受け取ったプロフィールをそのまま信用しない方針(サーバー側検証必須)は維持している。
 
-### フロントエンド (`apps/user-wallet`) 側のLINEログイン (2026-07-18実装)
+### フロントエンド (`apps/user-wallet`) 側のLINEログイン (2026-07-18実装・実チャネル結合試験完了)
 
 `apps/user-wallet/src/lib/liff.ts` が `@line/liff` を使ったLIFFログインフローを実装する。
 `NEXT_PUBLIC_LINE_LIFF_ID` (Next.jsのビルド時公開環境変数) が未設定の場合は一切呼ばれず、
@@ -49,16 +49,29 @@
 モック実装のまま動作する (ローカル開発・CI・Playwright E2Eはこの経路のまま無改修で成功)。
 
 設定済みの場合のフロー:
-1. 「LINEでログイン」クリック時に `liff.init()` → `liff.isLoggedIn()` が false なら
-   `liff.login({ redirectUri: 現在のURL })` でLINEのログイン画面へ遷移 (利用規約同意状態は
-   ページ遷移をまたぐため `sessionStorage` に一時保存する)。
+1. 「LINEでログイン」クリック時に `liff.init()` → 既にログイン状態が残っていても一度
+   `liff.logout()` してから `liff.login()` でLINEのログイン画面へ遷移する (期限切れの
+   IDトークンを誤って使い回さないため)。利用規約同意状態は `localStorage` に一時保存する。
 2. LINE側の認証後、同じ`/login`URLへリダイレクトされて戻ってくる。
 3. ページ読み込み時の `useEffect` で `liff.isLoggedIn()` を再確認し、trueなら
-   `liff.getIDToken()` で実際のIDトークンを取得して `/api/v1/auth/line/login` へ送信する。
+   `liff.getIDToken()` で実際のIDトークンを取得し、取得できた時点で即座に`localStorage`へ
+   保存した上で `/api/v1/auth/line/login` へ送信する。
 
-**未着手**: LINE Developersコンソールでの実際のLIFFアプリ作成 (Endpoint URLに実デプロイ
-先の`/login`URLを設定する必要があるため、デプロイ先確定後)。詳細:
-`docs/implementation/PRODUCTION_READINESS_PLAN.md`「P0-2」参照。
+**実チャネルでの結合試験(2026-07-18)で発覚し対応した問題**:
+- iOS上のLIFF SDKには、`pageshow`イベント発生時に無条件で`window.location.reload()`する
+  挙動があり、API送信・画面遷移が完了する前にリロードが繰り返されるループが発生した。
+  IDトークン取得後は`liff.init()`を再度呼ばずに保存済みのIDトークンで直接送信し直す方式で
+  回避した。
+- ログインAPI自体は成功するものの、直後の`/wallet`でのAPI呼び出しでセッションCookieが
+  送信されず401→`/login`への差し戻しが発生していた。原因はVercel(フロントエンド)と
+  Railway(API)が別ドメインのため`SameSite=None`で発行していたセッションCookieを、
+  iOS Safari/WebKitのIntelligent Tracking Prevention(ITP)が制限していたためと判明した。
+  `apps/user-wallet/next.config.mjs`の`rewrites()`で`/api/*`宛のリクエストを同一オリジンに
+  見せかけてAPIへ転送する方式(Vercelのエッジがサーバー側で転送するため、ブラウザからは
+  真の同一オリジンに見える)に変更し、Cookieを完全な第一者Cookieとして扱わせることで解決した。
+
+実チャネル(LINE Developersで発行したLIFFアプリ、iPhone実機・Chrome/Safari双方)での
+ログイン→ウォレット画面表示までの一連の動作を確認済み。
 
 ## 戦国パスポートSSO
 

@@ -34,11 +34,11 @@ P0 (本番安全性)
 |---|---|---|---|
 | 1 | `ove_transactions`のDBレベル保護 (DELETE禁止・COMPLETED取引の主要項目変更禁止) | `IMPLEMENTED` | — (完了) |
 | 2 | LINE Developersでチャネルを作成する | `IMPLEMENTED` | — (完了、channel_id: 2010749243) |
-| 3 | 上記チャネルの`channel_id`を`LINE_CHANNEL_ID`としてRailway環境変数に設定する | `IMPLEMENTED` | — (完了、`deploy.yml`に直値で設定済み。`AUTH_MODE=mock`のままでは参照されないため動作に影響なし) |
+| 3 | 上記チャネルの`channel_id`を`LINE_CHANNEL_ID`としてRailway環境変数に設定する | `IMPLEMENTED` | — (完了) |
 | 3.5 | `apps/user-wallet`のログイン画面にLIFF SDKを組み込む (`@line/liff`導入、`NEXT_PUBLIC_LINE_LIFF_ID`未設定時は既存のモック実装のまま動作、Playwright E2Eで無改修動作確認済み) | `IMPLEMENTED` | — (完了) |
-| 3.6 | LINE DevelopersでLIFFアプリを作成する (Endpoint URLに実際のuser-walletの`/login`URLを設定) | `NOT_IMPLEMENTED` | **ユーザー** (デプロイ先URL確定後) |
-| 3.7 | 発行されたLIFF IDを`NEXT_PUBLIC_LINE_LIFF_ID`としてVercelのuser-walletプロジェクトに設定する | `NOT_IMPLEMENTED` (3.6待ち) | **ユーザー**、確認は開発 |
-| 4 | `AUTH_MODE=production`で起動し、実チャネルでのLINEログインを確認する (`docs/implementation/PRODUCTION_READINESS_PLAN.md`「確認する項目」の9項目) | `BLOCKED` (3.6, 3.7待ち) | 開発 |
+| 3.6 | LINE DevelopersでLIFFアプリを作成する (Endpoint URLに実際のuser-walletの`/login`URLを設定) | `IMPLEMENTED` | — (完了、LIFF ID: 2010749243-Zu7AV5nR) |
+| 3.7 | 発行されたLIFF IDを`NEXT_PUBLIC_LINE_LIFF_ID`としてVercelのuser-walletプロジェクトに設定する | `IMPLEMENTED` | — (完了) |
+| 4 | `AUTH_MODE=production`で起動し、実チャネルでのLINEログインを確認する | `IMPLEMENTED` | — (完了、2026-07-18〜19: iPhone実機・Chrome/Safariでログイン→ウォレット画面表示までの動作を確認済み。調査過程で見つかった3件の不具合(iOSのLIFF SDKのpageshowリロードループ、iOS ITPによるクロスサイトセッションCookie制限)も対応済み。詳細は`docs/authentication.md`参照) |
 | 5 | ステージング環境を構築するか判断する (既存のRailway/Vercel動作確認用デプロイを昇格させるか、新設するか) | `BUSINESS_DECISION_REQUIRED` | **ユーザー** |
 | 6 | (5で構築する場合) ステージング用Railway/Vercelプロジェクト・PostgreSQL/Redis・LINEステージングチャネルを作成する | `NOT_IMPLEMENTED` (5待ち) | **ユーザー**、環境変数設定は開発 |
 | 7 | Sentryプロジェクトを作成し、DSNを払い出す | `IMPLEMENTED` | — (完了) |
@@ -125,7 +125,7 @@ P0〜P3完了後に要件定義する (ガチャ券交換・クーポン交換�
 
 1. ~~LINE Developersでチャネルを作成する~~ → 完了 (P0-2)
 2. ~~Sentryプロジェクトを作成する~~ → 完了・動作確認済み (P0-7, P0-8)
-3. デプロイ先URLが確定したら、LINE DevelopersでLIFFアプリを作成する (P0-3.6)
+3. ~~LINE DevelopersでLIFFアプリを作成し、実チャネルでのログインを確認する~~ → 完了 (P0-3.6〜4)
 4. ステージング環境を新設するか判断する (P0-5)
 5. 代理店システム側に紹介関係API13項目を確認依頼する (P1-1)
 6. AIアート教室運営に11項目を確認依頼し、金額検証方式を決める (P2-1, P2-2)
