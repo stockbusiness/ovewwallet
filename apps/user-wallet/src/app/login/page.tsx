@@ -182,10 +182,26 @@ export default function LoginPage() {
               <ChatBubbleIcon className="h-5 w-5" />
               {loading === "line" ? "ログイン中..." : "LINEでログイン"}
             </PrimaryButton>
-            <SecondaryButton fullWidth tone="gold" onClick={() => setView("email-request")} disabled={loading !== null}>
+            <SecondaryButton
+              fullWidth
+              tone="gold"
+              onClick={() => {
+                setError(null);
+                setView("email-request");
+              }}
+              disabled={loading !== null}
+            >
               メールでログイン
             </SecondaryButton>
-            <SecondaryButton fullWidth tone="neutral" onClick={() => setView("sengoku")} disabled={loading !== null}>
+            <SecondaryButton
+              fullWidth
+              tone="neutral"
+              onClick={() => {
+                setError(null);
+                setView("sengoku");
+              }}
+              disabled={loading !== null}
+            >
               <IdCardIcon className="h-5 w-5" />
               戦国パスポートIDでログイン
             </SecondaryButton>
@@ -211,7 +227,10 @@ export default function LoginPage() {
             </PrimaryButton>
             <button
               type="button"
-              onClick={() => setView("choose")}
+              onClick={() => {
+                setError(null);
+                setView("choose");
+              }}
               className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
             >
               戻る
@@ -247,7 +266,10 @@ export default function LoginPage() {
             </PrimaryButton>
             <button
               type="button"
-              onClick={() => setView("email-request")}
+              onClick={() => {
+                setError(null);
+                setView("email-request");
+              }}
               className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
             >
               メールアドレスを変更する
@@ -275,7 +297,10 @@ export default function LoginPage() {
             </PrimaryButton>
             <button
               type="button"
-              onClick={() => setView("choose")}
+              onClick={() => {
+                setError(null);
+                setView("choose");
+              }}
               className="text-sm font-medium text-sengoku-muted underline underline-offset-2"
             >
               戻る
