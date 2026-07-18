@@ -37,11 +37,19 @@ function describeLiffError(err: unknown): string {
   return "LINEログインに失敗しました";
 }
 
+export interface LiffLoginResult {
+  idToken: string;
+  termsAccepted: boolean;
+}
+
 /**
  * LIFFを初期化し、未ログインならLINEのログイン画面へ遷移する (呼び出し元には戻らない)。
- * 既にログイン済み(=LINEからのリダイレクト直後)の場合のみ通常通り関数が返る。
+ * 既にログイン済み(=LIFFのアクセストークンがまだ有効な状態でボタンを押した場合。
+ * 例えば直前のテストの続きで、ページ再読み込みなしに再度ボタンを押した場合等)は、
+ * LINEへ遷移せずその場でIDトークンを返す (以前はこのケースで何もせず無言で
+ * 終了してしまい、ボタンを押しても反応が無いように見える不具合があった)。
  */
-export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
+export async function ensureLiffLogin(termsAccepted: boolean): Promise<LiffLoginResult | null> {
   if (!LIFF_ID) throw new Error("LIFF is not configured (NEXT_PUBLIC_LINE_LIFF_ID is unset)");
 
   const liff = (await import("@line/liff")).default;
@@ -55,14 +63,15 @@ export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
     window.localStorage.setItem(PENDING_KEY, "1");
     window.localStorage.setItem(TERMS_KEY, termsAccepted ? "1" : "0");
     liff.login();
-    // login()はブラウザを遷移させるため、ここには到達しない。
-    return;
+    // login()はブラウザを遷移させるため、通常ここには到達しない。
+    return null;
   }
-}
 
-export interface LiffLoginResult {
-  idToken: string;
-  termsAccepted: boolean;
+  const idToken = liff.getIDToken();
+  if (!idToken) {
+    throw new Error("LINEのIDトークンを取得できませんでした (liff.getIDToken()がnull)");
+  }
+  return { idToken, termsAccepted };
 }
 
 /**

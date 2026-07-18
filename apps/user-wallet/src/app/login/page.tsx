@@ -75,9 +75,17 @@ export default function LoginPage() {
     setLoading("line");
     try {
       if (isLiffConfigured()) {
-        // ensureLiffLogin()は通常ページ遷移してここへは戻らない。
-        // (既にLIFFログイン済みの場合のみ戻るが、そのケースは上のuseEffectが処理する)
-        await ensureLiffLogin(termsAccepted);
+        // 未ログインならensureLiffLogin()内でLINEへ遷移し、通常ここへは戻らない。
+        // 既にLIFFのログイン状態が残っている場合のみIDトークンが返るので、その場で
+        // ログインを完了させる (nullを返して何もしないと、ボタンを押しても無反応に
+        // 見えてしまうため)。
+        const result = await ensureLiffLogin(termsAccepted);
+        if (!result) return;
+        await apiFetch("/api/v1/auth/line/login", {
+          method: "POST",
+          body: JSON.stringify({ idToken: result.idToken, termsAccepted: result.termsAccepted }),
+        });
+        router.push("/wallet");
         return;
       }
       const idToken = `mock.${getMockLineUserId()}`;
