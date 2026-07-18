@@ -5,7 +5,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
-import { isLiffConfigured, ensureLiffLogin, getLiffIdTokenIfLoggedIn, getDebugLog, clearDebugLog } from "@/lib/liff";
+import {
+  isLiffConfigured,
+  ensureLiffLogin,
+  getLiffIdTokenIfLoggedIn,
+  getDebugLog,
+  clearDebugLog,
+  appendDebugLog,
+  savePendingSubmission,
+  getPendingSubmission,
+  clearPendingSubmission,
+} from "@/lib/liff";
 
 type View = "choose" | "email-request" | "email-code" | "sengoku";
 
@@ -41,17 +51,30 @@ export default function LoginPage() {
     if (isLiffConfigured()) setDebugLog(getDebugLog());
     let cancelled = false;
     (async () => {
+      // 直前の試行でAPI送信・画面遷移が完了する前にページがリロードされていた
+      // 場合、保存済みのIDトークンがあればliff.init()を再実行せず直接送信する。
+      // iOSのLIFF SDKには`pageshow`イベントで自動的に`location.reload()`する
+      // 挙動があり(実チャネルでの結合試験(2026-07-18)で確認)、liff.init()を
+      // 呼ぶたびにこれが再発火してリロードを繰り返すループになっていたため、
+      // 一度IDトークンを取得できたら以後はliff.init()を経由しないようにする。
+      const pending = getPendingSubmission();
       let result;
-      try {
-        result = await getLiffIdTokenIfLoggedIn();
-      } catch (err) {
-        // LINEへのログイン遷移後に戻ってきたのに失敗した場合はここに来る
-        // (未訪問時のnullとは区別して、必ず画面にエラーを表示する)。
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
-          setDebugLog(getDebugLog());
+      if (pending) {
+        appendDebugLog("保存済みの送信待ちIDトークンを検出、liff.init()をスキップして直接送信");
+        result = pending;
+      } else {
+        try {
+          result = await getLiffIdTokenIfLoggedIn();
+        } catch (err) {
+          // LINEへのログイン遷移後に戻ってきたのに失敗した場合はここに来る
+          // (未訪問時のnullとは区別して、必ず画面にエラーを表示する)。
+          if (!cancelled) {
+            setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
+            setDebugLog(getDebugLog());
+          }
+          return;
         }
-        return;
+        if (result) savePendingSubmission(result);
       }
       if (isLiffConfigured()) setDebugLog(getDebugLog());
       if (!result || cancelled) return;
@@ -61,9 +84,11 @@ export default function LoginPage() {
           method: "POST",
           body: JSON.stringify({ idToken: result.idToken, termsAccepted: result.termsAccepted }),
         });
+        clearPendingSubmission();
         router.push("/wallet");
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
+        clearPendingSubmission();
       } finally {
         if (!cancelled) setLoading(null);
       }

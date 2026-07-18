@@ -141,6 +141,38 @@ export interface LiffLoginResult {
   termsAccepted: boolean;
 }
 
+const PENDING_SUBMIT_KEY = "ove-liff-pending-submit";
+
+/**
+ * IDトークンをAPIへ送信・`/wallet`へ遷移する前に、iOS特有のLIFF SDKの挙動
+ * (`pageshow`イベントでの自動`location.reload()`、実チャネルでの結合試験
+ * (2026-07-18)で確認)によってページがリロードされ、送信・遷移が完了しない
+ * まま同じ処理が繰り返されるループが発生した。IDトークンを取得できた時点で
+ * 即座にここへ保存しておくことで、リロードで中断された場合でも次の読み込み時に
+ * `liff.init()`を再実行せず(=再びリロードのきっかけを作らず)直接送信を
+ * やり直せるようにする。
+ */
+export function savePendingSubmission(result: LiffLoginResult): void {
+  try {
+    window.localStorage.setItem(PENDING_SUBMIT_KEY, JSON.stringify(result));
+  } catch {
+    // 保存できなくても致命的ではない (通常通りliff.init()からやり直すだけ)。
+  }
+}
+
+export function getPendingSubmission(): LiffLoginResult | null {
+  try {
+    const raw = window.localStorage.getItem(PENDING_SUBMIT_KEY);
+    return raw ? (JSON.parse(raw) as LiffLoginResult) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingSubmission(): void {
+  window.localStorage.removeItem(PENDING_SUBMIT_KEY);
+}
+
 /**
  * LIFFを初期化し、LINEのログイン画面へ遷移する (呼び出し元には戻らない)。
  *
