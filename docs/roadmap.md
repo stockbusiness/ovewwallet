@@ -39,7 +39,7 @@ P0 (本番安全性)
 | 5 | ステージング環境を構築するか判断する (既存のRailway/Vercel動作確認用デプロイを昇格させるか、新設するか) | `BUSINESS_DECISION_REQUIRED` | **ユーザー** |
 | 6 | (5で構築する場合) ステージング用Railway/Vercelプロジェクト・PostgreSQL/Redis・LINEステージングチャネルを作成する | `NOT_IMPLEMENTED` (5待ち) | **ユーザー**、環境変数設定は開発 |
 | 7 | Sentryプロジェクトを作成し、DSNを払い出す | `IMPLEMENTED` | — (完了) |
-| 8 | `SENTRY_DSN`をGitHub Actionsシークレットに登録し (`deploy.yml`は対応済み)、5xxエラー送信・Outbox失敗通知を確認する | `CONFIGURATION_REQUIRED` | **ユーザー** (シークレット登録)、確認は開発 |
+| 8 | `SENTRY_DSN`をGitHub Actionsシークレットに登録し、5xxエラー送信を確認する | `IMPLEMENTED` | — (完了、2026-07-18: 実際にAPIへテストリクエストを送りSentryのIssue一覧に表示されることを確認済み。Outbox失敗通知は宛先ハンドラ自体が未実装のためP1完了後に確認) |
 | 9 | 定期バックアップの自動化 | `IMPLEMENTED` | — (完了、`.github/workflows/backup-db.yml`) |
 | 10 | 本番相当DBでの復旧試験 (現状はローカル開発DBでの検証のみ) | `NOT_IMPLEMENTED` | 開発 (ステージング環境が要る場合は5,6待ち) |
 | 11 | バックアップ失敗時の通知確認 (GitHub Actions失敗通知の設定) | `NOT_IMPLEMENTED` | **ユーザー** (GitHubの通知設定はリポジトリ管理者側の設定) |

@@ -4,7 +4,7 @@
 このドキュメントは「コードとして自動化済みのもの」と「Sentry/外部サービスのアカウント
 契約など、人手による設定が別途必要なもの」を明確に分ける。
 
-## 1. エラートラッキング (Sentry) — コード実装済み・設定は未着手
+## 1. エラートラッキング (Sentry) — 設定・動作確認完了 (2026-07-18)
 
 - `apps/api/src/common/sentry.ts` の `initSentry()` / `captureException()`。
 - `SENTRY_DSN` 環境変数が未設定の場合は何もしない (Feature Flagと同じ「設定するまでは
@@ -16,20 +16,17 @@
 - 単体テスト: `apps/api/src/common/sentry.test.ts` (`SENTRY_DSN`未設定/設定済みの両方を
   `@sentry/node` をモックして検証)。
 
-**進捗 (2026-07-17)**: Sentryプロジェクト作成 (Nest.js、Error Monitoringのみ有効化・
+**進捗 (2026-07-17〜18)**: Sentryプロジェクト作成 (Nest.js、Error Monitoringのみ有効化・
 Logging/Tracing/Profiling/Application Metricsは無効のまま) 完了。`.github/workflows/deploy.yml`
-に `SENTRY_DSN` を `secrets.SENTRY_DSN` から設定する行を追加済み (未登録でも空文字列が
-設定されるだけで、`initSentry()`はno-opのままデプロイ自体は失敗しない)。
+に `SENTRY_DSN` を `secrets.SENTRY_DSN` から設定する行を追加し、GitHub Actionsシークレット
+登録・`deploy.yml`実行によるRailwayへの反映まで完了。実際にAPI (`POST /api/v1/auth/line/login`
+へ`idToken: "mock."`という不正な値を送信し、モック検証ロジック内の未捕捉`Error`を意図的に
+発生させるテスト) にリクエストを送り、SentryのIssue一覧に「invalid LINE id token」の
+Issueが表示されることを確認済み。データを変更しない安全なテスト方法。
 
 **残作業 (人手が必要)**:
-1. ~~Sentryでプロジェクトを作成し、DSNを払い出す。~~ → 完了。
-2. GitHub Actionsのシークレットに `SENTRY_DSN` を登録する (リポジトリ設定 →
-   Settings → Environments → RAILWAY → secrets)。登録後、`deploy.yml`
-   (`workflow_dispatch`) を実行すればRailwayの環境変数に反映される。
-   即時反映させたい場合は、Railwayダッシュボードのapiサービスの変数に直接
-   `SENTRY_DSN` を設定してもよい (どちらの経路でも値は同じ)。
-3. Sentry側でアラートルール (例: 1分間に5件以上の新規Issueでメール/Slack通知) を設定する。
-4. apps/user-wallet・apps/admin-wallet (Next.js, Vercel) のクライアント/サーバー側エラーは
+1. Sentry側でアラートルール (例: 1分間に5件以上の新規Issueでメール/Slack通知) を設定する。
+2. apps/user-wallet・apps/admin-wallet (Next.js, Vercel) のクライアント/サーバー側エラーは
    今回は対象外。必要になったら `@sentry/nextjs` を追加する (同様にDSN未設定時はno-opにする)。
 
 ## 2. ヘルスチェック — 実装済み・Railwayの自己監視のみ
