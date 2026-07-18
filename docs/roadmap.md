@@ -38,8 +38,8 @@ P0 (本番安全性)
 | 4 | `AUTH_MODE=production`で起動し、実チャネルでのLINEログインを確認する (`docs/implementation/PRODUCTION_READINESS_PLAN.md`「確認する項目」の9項目) | `NOT_IMPLEMENTED` (2,3待ち) | 開発 (ユーザーによるチャネル発行後に着手可能) |
 | 5 | ステージング環境を構築するか判断する (既存のRailway/Vercel動作確認用デプロイを昇格させるか、新設するか) | `BUSINESS_DECISION_REQUIRED` | **ユーザー** |
 | 6 | (5で構築する場合) ステージング用Railway/Vercelプロジェクト・PostgreSQL/Redis・LINEステージングチャネルを作成する | `NOT_IMPLEMENTED` (5待ち) | **ユーザー**、環境変数設定は開発 |
-| 7 | Sentryプロジェクトを作成し、DSNを払い出す | `NOT_IMPLEMENTED` | **ユーザー** |
-| 8 | `SENTRY_DSN`を環境変数に設定し、5xxエラー送信・Outbox失敗通知を確認する | `NOT_IMPLEMENTED` (7待ち) | 開発 (コード自体は`IMPLEMENTED`、設定後の動作確認のみ) |
+| 7 | Sentryプロジェクトを作成し、DSNを払い出す | `IMPLEMENTED` | — (完了) |
+| 8 | `SENTRY_DSN`をGitHub Actionsシークレットに登録し (`deploy.yml`は対応済み)、5xxエラー送信・Outbox失敗通知を確認する | `CONFIGURATION_REQUIRED` | **ユーザー** (シークレット登録)、確認は開発 |
 | 9 | 定期バックアップの自動化 | `IMPLEMENTED` | — (完了、`.github/workflows/backup-db.yml`) |
 | 10 | 本番相当DBでの復旧試験 (現状はローカル開発DBでの検証のみ) | `NOT_IMPLEMENTED` | 開発 (ステージング環境が要る場合は5,6待ち) |
 | 11 | バックアップ失敗時の通知確認 (GitHub Actions失敗通知の設定) | `NOT_IMPLEMENTED` | **ユーザー** (GitHubの通知設定はリポジトリ管理者側の設定) |

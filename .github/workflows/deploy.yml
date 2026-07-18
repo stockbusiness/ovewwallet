@@ -153,6 +153,10 @@ jobs:
           # 上書きし「本番ではない」ことを明示する(Railwayの変数はイメージのENVより優先)。
           railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
           railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
+          # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
+          # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
+          # 挙動なので、シークレット未登録でもデプロイ自体は失敗しない。
+          railway variable set "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" --service api --skip-deploys --json
           # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
           # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
           # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、

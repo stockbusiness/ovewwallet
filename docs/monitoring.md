@@ -16,9 +16,18 @@
 - 単体テスト: `apps/api/src/common/sentry.test.ts` (`SENTRY_DSN`未設定/設定済みの両方を
   `@sentry/node` をモックして検証)。
 
+**進捗 (2026-07-17)**: Sentryプロジェクト作成 (Nest.js、Error Monitoringのみ有効化・
+Logging/Tracing/Profiling/Application Metricsは無効のまま) 完了。`.github/workflows/deploy.yml`
+に `SENTRY_DSN` を `secrets.SENTRY_DSN` から設定する行を追加済み (未登録でも空文字列が
+設定されるだけで、`initSentry()`はno-opのままデプロイ自体は失敗しない)。
+
 **残作業 (人手が必要)**:
-1. Sentryでプロジェクトを作成し、DSNを払い出す。
-2. Railway (apps/api) の環境変数に `SENTRY_DSN` を設定する。
+1. ~~Sentryでプロジェクトを作成し、DSNを払い出す。~~ → 完了。
+2. GitHub Actionsのシークレットに `SENTRY_DSN` を登録する (リポジトリ設定 →
+   Settings → Environments → RAILWAY → secrets)。登録後、`deploy.yml`
+   (`workflow_dispatch`) を実行すればRailwayの環境変数に反映される。
+   即時反映させたい場合は、Railwayダッシュボードのapiサービスの変数に直接
+   `SENTRY_DSN` を設定してもよい (どちらの経路でも値は同じ)。
 3. Sentry側でアラートルール (例: 1分間に5件以上の新規Issueでメール/Slack通知) を設定する。
 4. apps/user-wallet・apps/admin-wallet (Next.js, Vercel) のクライアント/サーバー側エラーは
    今回は対象外。必要になったら `@sentry/nextjs` を追加する (同様にDSN未設定時はno-opにする)。
