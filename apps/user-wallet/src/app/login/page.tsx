@@ -37,7 +37,15 @@ export default function LoginPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const result = await getLiffIdTokenIfLoggedIn();
+      let result;
+      try {
+        result = await getLiffIdTokenIfLoggedIn();
+      } catch (err) {
+        // LINEへのログイン遷移後に戻ってきたのに失敗した場合はここに来る
+        // (未訪問時のnullとは区別して、必ず画面にエラーを表示する)。
+        if (!cancelled) setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
+        return;
+      }
       if (!result || cancelled) return;
       setLoading("line");
       try {
