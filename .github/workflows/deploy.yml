@@ -157,6 +157,12 @@ jobs:
           # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
           # 挙動なので、シークレット未登録でもデプロイ自体は失敗しない。
           railway variable set "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" --service api --skip-deploys --json
+          # LINE Developersで発行したチャネルID (シークレットではない、LIFF初期化等で
+          # クライアント側にも露出する値のため直接埋め込む)。AUTH_MODE=mockのままでは
+          # 参照されない (apps/api/src/auth/auth.service.ts) ため、設定するだけでは
+          # 動作は変わらない。実際にLINE本番ログインを有効化するには、AUTH_MODEを
+          # productionへ切り替える対応が別途必要 (docs/roadmap.md「P0」参照)。
+          railway variable set "LINE_CHANNEL_ID=2010749243" --service api --skip-deploys --json
           # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
           # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
           # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、

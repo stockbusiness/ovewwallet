@@ -33,9 +33,10 @@ P0 (本番安全性)
 | # | 作業 | 状態 | 担当 |
 |---|---|---|---|
 | 1 | `ove_transactions`のDBレベル保護 (DELETE禁止・COMPLETED取引の主要項目変更禁止) | `IMPLEMENTED` | — (完了) |
-| 2 | LINE Developersでチャネルを作成する | `NOT_IMPLEMENTED` | **ユーザー** |
-| 3 | 上記チャネルの`channel_id`を`LINE_CHANNEL_ID`としてステージング/本番環境に設定する | `NOT_IMPLEMENTED` (2待ち) | **ユーザー** |
-| 4 | `AUTH_MODE=production`で起動し、実チャネルでのLINEログインを確認する (`docs/implementation/PRODUCTION_READINESS_PLAN.md`「確認する項目」の9項目) | `NOT_IMPLEMENTED` (2,3待ち) | 開発 (ユーザーによるチャネル発行後に着手可能) |
+| 2 | LINE Developersでチャネルを作成する | `IMPLEMENTED` | — (完了、channel_id: 2010749243) |
+| 3 | 上記チャネルの`channel_id`を`LINE_CHANNEL_ID`としてRailway環境変数に設定する | `IMPLEMENTED` | — (完了、`deploy.yml`に直値で設定済み。`AUTH_MODE=mock`のままでは参照されないため動作に影響なし) |
+| 3.5 | **(新たに判明したギャップ)** `apps/user-wallet`のログイン画面にLIFF/LINE Login SDKを組み込む。現状は疑似IDを直接`/api/v1/auth/line/login`へ送るモック実装のみで、本物のLINE認証フローを一切呼んでいない。これが無いと`AUTH_MODE=production`に切り替えた瞬間に本物のIDトークンが送られず、既存のログイン自体が壊れる | `NOT_IMPLEMENTED` | 開発 |
+| 4 | `AUTH_MODE=production`で起動し、実チャネルでのLINEログインを確認する (`docs/implementation/PRODUCTION_READINESS_PLAN.md`「確認する項目」の9項目) | `BLOCKED` (3.5待ち) | 開発 |
 | 5 | ステージング環境を構築するか判断する (既存のRailway/Vercel動作確認用デプロイを昇格させるか、新設するか) | `BUSINESS_DECISION_REQUIRED` | **ユーザー** |
 | 6 | (5で構築する場合) ステージング用Railway/Vercelプロジェクト・PostgreSQL/Redis・LINEステージングチャネルを作成する | `NOT_IMPLEMENTED` (5待ち) | **ユーザー**、環境変数設定は開発 |
 | 7 | Sentryプロジェクトを作成し、DSNを払い出す | `IMPLEMENTED` | — (完了) |
