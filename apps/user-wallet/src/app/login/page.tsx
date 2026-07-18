@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
-import { isLiffConfigured, ensureLiffLogin, getLiffIdTokenIfLoggedIn } from "@/lib/liff";
+import { isLiffConfigured, ensureLiffLogin, getLiffIdTokenIfLoggedIn, getDebugLog, clearDebugLog } from "@/lib/liff";
 
 type View = "choose" | "email-request" | "email-code" | "sengoku";
 
@@ -29,12 +29,16 @@ export default function LoginPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"line" | "email" | "sengoku" | null>(null);
+  // LINEアプリ経由での結合試験(2026-07-18)で発生した不具合の調査用。開発者ツールが
+  // 使えない環境でも状況を把握できるよう、画面に直接表示する (恒久的な機能ではない)。
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
   // LIFFの login() はページ全体をLINEのログイン画面へ遷移させ、認証後にこの同じURLへ
   // 戻ってくる。戻ってきた直後にLIFFがログイン済みと判定できるので、その場合だけ
   // ここでログインを完了させる (LIFF未設定の環境ではgetLiffIdTokenIfLoggedIn()は
   // 常にnullを返し、何もしない)。
   useEffect(() => {
+    if (isLiffConfigured()) setDebugLog(getDebugLog());
     let cancelled = false;
     (async () => {
       let result;
@@ -43,9 +47,13 @@ export default function LoginPage() {
       } catch (err) {
         // LINEへのログイン遷移後に戻ってきたのに失敗した場合はここに来る
         // (未訪問時のnullとは区別して、必ず画面にエラーを表示する)。
-        if (!cancelled) setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
+          setDebugLog(getDebugLog());
+        }
         return;
       }
+      if (isLiffConfigured()) setDebugLog(getDebugLog());
       if (!result || cancelled) return;
       setLoading("line");
       try {
@@ -310,6 +318,27 @@ export default function LoginPage() {
         )}
 
         {error && <p className="text-center text-sm font-medium text-sengoku-gold-soft">{error}</p>}
+
+        {isLiffConfigured() && debugLog.length > 0 && (
+          <div className="rounded-lg border border-sengoku-border bg-black/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-sengoku-muted">診断ログ (調査用)</span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearDebugLog();
+                  setDebugLog([]);
+                }}
+                className="text-xs font-medium text-sengoku-gold underline underline-offset-2"
+              >
+                ログをクリア
+              </button>
+            </div>
+            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-all text-[10px] leading-relaxed text-sengoku-muted">
+              {debugLog.join("\n")}
+            </pre>
+          </div>
+        )}
       </div>
     </main>
   );

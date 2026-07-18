@@ -37,6 +37,42 @@ function describeLiffError(err: unknown): string {
   return "LINEログインに失敗しました";
 }
 
+const DEBUG_LOG_KEY = "ove-liff-debug-log";
+const DEBUG_LOG_MAX_ENTRIES = 40;
+
+/**
+ * 実チャネルでの結合試験(2026-07-18)で、モバイル端末でLINEアプリを経由した後
+ * ログイン画面に戻ってきて読み込みを繰り返す不具合が発生し、開発者ツールが
+ * 使えない環境での原因調査が難航したため、要所の状態を`localStorage`へ時系列で
+ * 記録し、画面に直接表示できるようにする (デバッグ用、恒久的な機能ではない)。
+ * ページ遷移(LINEへの往復)をまたいでも記録が残るよう、Reactのstateではなく
+ * `localStorage`に保存する。
+ */
+export function appendDebugLog(entry: string): void {
+  try {
+    const raw = window.localStorage.getItem(DEBUG_LOG_KEY);
+    const log: string[] = raw ? JSON.parse(raw) : [];
+    log.push(`${new Date().toISOString().slice(11, 23)} ${entry}`);
+    while (log.length > DEBUG_LOG_MAX_ENTRIES) log.shift();
+    window.localStorage.setItem(DEBUG_LOG_KEY, JSON.stringify(log));
+  } catch {
+    // 診断用ログの保存に失敗しても本来の処理には影響させない。
+  }
+}
+
+export function getDebugLog(): string[] {
+  try {
+    const raw = window.localStorage.getItem(DEBUG_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function clearDebugLog(): void {
+  window.localStorage.removeItem(DEBUG_LOG_KEY);
+}
+
 type Liff = (typeof import("@line/liff"))["default"];
 
 const LIFF_INIT_TIMEOUT_MS = 10_000;
@@ -117,19 +153,26 @@ export interface LiffLoginResult {
  * 取得し直す方式にしている。
  */
 export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
+  appendDebugLog(`ensureLiffLogin開始 url=${window.location.href}`);
   let liff: Liff;
   try {
     liff = await getInitializedLiff();
+    appendDebugLog("liff.init()成功 (ensureLiffLogin)");
   } catch (err) {
+    appendDebugLog(`liff.init()失敗 (ensureLiffLogin): ${describeLiffError(err)}`);
     throw new Error(describeLiffError(err));
   }
 
-  if (liff.isLoggedIn()) {
+  const wasLoggedIn = liff.isLoggedIn();
+  appendDebugLog(`liff.isLoggedIn()=${wasLoggedIn} (ensureLiffLogin)`);
+  if (wasLoggedIn) {
     liff.logout();
+    appendDebugLog("liff.logout()実行済み");
   }
 
   window.localStorage.setItem(PENDING_KEY, "1");
   window.localStorage.setItem(TERMS_KEY, termsAccepted ? "1" : "0");
+  appendDebugLog("liff.login()呼び出し直前 (この後LINEへ遷移するはず)");
   liff.login();
   // login()はブラウザを遷移させるため、ここには到達しない。
 }
@@ -155,16 +198,21 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
   const termsAccepted = window.localStorage.getItem(TERMS_KEY) === "1";
   window.localStorage.removeItem(PENDING_KEY);
   window.localStorage.removeItem(TERMS_KEY);
+  appendDebugLog(`getLiffIdTokenIfLoggedIn開始 url=${window.location.href} wasPending=${wasPending}`);
 
   let liff: Liff;
   try {
     liff = await getInitializedLiff();
+    appendDebugLog("liff.init()成功 (getLiffIdTokenIfLoggedIn)");
   } catch (err) {
+    appendDebugLog(`liff.init()失敗 (getLiffIdTokenIfLoggedIn): ${describeLiffError(err)}`);
     if (wasPending) throw new Error(describeLiffError(err));
     return null;
   }
 
-  if (!liff.isLoggedIn()) {
+  const loggedIn = liff.isLoggedIn();
+  appendDebugLog(`liff.isLoggedIn()=${loggedIn} (getLiffIdTokenIfLoggedIn)`);
+  if (!loggedIn) {
     if (wasPending) {
       throw new Error("LINEログインからの復帰後もログイン状態を確認できませんでした (liff.isLoggedIn()がfalse)");
     }
@@ -172,6 +220,7 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
   }
 
   const idToken = liff.getIDToken();
+  appendDebugLog(`liff.getIDToken()=${idToken ? "取得できた" : "null"}`);
   if (!idToken) {
     if (wasPending) {
       throw new Error("LINEのIDトークンを取得できませんでした (liff.getIDToken()がnull)");
@@ -179,5 +228,6 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
     return null;
   }
 
+  appendDebugLog("getLiffIdTokenIfLoggedIn成功");
   return { idToken, termsAccepted };
 }
