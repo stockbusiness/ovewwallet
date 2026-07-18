@@ -37,6 +37,39 @@ function describeLiffError(err: unknown): string {
   return "LINEログインに失敗しました";
 }
 
+type Liff = (typeof import("@line/liff"))["default"];
+
+/**
+ * `liff.init()`は1ページ読み込みにつき1回のみ呼ばれることを想定した設計になっており
+ * (LIFF SDK自身が「liff.init is not expected to be called more than once」と警告する)、
+ * ページ読み込み時の`useEffect` (getLiffIdTokenIfLoggedIn) とボタンクリック時
+ * (ensureLiffLogin) の両方から個別に呼んでいたことが原因で、2回目の初期化が
+ * ハングし「ログイン中...」のまま固まる不具合を実チャネルで確認した(2026-07-18)。
+ * そのため初期化を1回だけ行い、結果 (liffインスタンス) をこのモジュール内で
+ * 使い回す。
+ */
+let liffInitPromise: Promise<Liff> | null = null;
+
+async function getInitializedLiff(): Promise<Liff> {
+  if (!LIFF_ID) throw new Error("LIFF is not configured (NEXT_PUBLIC_LINE_LIFF_ID is unset)");
+
+  if (!liffInitPromise) {
+    liffInitPromise = (async () => {
+      const liff = (await import("@line/liff")).default;
+      await liff.init({ liffId: LIFF_ID });
+      return liff;
+    })();
+  }
+
+  try {
+    return await liffInitPromise;
+  } catch (err) {
+    // 初期化失敗時は次回の呼び出しでやり直せるようキャッシュをクリアする。
+    liffInitPromise = null;
+    throw err;
+  }
+}
+
 export interface LiffLoginResult {
   idToken: string;
   termsAccepted: boolean;
@@ -54,11 +87,9 @@ export interface LiffLoginResult {
  * 取得し直す方式にしている。
  */
 export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
-  if (!LIFF_ID) throw new Error("LIFF is not configured (NEXT_PUBLIC_LINE_LIFF_ID is unset)");
-
-  const liff = (await import("@line/liff")).default;
+  let liff: Liff;
   try {
-    await liff.init({ liffId: LIFF_ID });
+    liff = await getInitializedLiff();
   } catch (err) {
     throw new Error(describeLiffError(err));
   }
@@ -95,9 +126,9 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
   window.localStorage.removeItem(PENDING_KEY);
   window.localStorage.removeItem(TERMS_KEY);
 
-  const liff = (await import("@line/liff")).default;
+  let liff: Liff;
   try {
-    await liff.init({ liffId: LIFF_ID });
+    liff = await getInitializedLiff();
   } catch (err) {
     if (wasPending) throw new Error(describeLiffError(err));
     return null;
