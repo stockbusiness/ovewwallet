@@ -117,6 +117,33 @@ export class AdminService {
     });
   }
 
+  /**
+   * アカウント一覧CSVエクスポート (docs/admin-operations.md参照)。画面の一覧
+   * (200件上限) とは別に、直近10,000件を上限として返す
+   * (`docs/transaction-export.md`と同じ方針)。状態での絞り込みも一覧画面と同様に可能。
+   */
+  async exportAccountsCsv(params: { status?: string }): Promise<string> {
+    const accounts = await this.db.oveAccount.findMany({
+      where: params.status ? { status: params.status as never } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: 10000,
+      include: { wallet: true },
+    });
+
+    const header = ["アカウントコード", "状態", "表示名", "メールアドレス", "登録日時", "ウォレットコード", "利用可能残高"];
+    const rows = accounts.map((a) => [
+      a.accountCode,
+      a.status,
+      a.displayName ?? "",
+      a.primaryEmail ?? "",
+      a.createdAt.toISOString(),
+      a.wallet?.walletCode ?? "",
+      a.wallet ? a.wallet.availableBalance.toString() : "",
+    ]);
+
+    return toCsv(header, rows);
+  }
+
   /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */
   async getAccountDetail(accountId: string): Promise<unknown> {
     const account = await this.db.oveAccount.findUnique({

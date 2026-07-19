@@ -8,7 +8,7 @@
 |---|---|---|
 | 管理者ログイン | `/login` | メール+パスワード |
 | OVEダッシュボード | `/dashboard` | ウォレット数・発行済み残高・累計付与/利用・会員ランク分布・残高整合性チェック結果 |
-| アカウント一覧 | `/accounts` | 一覧・状態(PENDING/ACTIVE/RESTRICTED/REVIEWING/LOCKED/CLOSED/MERGED)での絞り込み・ウォレットへのリンク |
+| アカウント一覧 | `/accounts` | 一覧・状態(PENDING/ACTIVE/RESTRICTED/REVIEWING/LOCKED/CLOSED/MERGED)での絞り込み・CSVダウンロード・ウォレットへのリンク |
 | ウォレット一覧 | `/wallets` | 一覧・詳細へのリンク |
 | ウォレット詳細 | `/wallets/[walletId]` | 残高・個別付与/減算/保留・保留解除・最近の取引 |
 | 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向/取引種別)・取消。取引種別で`EXPIRATION`/`DAILY_LOGIN_BONUS`等を絞り込むことで、失効バッチや継続ログインボーナスの実行履歴確認にも使える |
@@ -180,6 +180,19 @@ CSV生成ロジック (BOM付与・フィールドエスケープ) は`apps/api/
 `apps/api/src/e2e/audit-logs-export.test.ts` (2件): ヘッダー行・BOM・監査ログの内容
 (全セッション無効化操作) が含まれること、`targetType`で絞り込めることを検証済み。
 実ブラウザでのダウンロード確認は未実施 (今後の課題)。
+
+## アカウント一覧CSVエクスポート (2026-07-19追加)
+
+`GET /api/v1/admin/accounts/export`: アカウント一覧画面 (200件上限) とは別に、直近
+10,000件を上限としてCSVでダウンロードできる。UTF-8 BOM付き・`text/csv`
+(`apps/api/src/common/csv.ts`の`toCsv()`を利用)。列: アカウントコード・状態・表示名・
+メールアドレス・登録日時・ウォレットコード・利用可能残高。`status`クエリパラメータで
+絞り込み可能 (一覧画面の状態フィルタと同じ)。動的セグメント`:accountId`より前に
+`accounts/export`を登録している (`docs/transaction-export.md`と同じ理由)。
+
+`apps/api/src/e2e/accounts-export.test.ts` (2件): ヘッダー行・BOM・アカウントの内容が
+含まれること、`status`で絞り込めることを検証済み。実ブラウザでのダウンロード確認は
+未実施 (今後の課題)。
 
 ## アカウント詳細 (指示書13章)
 

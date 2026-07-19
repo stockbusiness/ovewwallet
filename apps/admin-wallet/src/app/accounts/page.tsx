@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, ApiError, type AccountListItem } from "@/lib/api";
+import { apiFetch, ApiError, API_BASE_URL, type AccountListItem } from "@/lib/api";
 
 const STATUS_OPTIONS = [
   { value: "", label: "すべて" },
@@ -22,6 +22,7 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<AccountListItem[]>([]);
   const [status, setStatus] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -39,15 +40,45 @@ export default function AccountsPage() {
     })();
   }, [router, status]);
 
+  async function downloadCsv() {
+    setExporting(true);
+    setError(null);
+    try {
+      const query = status ? `?status=${status}` : "";
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/accounts/export${query}`, { credentials: "include" });
+      if (!res.ok) throw new Error("failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "accounts.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("CSVのダウンロードに失敗しました");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
       <AdminNav />
       <main className="mx-auto max-w-5xl p-6">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-bold">アカウント一覧</h1>
-          <Link href="/accounts/merge" className="text-sm text-brand-600 underline">
-            アカウント統合
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={downloadCsv}
+              disabled={exporting}
+              className="rounded-md border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 disabled:opacity-50"
+            >
+              {exporting ? "ダウンロード中..." : "CSVダウンロード"}
+            </button>
+            <Link href="/accounts/merge" className="text-sm text-brand-600 underline">
+              アカウント統合
+            </Link>
+          </div>
         </div>
         <div className="mb-4 flex items-center gap-2">
           <label htmlFor="status-filter" className="text-sm text-neutral-600">

@@ -230,6 +230,21 @@ export class AdminController {
     return this.admin.listAccounts({ status, limit: limit ? Number(limit) : undefined });
   }
 
+  /**
+   * アカウント一覧CSVエクスポート (docs/admin-operations.md参照)。動的セグメント
+   * `:accountId`より前に登録している (`docs/transaction-export.md`「ルーティング上の
+   * 注意」と同じ理由で、後に登録すると`export`という文字列がaccountIdとして
+   * 解決されてしまう)。
+   */
+  @Get("accounts/export")
+  @UseGuards(AdminAuthGuard)
+  async exportAccounts(@Query("status") status: string | undefined, @Res() res: Response) {
+    const csv = await this.admin.exportAccountsCsv({ status });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="accounts.csv"');
+    res.send(csv);
+  }
+
   /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */
   @Get("accounts/:accountId")
   @UseGuards(AdminAuthGuard)
