@@ -139,9 +139,9 @@ export default function TransactionHistoryPage() {
         items={[
           { href: "/wallet", label: "ホーム", icon: <HomeIcon className="h-5 w-5" /> },
           { href: "/wallet/transactions", label: "履歴", icon: <ClockIcon className="h-5 w-5" />, matchPrefix: true },
-          { href: "/wallet/save", label: "貯める", icon: <GiftIcon className="h-5 w-5" />, disabled: true },
-          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" />, disabled: true },
-          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" />, disabled: true },
+          { href: "/wallet/earn", label: "貯める", icon: <GiftIcon className="h-5 w-5" /> },
+          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" /> },
+          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" /> },
         ]}
       />
     </main>

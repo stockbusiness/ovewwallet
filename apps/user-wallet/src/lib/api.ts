@@ -72,3 +72,18 @@ export interface OveAccount {
   displayName: string | null;
   primaryEmail: string | null;
 }
+
+export interface LinkedService {
+  service_code: string;
+  service_name: string;
+  linked: boolean;
+  linked_at: string | null;
+}
+
+export interface RewardRulePublic {
+  rule_code: string;
+  display_name: string;
+  description: string | null;
+  reward_amount: string;
+  source_service: string;
+}

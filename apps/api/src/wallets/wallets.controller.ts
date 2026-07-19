@@ -36,6 +36,12 @@ export class MeController {
   async transactionDetail(@Req() req: AuthenticatedUserRequest, @Param("transactionId") transactionId: string) {
     return this.wallets.getTransaction(req.account.id, transactionId);
   }
+
+  @Get("linked-services")
+  @UseGuards(SessionAuthGuard)
+  async linkedServices(@Req() req: AuthenticatedUserRequest) {
+    return this.wallets.listLinkedServices(req.account.id);
+  }
 }
 
 /**

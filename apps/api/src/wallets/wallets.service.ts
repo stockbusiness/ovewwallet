@@ -61,6 +61,32 @@ export class WalletsService {
     if (!link || !link.oveAccountId) throw new NotFoundException("no OVE account linked to this external_user_id");
     return this.getBalance(link.oveAccountId);
   }
+
+  /**
+   * ウォレット画面の「連携サービス」「OVEを使う」向け。稼働中のサービス連携先を、
+   * 本人が連携済みかどうかのフラグ付きで返す。api_key_hash等の機密フィールドは含めない。
+   */
+  async listLinkedServices(oveAccountId: string) {
+    const [integrations, links] = await Promise.all([
+      this.db.serviceIntegration.findMany({
+        where: { status: "ACTIVE" },
+        orderBy: { serviceName: "asc" },
+      }),
+      this.db.accountLink.findMany({
+        where: { oveAccountId, status: "ACTIVE" },
+      }),
+    ]);
+    const linkByServiceId = new Map(links.map((l) => [l.serviceIntegrationId, l]));
+    return integrations.map((s) => {
+      const link = linkByServiceId.get(s.id);
+      return {
+        service_code: s.serviceCode,
+        service_name: s.serviceName,
+        linked: Boolean(link),
+        linked_at: link ? link.linkedAt.toISOString() : null,
+      };
+    });
+  }
 }
 
 export function serializeTransaction(t: {

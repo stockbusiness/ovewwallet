@@ -46,3 +46,15 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   RELEASE: "保留解除",
   CAMPAIGN_REWARD: "キャンペーン特典",
 };
+
+/** サービスコード (ServiceCode enum) から画面表示用の日本語名を決める。 */
+export const SERVICE_CODE_LABEL: Record<string, string> = {
+  SENGOKU_PASSPORT: "戦国パスポート",
+  AIART: "AIアート教室",
+  SENGOKU_GACHA: "戦国ガチャ",
+  SENGOKU_EC: "戦国EC",
+  NFT_MARKET: "NFTマーケット",
+  SENGOKU_METAVERSE: "戦国メタバース",
+  EVENT_SYSTEM: "イベントシステム",
+  AGENCY_SYSTEM: "代理店システム",
+};

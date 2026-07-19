@@ -1,0 +1,110 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  BottomNavigation,
+  ThemeToggle,
+  ArrowLeftIcon,
+  ChevronRightIcon,
+  HomeIcon,
+  ClockIcon,
+  GiftIcon,
+  CartIcon,
+  MenuIcon,
+} from "@ove/shared-ui";
+import { apiFetch, ApiError, type OveAccount, type WalletBalance } from "@/lib/api";
+
+export default function WalletMenuPage() {
+  const router = useRouter();
+  const [account, setAccount] = useState<OveAccount | null>(null);
+  const [balance, setBalance] = useState<WalletBalance | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [acc, bal] = await Promise.all([
+          apiFetch<OveAccount>("/api/v1/accounts/me"),
+          apiFetch<WalletBalance>("/api/v1/me/wallet"),
+        ]);
+        setAccount(acc);
+        setBalance(bal);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) router.push("/login");
+      }
+    })();
+  }, [router]);
+
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      await apiFetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // ログアウトAPIが失敗してもローカルでは遷移させる (セッション切れ等)
+    } finally {
+      router.push("/login");
+    }
+  }
+
+  return (
+    <main className="flex flex-col gap-6 px-4 pb-24 pt-6">
+      <header className="flex items-center gap-3">
+        <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
+          <ArrowLeftIcon className="h-5 w-5" />
+        </Link>
+        <h1 className="font-heading text-lg font-bold text-sengoku-text">メニュー</h1>
+      </header>
+
+      <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
+        <p className="text-sm font-bold text-sengoku-text">{account?.displayName || "表示名未設定"}</p>
+        <p className="mt-1 text-xs text-sengoku-muted">{account?.accountCode}</p>
+        {balance && <p className="mt-0.5 text-xs text-sengoku-muted">{balance.wallet_code}</p>}
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-sm font-semibold text-sengoku-text">表示テーマ</span>
+          <ThemeToggle />
+        </div>
+        <MenuLink href="/wallet/services" label="連携サービス" />
+        <MenuLink href="/wallet/earn" label="OVEを貯める" />
+        <MenuLink href="/wallet/use" label="OVEを使う" />
+        <MenuLink href="/about" label="OVEについて" />
+        <MenuLink href="/terms" label="利用規約" />
+      </section>
+
+      <button
+        type="button"
+        onClick={logout}
+        disabled={loggingOut}
+        className="rounded-xl border border-sengoku-red/40 bg-sengoku-red/10 py-3 text-sm font-bold text-sengoku-red transition-colors hover:bg-sengoku-red/15 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {loggingOut ? "ログアウト中..." : "ログアウト"}
+      </button>
+
+      <BottomNavigation
+        items={[
+          { href: "/wallet", label: "ホーム", icon: <HomeIcon className="h-5 w-5" /> },
+          { href: "/wallet/transactions", label: "履歴", icon: <ClockIcon className="h-5 w-5" />, matchPrefix: true },
+          { href: "/wallet/earn", label: "貯める", icon: <GiftIcon className="h-5 w-5" /> },
+          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" /> },
+          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" />, matchPrefix: true },
+        ]}
+      />
+    </main>
+  );
+}
+
+function MenuLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between border-t border-sengoku-border px-4 py-3 text-sm font-semibold text-sengoku-text transition-colors hover:bg-sengoku-text/5"
+    >
+      {label}
+      <ChevronRightIcon className="h-4 w-4 text-sengoku-muted" />
+    </Link>
+  );
+}

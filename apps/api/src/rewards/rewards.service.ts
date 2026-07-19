@@ -19,6 +19,29 @@ export class RewardsService {
     private readonly accounts: AccountsService,
   ) {}
 
+  /**
+   * ウォレット画面の「OVEを貯める」向け。稼働中の付与ルールを、公開して問題ない
+   * フィールドのみで返す (上限値・内部管理用コードなどは含めない)。
+   */
+  async listPublicRules() {
+    const now = new Date();
+    const rules = await this.db.rewardRule.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
+        AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return rules.map((r) => ({
+      rule_code: r.ruleCode,
+      display_name: r.displayName,
+      description: r.description,
+      reward_amount: r.rewardAmount.toString(),
+      source_service: r.sourceService,
+    }));
+  }
+
   async grant(request: RewardGrantRequest, serviceIntegration: ServiceIntegration) {
     // 冪等キーが既に処理済みなら、上限チェックより前に既存取引をそのまま返す。
     // (再送/リトライは "新規リクエスト" ではないため、上限判定の対象にしない)

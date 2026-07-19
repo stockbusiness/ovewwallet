@@ -80,10 +80,10 @@ export default function WalletTopPage() {
 
         <ActionGrid
           items={[
-            { icon: <GiftIcon className="h-6 w-6" />, label: "OVEを貯める", disabled: true },
-            { icon: <CartIcon className="h-6 w-6" />, label: "OVEを使う", disabled: true },
+            { icon: <GiftIcon className="h-6 w-6" />, label: "OVEを貯める", href: "/wallet/earn" },
+            { icon: <CartIcon className="h-6 w-6" />, label: "OVEを使う", href: "/wallet/use" },
             { icon: <ClockIcon className="h-6 w-6" />, label: "取引履歴", href: "/wallet/transactions" },
-            { icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", disabled: true },
+            { icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", href: "/wallet/services" },
           ]}
         />
 
@@ -118,9 +118,9 @@ export default function WalletTopPage() {
         items={[
           { href: "/wallet", label: "ホーム", icon: <HomeIcon className="h-5 w-5" /> },
           { href: "/wallet/transactions", label: "履歴", icon: <ClockIcon className="h-5 w-5" />, matchPrefix: true },
-          { href: "/wallet/save", label: "貯める", icon: <GiftIcon className="h-5 w-5" />, disabled: true },
-          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" />, disabled: true },
-          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" />, disabled: true },
+          { href: "/wallet/earn", label: "貯める", icon: <GiftIcon className="h-5 w-5" /> },
+          { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" /> },
+          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" /> },
         ]}
       />
     </main>
