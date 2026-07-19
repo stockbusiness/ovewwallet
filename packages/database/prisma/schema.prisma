@@ -127,6 +127,7 @@ enum TransactionType {
   ACCOUNT_MERGE_OUT
   BLOCKCHAIN_MIGRATION
   MIGRATION_REVERSAL
+  EXPIRATION
 }
 
 enum CreatedByType {
@@ -401,6 +402,7 @@ model Wallet {
   transactions OveTransaction[]
   holds        WalletHold[]
   migrations   BlockchainMigration[]
+  creditLots   OveCreditLot[]
 
   @@map("wallets")
 }
@@ -431,10 +433,35 @@ model OveTransaction {
   wallet             Wallet           @relation(fields: [walletId], references: [id])
   relatedTransaction OveTransaction?  @relation("TransactionReversal", fields: [relatedTransactionId], references: [id])
   reversals          OveTransaction[] @relation("TransactionReversal")
+  creditLot          OveCreditLot?
 
   @@index([walletId])
   @@index([sourceService, sourceReferenceId])
   @@map("ove_transactions")
+}
+
+/// 有効期限付き獲得OVEの「ロット」。reward_rules.expiry_days が設定された
+/// 付与ルール経由のCREDIT取引1件につき1行作成される (通常の管理者付与・
+/// 移行インポート等は対象外)。DEBIT発生時にexpires_atが早い順(FIFO)で
+/// remaining_amountを消費し、有効期限到来時に残っている分だけEXPIRATION
+/// 取引として失効させる。詳細: docs/credit-expiry.md
+model OveCreditLot {
+  id              String    @id
+  walletId        String    @map("wallet_id")
+  transactionId   String    @unique @map("transaction_id")
+  amount          BigInt
+  remainingAmount BigInt    @map("remaining_amount")
+  expiresAt       DateTime  @map("expires_at")
+  expiredAt       DateTime? @map("expired_at")
+  /// 元のCREDIT取引がREVERSALで取り消された場合にセットする (以後、消費・失効の対象外)
+  voidedAt        DateTime? @map("voided_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  wallet      Wallet         @relation(fields: [walletId], references: [id])
+  transaction OveTransaction @relation(fields: [transactionId], references: [id])
+
+  @@index([walletId, expiresAt])
+  @@map("ove_credit_lots")
 }
 
 model RewardRule {
@@ -454,6 +481,8 @@ model RewardRule {
   status             RewardRuleStatus @default(ACTIVE)
   displayName        String           @map("display_name")
   description        String?
+  /// このルール経由で付与されたOVEが何日で失効するか。nullなら失効しない (既定)。
+  expiryDays         Int?             @map("expiry_days")
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 

@@ -5,3 +5,4 @@ export * from "./hold";
 export * from "./queries";
 export * from "./reconcile";
 export * from "./merge";
+export * from "./expiry";

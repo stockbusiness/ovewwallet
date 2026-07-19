@@ -18,20 +18,22 @@ import {
 } from "@ove/shared-ui";
 import { apiFetch, ApiError, type TransactionSummary } from "@/lib/api";
 
-type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "HELD";
+type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "HELD" | "EXPIRED";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "ALL", label: "すべて" },
   { key: "CREDIT", label: "獲得" },
   { key: "DEBIT", label: "利用" },
   { key: "HELD", label: "保留" },
+  { key: "EXPIRED", label: "失効" },
 ];
 
 function matchesFilter(t: TransactionSummary, filter: FilterKey): boolean {
   if (filter === "ALL") return true;
   if (filter === "HELD") return t.status === "HELD";
+  if (filter === "EXPIRED") return t.transaction_type === "EXPIRATION";
   if (filter === "CREDIT") return t.direction === "CREDIT" && t.status === "COMPLETED";
-  return t.direction === "DEBIT" && t.status === "COMPLETED";
+  return t.direction === "DEBIT" && t.status === "COMPLETED" && t.transaction_type !== "EXPIRATION";
 }
 
 function monthGroupLabel(iso: string): string {

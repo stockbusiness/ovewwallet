@@ -27,6 +27,9 @@ export default function RewardRulesPage() {
   const [rewardAmount, setRewardAmount] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [perUserLimit, setPerUserLimit] = useState("");
+  const [expiryDays, setExpiryDays] = useState("");
+  const [expiryResult, setExpiryResult] = useState<string | null>(null);
+  const [expiryRunning, setExpiryRunning] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -58,6 +61,7 @@ export default function RewardRulesPage() {
           rewardAmount: Number(rewardAmount),
           displayName,
           perUserLimit: perUserLimit ? Number(perUserLimit) : undefined,
+          expiryDays: expiryDays ? Number(expiryDays) : undefined,
         }),
       });
       setMessage("ルールを作成しました");
@@ -66,9 +70,29 @@ export default function RewardRulesPage() {
       setRewardAmount("");
       setDisplayName("");
       setPerUserLimit("");
+      setExpiryDays("");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "作成に失敗しました");
+    }
+  }
+
+  async function runExpiryBatch() {
+    setExpiryRunning(true);
+    setExpiryResult(null);
+    setError(null);
+    try {
+      const result = await apiFetch<{ wallets_processed: number; total_expired_amount: string }>(
+        "/api/v1/admin/expire-credits",
+        { method: "POST" },
+      );
+      setExpiryResult(
+        `${result.wallets_processed}件のウォレットで、合計${Number(result.total_expired_amount).toLocaleString("ja-JP")} OVEを失効させました`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "失効バッチの実行に失敗しました");
+    } finally {
+      setExpiryRunning(false);
     }
   }
 
@@ -129,6 +153,10 @@ export default function RewardRulesPage() {
               ユーザー上限回数
               <input value={perUserLimit} onChange={(e) => setPerUserLimit(e.target.value)} className="mt-1 block w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm" />
             </label>
+            <label className="text-xs">
+              有効期限 (日、空欄なら失効しない)
+              <input value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)} className="mt-1 block w-24 rounded-md border border-neutral-300 px-2 py-1 text-sm" />
+            </label>
             <button
               onClick={createRule}
               disabled={!ruleCode || !ruleName || !rewardAmount || !displayName}
@@ -148,6 +176,7 @@ export default function RewardRulesPage() {
               <th className="p-3">サービス</th>
               <th className="p-3">付与額</th>
               <th className="p-3">上限 (ユーザー/イベント)</th>
+              <th className="p-3">有効期限</th>
               <th className="p-3">状態</th>
               <th className="p-3"></th>
             </tr>
@@ -164,6 +193,7 @@ export default function RewardRulesPage() {
                 <td className="p-3">
                   {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
                 </td>
+                <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
                 <td className="p-3">
                   <span className={r.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-400"}>{r.status}</span>
                 </td>
@@ -176,6 +206,22 @@ export default function RewardRulesPage() {
             ))}
           </tbody>
         </table>
+
+        <section className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <h2 className="mb-1 text-sm font-semibold">OVE失効バッチ</h2>
+          <p className="mb-3 text-xs text-neutral-500">
+            有効期限が到来した獲得OVEを失効させます。cron等の外部スケジューラは未接続のため、
+            当面はここから手動実行してください (docs/credit-expiry.md参照)。
+          </p>
+          <button
+            onClick={runExpiryBatch}
+            disabled={expiryRunning}
+            className="rounded-md bg-brand-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          >
+            {expiryRunning ? "実行中..." : "失効バッチを今すぐ実行"}
+          </button>
+          {expiryResult && <p className="mt-2 text-sm text-emerald-600">{expiryResult}</p>}
+        </section>
       </main>
     </div>
   );

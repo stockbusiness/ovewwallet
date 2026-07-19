@@ -1,5 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
+import { expireDueCreditLots } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 
 export interface CreateRewardRuleParams {
@@ -17,6 +18,8 @@ export interface CreateRewardRuleParams {
   startsAt?: string;
   endsAt?: string;
   approvalType?: string;
+  /** このルール経由で付与されたOVEが何日で失効するか。未指定なら失効しない (docs/credit-expiry.md参照)。 */
+  expiryDays?: number;
 }
 
 export interface UpdateRewardRuleParams {
@@ -33,6 +36,7 @@ export interface UpdateRewardRuleParams {
   startsAt?: string | null;
   endsAt?: string | null;
   approvalType?: string;
+  expiryDays?: number | null;
 }
 
 /**
@@ -72,6 +76,7 @@ export class AdminRewardRulesService {
         endsAt: params.endsAt ? new Date(params.endsAt) : undefined,
         approvalType: (params.approvalType as never) ?? "AUTOMATIC",
         status: "ACTIVE",
+        expiryDays: params.expiryDays,
       },
     });
   }
@@ -96,7 +101,21 @@ export class AdminRewardRulesService {
         startsAt: params.startsAt === undefined ? undefined : params.startsAt ? new Date(params.startsAt) : null,
         endsAt: params.endsAt === undefined ? undefined : params.endsAt ? new Date(params.endsAt) : null,
         approvalType: params.approvalType as never,
+        expiryDays: params.expiryDays,
       },
     });
+  }
+
+  /**
+   * 有効期限が到来した獲得OVEを失効させるバッチを手動実行する
+   * (cron等の外部スケジューラは未接続のため、当面は管理画面からの手動実行を想定。
+   * docs/credit-expiry.md「運用」参照)。
+   */
+  async runExpiryBatch() {
+    const result = await expireDueCreditLots(this.db);
+    return {
+      wallets_processed: result.walletsProcessed,
+      total_expired_amount: result.totalExpiredAmount.toString(),
+    };
   }
 }

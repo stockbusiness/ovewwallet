@@ -39,6 +39,7 @@ export class RewardsService {
       description: r.description,
       reward_amount: r.rewardAmount.toString(),
       source_service: r.sourceService,
+      expiry_days: r.expiryDays,
     }));
   }
 
@@ -90,8 +91,10 @@ export class RewardsService {
     const transactionType = request.transaction_type as TransactionType;
 
     const ruleCode = RULE_CODE_BY_TRANSACTION_TYPE[request.transaction_type];
+    let expiryDays: number | null = null;
     if (ruleCode) {
-      await this.enforceRuleLimits(ruleCode, wallet.id, transactionType, request.event_id, amount);
+      const rule = await this.enforceRuleLimits(ruleCode, wallet.id, transactionType, request.event_id, amount);
+      expiryDays = rule?.expiryDays ?? null;
     }
 
     const transaction = await creditWallet(
@@ -107,6 +110,7 @@ export class RewardsService {
         createdByType: "EXTERNAL_SERVICE",
         createdById: serviceIntegration.id,
         metadata: { eventType: request.event_type, eventId: request.event_id },
+        expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
       },
       this.db,
     );
@@ -120,9 +124,9 @@ export class RewardsService {
     transactionType: TransactionType,
     eventId: string,
     amount: bigint,
-  ): Promise<void> {
+  ) {
     const rule = await this.db.rewardRule.findUnique({ where: { ruleCode } });
-    if (!rule || rule.status !== "ACTIVE") return;
+    if (!rule || rule.status !== "ACTIVE") return rule;
 
     const now = new Date();
     if (rule.startsAt && now < rule.startsAt) {
@@ -189,5 +193,7 @@ export class RewardsService {
         throw new BadRequestException(`global_amount_limit (${rule.globalAmountLimit.toString()}) exceeded for ${ruleCode}`);
       }
     }
+
+    return rule;
   }
 }

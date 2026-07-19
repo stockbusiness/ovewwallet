@@ -21,8 +21,10 @@
 - CSV一括付与 (プレビュー→実行、同じCSVの再実行でも二重付与されない)
 - 既存ユーザー移行 (旧システムのuser_id・残高をCSVで取り込み、残高不明時はREVIEWING状態に)
 - アカウント統合(マージ) (統合元→統合先へ残高・連携情報を移管)
+- OVE有効期限・自動失効 (付与ルール単位で設定可能、有効期限が近い順にFIFO消費、
+  取消(REVERSAL)との整合性込み)
 
-詳細: `docs/ledger-rules.md`, `docs/database.md`, `docs/migration.md`
+詳細: `docs/ledger-rules.md`, `docs/database.md`, `docs/migration.md`, `docs/credit-expiry.md`
 
 ## 2. 認証・ログイン
 

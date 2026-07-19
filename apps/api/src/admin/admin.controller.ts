@@ -80,6 +80,7 @@ const CreateRewardRuleSchema = z.object({
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
   approvalType: z.enum(approvalTypeValues).optional(),
+  expiryDays: z.number().int().positive().optional(),
 });
 const UpdateRewardRuleSchema = z.object({
   ruleName: z.string().min(1).optional(),
@@ -95,6 +96,7 @@ const UpdateRewardRuleSchema = z.object({
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
   approvalType: z.enum(approvalTypeValues).optional(),
+  expiryDays: z.number().int().positive().nullable().optional(),
 });
 const CreateNoticeSchema = z.object({
   title: z.string().min(1),
@@ -507,6 +509,14 @@ export class AdminController {
     @Body(new ZodValidationPipe(UpdateRewardRuleSchema)) body: z.infer<typeof UpdateRewardRuleSchema>,
   ) {
     return this.rewardRules.update(ruleCode, body);
+  }
+
+  /** OVE有効期限バッチの手動実行 (docs/credit-expiry.md参照)。 */
+  @Post("expire-credits")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR")
+  async runExpiryBatch() {
+    return this.rewardRules.runExpiryBatch();
   }
 
   /**

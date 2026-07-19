@@ -69,6 +69,7 @@ export interface RewardRuleItem {
   status: string;
   displayName: string;
   description: string | null;
+  expiryDays: number | null;
 }
 
 export interface NoticeItem {

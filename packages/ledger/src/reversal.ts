@@ -107,6 +107,15 @@ export async function reverseTransaction(
             : { availableBalance: balanceAfter, lifetimeDebited: { increment: amount } },
       });
 
+      // 元取引がCREDITなら、対応する失効ロットを無効化する (取消により入金自体が
+      // 無かったことになるため、残額に関わらずロットごと消費・失効対象から外す)。
+      if (original.direction === "CREDIT") {
+        await tx.oveCreditLot.updateMany({
+          where: { transactionId: original.id, voidedAt: null, expiredAt: null },
+          data: { voidedAt: new Date(), remainingAmount: 0n },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           id: generateId(),

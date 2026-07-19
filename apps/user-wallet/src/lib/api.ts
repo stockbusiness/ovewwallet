@@ -93,4 +93,5 @@ export interface RewardRulePublic {
   description: string | null;
   reward_amount: string;
   source_service: string;
+  expiry_days: number | null;
 }

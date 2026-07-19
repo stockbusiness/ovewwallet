@@ -10,7 +10,13 @@ import {
   type Prisma,
 } from "@ove/database";
 import { InsufficientBalanceError, WalletNotFoundError } from "./errors";
-import { assertWalletActive, isUniqueConstraintError, lockWallet, toPositiveBigInt } from "./util";
+import {
+  assertWalletActive,
+  consumeCreditLotsFifo,
+  isUniqueConstraintError,
+  lockWallet,
+  toPositiveBigInt,
+} from "./util";
 
 type Db = PrismaClient;
 
@@ -26,6 +32,12 @@ export interface CreditWalletParams {
   createdByType: CreatedByType;
   createdById?: string;
   metadata?: Prisma.InputJsonValue;
+  /**
+   * 指定した日時が過ぎたCREDIT分をOVE有効期限バッチの対象にする
+   * (docs/credit-expiry.md参照)。付与ルールに `expiry_days` が設定されて
+   * いる場合のみ呼び出し元が計算して渡す。未指定なら失効しない。
+   */
+  expiresAt?: Date;
 }
 
 /**
@@ -84,6 +96,19 @@ export async function creditWallet(
           lifetimeCredited: { increment: amount },
         },
       });
+
+      if (params.expiresAt) {
+        await tx.oveCreditLot.create({
+          data: {
+            id: generateId(),
+            walletId: wallet.id,
+            transactionId: created.id,
+            amount,
+            remainingAmount: amount,
+            expiresAt: params.expiresAt,
+          },
+        });
+      }
 
       await tx.auditLog.create({
         data: {
@@ -189,6 +214,9 @@ export async function debitWallet(
           lifetimeDebited: { increment: amount },
         },
       });
+
+      // 有効期限が近いロットから優先的に消費する (対象ロットが無ければ何もしない)。
+      await consumeCreditLotsFifo(tx, wallet.id, amount);
 
       await tx.auditLog.create({
         data: {

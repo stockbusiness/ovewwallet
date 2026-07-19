@@ -53,3 +53,36 @@ export function isUniqueConstraintError(error: unknown): boolean {
     error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
   );
 }
+
+/**
+ * 有効期限付きロット (ove_credit_lots) のFIFO消費。DEBIT発生時に呼び出し、
+ * 有効期限が近い順にremaining_amountを減らす。対象ロットが無いウォレット
+ * (失効ポリシー未設定・全ロット消費済み等) では何もしない。
+ */
+export async function consumeCreditLotsFifo(
+  tx: Prisma.TransactionClient,
+  walletId: string,
+  amount: bigint,
+): Promise<void> {
+  let remaining = amount;
+  const lots = await tx.oveCreditLot.findMany({
+    where: {
+      walletId,
+      remainingAmount: { gt: 0n },
+      expiredAt: null,
+      voidedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { expiresAt: "asc" },
+  });
+
+  for (const lot of lots) {
+    if (remaining <= 0n) break;
+    const consumed = lot.remainingAmount < remaining ? lot.remainingAmount : remaining;
+    await tx.oveCreditLot.update({
+      where: { id: lot.id },
+      data: { remainingAmount: { decrement: consumed } },
+    });
+    remaining -= consumed;
+  }
+}

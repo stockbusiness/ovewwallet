@@ -85,6 +85,9 @@ export default function EarnOvePage() {
                 <p className="text-sm font-semibold text-sengoku-text">{r.display_name}</p>
                 {r.description && <p className="mt-0.5 text-xs leading-relaxed text-sengoku-muted">{r.description}</p>}
                 <p className="mt-1 text-xs text-sengoku-faint">{SERVICE_CODE_LABEL[r.source_service] ?? r.source_service}</p>
+                {r.expiry_days != null && (
+                  <p className="mt-1 text-xs text-sengoku-faint">獲得から{r.expiry_days}日で失効します</p>
+                )}
               </span>
               <span className="shrink-0 text-sm font-bold text-sengoku-green">
                 +{Number(r.reward_amount).toLocaleString("ja-JP")}
