@@ -1,4 +1,5 @@
 import { ChevronRightIcon } from "../icons";
+import { WalletLogo } from "./WalletLogo";
 
 export interface BalanceStat {
   label: string;
@@ -15,15 +16,15 @@ export interface BalanceCardProps {
 
 /**
  * 利用可能残高を強調表示するカード。ウォレットホームの主役要素となるよう、
- * 金のグラデーション枠とグロー、天守閣シルエットの薄い装飾を持つ。
+ * 金のグラデーション枠とグロー、円環ロゴモチーフの薄い装飾を持つ。
  */
 export function BalanceCard({ label = "利用可能残高", amount, unit = "OVE", stats = [], footnote }: BalanceCardProps) {
   return (
     <section
       className="relative overflow-hidden rounded-2xl border border-sengoku-gold/50 bg-gradient-to-br from-sengoku-navy via-sengoku-navy to-sengoku-navy-deep p-5"
-      style={{ boxShadow: "0 0 0 1px rgba(212,175,55,0.08), 0 12px 32px rgba(0,0,0,0.45), 0 0 24px rgba(212,175,55,0.1)" }}
+      style={{ boxShadow: "0 0 0 1px rgba(200,164,90,0.08), 0 12px 32px rgba(0,0,0,0.45), 0 0 24px rgba(200,164,90,0.1)" }}
     >
-      <CastleSilhouette className="pointer-events-none absolute -bottom-2 -right-4 h-32 w-32 text-sengoku-gold opacity-[0.14]" />
+      <WalletLogo className="pointer-events-none absolute -bottom-6 -right-6 h-32 w-32 text-sengoku-gold opacity-[0.14]" />
       <div className="relative z-10">
         <div className="flex items-center justify-between">
           <p className="text-sm text-sengoku-muted">{label}</p>
@@ -46,23 +47,5 @@ export function BalanceCard({ label = "利用可能残高", amount, unit = "OVE"
         {footnote && <p className="mt-3 text-xs leading-relaxed text-sengoku-faint">{footnote}</p>}
       </div>
     </section>
-  );
-}
-
-function CastleSilhouette({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 120 120" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M60 8 68 20H52Z" />
-      <rect x="55" y="18" width="10" height="10" />
-      <path d="M30 30 40 40H20Z" />
-      <path d="M90 30 100 40H80Z" />
-      <path d="M45 30 60 44 75 30 78 42H42Z" />
-      <rect x="22" y="40" width="12" height="16" />
-      <rect x="86" y="40" width="12" height="16" />
-      <rect x="46" y="42" width="28" height="20" />
-      <path d="M15 58 105 58 112 74H8Z" />
-      <rect x="8" y="74" width="104" height="38" />
-      <path d="M2 112h116v6H2Z" />
-    </svg>
   );
 }

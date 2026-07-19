@@ -1,22 +1,23 @@
 /**
- * 戦国ウォレット UIデザイン仕様 v1.0 のデザイントークン。
+ * 千の国ウォレット UIデザイン仕様 v1.0 のデザイントークン (2026-07-19改訂)。
  * Tailwind設定 (各アプリの tailwind.config.ts) と実行時の値 (グラフの線色など) の
- * 両方から、この1箇所を正として参照する。
+ * 両方から、この1箇所を正として参照する。実際の値はCSS変数 (globals.css) 側が
+ * 正であり、この定数は変数導入前からの参照互換用 (現状このオブジェクト自体を
+ * importしている箇所は無い)。
  */
 export const colors = {
-  background: "#0E0E11",
-  surface: "#0B0B0D",
-  deepNavy: "#0F1626",
-  samuraiRed: "#B3202A",
-  gold: "#D4AF37",
-  softGold: "#F5E6B3",
-  // 取引一覧・詳細の「獲得(CREDIT)」表示用。仕様書のテキストには無いが、
-  // 見本画像のピクセルサンプリングにより特定した色 (獲得=緑/利用=深紅で色分けするため)。
-  creditGreen: "#35B072",
+  background: "#0A1E3F",
+  surface: "#10264D",
+  deepNavy: "#163360",
+  samuraiRed: "#B4533C",
+  gold: "#C8A45A",
+  softGold: "#E7D6A6",
+  // 取引一覧・詳細の「獲得(CREDIT)」表示用。
+  creditGreen: "#22C55E",
   textPrimary: "#FFFFFF",
-  textSecondary: "#BFBFBF",
-  textMuted: "#7A7A7A",
-  border: "#2A2A2E",
+  textSecondary: "#D1D5DB",
+  textMuted: "#6B7280",
+  border: "#D8D2C6",
 } as const;
 
 export const radius = {

@@ -18,8 +18,8 @@ const notoSerifJp = Noto_Serif_JP({
 });
 
 export const metadata: Metadata = {
-  title: "戦国ウォレット (OVE)",
-  description: "戦国パスポート・AIアート教室などから共通利用されるOVE残高管理基盤",
+  title: "千の国ウォレット (OVE)",
+  description: "千の国パスポート・AIアート教室などから共通利用されるOVE残高管理基盤",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

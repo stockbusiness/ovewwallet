@@ -104,7 +104,7 @@ export default function AdminLoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-neutral-100">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl bg-white p-8 shadow">
-        <h1 className="mb-1 text-lg font-bold text-brand-700">OVEウォレット管理画面</h1>
+        <h1 className="mb-1 text-lg font-bold text-brand-700">千の国ウォレット管理画面</h1>
         <p className="mb-6 text-sm text-neutral-500">管理者アカウントでログインしてください。</p>
         <label className="mb-3 block text-sm font-medium">
           メールアドレス

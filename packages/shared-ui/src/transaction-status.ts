@@ -34,7 +34,7 @@ export function transactionStatusTone(status: string, direction: TransactionDire
 
 /** 取引種別コードから画面表示用の日本語名を決める (仕様書に記載のない種別はそのまま返す)。 */
 export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
-  SENGOKU_REGISTRATION_BONUS: "戦国パスポート登録特典",
+  SENGOKU_REGISTRATION_BONUS: "千の国パスポート登録特典",
   AIART_ATTENDANCE_REWARD: "AIアート教室参加特典",
   REGISTRATION_BONUS: "登録特典",
   AIART_ATTENDANCE: "AIアート教室参加特典",
@@ -51,7 +51,7 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
 
 /** サービスコード (ServiceCode enum) から画面表示用の日本語名を決める。 */
 export const SERVICE_CODE_LABEL: Record<string, string> = {
-  SENGOKU_PASSPORT: "戦国パスポート",
+  SENGOKU_PASSPORT: "千の国パスポート",
   AIART: "AIアート教室",
   SENGOKU_GACHA: "戦国ガチャ",
   SENGOKU_EC: "戦国EC",

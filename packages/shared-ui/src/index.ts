@@ -16,4 +16,5 @@ export * from "./components/InfoCard";
 export * from "./components/AuthButton";
 export * from "./components/ThemeToggle";
 export * from "./components/RankBadge";
+export * from "./components/WalletLogo";
 export * from "./theme";

@@ -1,9 +1,35 @@
-# UIデザインシステム「戦国ウォレット UIデザイン仕様 v1.0」
+# UIデザインシステム「千の国ウォレット UIデザイン仕様 v1.0」
 
 ユーザー向け10画面 (ログイン・ウォレットホーム・取引履歴一覧・取引詳細・メニュー・
 連携サービス・貯める・使う・お知らせ・ログイン中の端末) と、管理画面のダッシュボード
-画面を、戦国ウォレット UIデザイン仕様 v1.0 (黒・濃紺・金・深紅を基調としたデザイン) で
-実装した。ダーク/ライト両モードに対応している (後述)。
+画面を実装した。ダーク/ライト両モードに対応している (後述)。
+
+## 2026-07-19: 「戦国ウォレット」から「千の国ウォレット」へのブランド刷新
+
+プロジェクト名の変更に伴い、UI表示のみを刷新した (リポジトリ名・ルート・コード上の
+識別子 — `sengoku`を含む変数名・CSS変数名・Prismaの`ServiceCode`enum値等 — は
+変更していない。ユーザーからの明示的な指示によるスコープ限定)。
+
+- **プロダクト名の表示**: 「戦国ウォレット」→「千の国ウォレット」(英語表記:
+  SEN NO KUNI WALLET)。ページタイトル・ヘッダー・ログイン画面・管理ダッシュボード
+  見出し・利用規約/OVEについて画面の本文で置換した。
+- **ロゴ**: 兜モチーフ (`KabutoMark`, `AppHeader.tsx`) と天守閣シルエット
+  (`CastleSilhouette`, `BalanceCard.tsx`) を廃止し、千輪紋 (円環を輪状に並べた
+  モチーフ) + ウォレットの意匠による`WalletLogo`共通コンポーネント
+  (`packages/shared-ui/src/components/WalletLogo.tsx`) に置き換えた。指示書
+  「戦国専用モチーフ（武将、甲冑、城の大きな背景）は共通UIでは使わない」に対応。
+- **ログイン画面の演出**: 霧の山並み・城のシルエットを描画していた`CastleHero`を
+  廃止し、`WalletLogo`を中心に据えた`WalletHero`に置き換えた
+  (`apps/user-wallet/src/app/login/page.tsx`)。旧CastleHero専用のCSS変数
+  (`--hero-sky`, `--hero-mountain-back`, `--hero-mountain-front`) も削除した。
+- **配色**: デザイントークンの値をDeep Indigo/Gold基調に更新 (下表参照)。
+  CSS変数名 (`--sengoku-gold`等) は既存コードとの互換のため維持し、値のみ変更した。
+- **「戦国パスポート」→「千の国パスポート」**: ログインボタン・
+  `SERVICE_CODE_LABEL.SENGOKU_PASSPORT`・`TRANSACTION_TYPE_LABEL.SENGOKU_REGISTRATION_BONUS`
+  の表示ラベルを変更 (プラットフォーム共通のログイン手段としての表示名のため)。
+  一方、`戦国ガチャ`/`戦国EC`/`戦国メタバース` (`SENGOKU_GACHA`/`SENGOKU_EC`/
+  `SENGOKU_METAVERSE`) は「戦国の国」固有のサービス名として意図的にそのまま残した
+  (千の国ウォレットは複数の「国」の共通基盤であり、戦国の国はその1つという位置付け)。
 
 ## デザイントークン
 
@@ -16,21 +42,24 @@ importせず、値を複製して保守性より安定性を優先している�
 `bg-sengoku-gold/10` のような透過度モディファイアもそのまま使える
 (詳細は後述「ダーク/ライトテーマ」参照)。
 
+2026-07-19、千の国ブランドへの刷新に伴い値をDeep Indigo/Gold基調へ更新
+(変数名は既存コードとの互換のため維持):
+
 | トークン名 | ダーク値 | ライト値 | 用途 |
 |---|---|---|---|
-| `sengoku-bg` | `#0E0E11` | `#F7F4EC` | ページ背景 |
-| `sengoku-surface` | `#0B0B0D` | `#FFFFFF` | ボトムナビ等の重ね面 |
-| `sengoku-navy` | `#0F1626` | `#FFFFFF` | カード背景 |
-| `sengoku-navy-deep` | `#030304` | `#EFEAD9` | より濃い/淡い背景 (CastleHero空など) |
-| `sengoku-red` | `#B3202A` | `#B3202A` | 重要操作・選択状態 (プライマリボタン、失効バッジ、選択中タブ) |
-| `sengoku-gold` | `#D4AF37` | `#9A6F0F` | 主要アクセント (残高・獲得金額・見出しリンク) |
-| `sengoku-gold-soft` | `#F5E6B3` | `#8A6A2F` | 金の淡色バリアント (単位表示など) |
-| `sengoku-green` | `#35B072` | `#1E8F57` | 「獲得(CREDIT)」表示 (取引一覧・詳細で利用=赤と色分け) |
-| `sengoku-text` | `#FFFFFF` | `#1A1A1A` | 本文・見出し文字 |
-| `sengoku-muted` | `#BFBFBF` | `#5B5B5B` | 補助文字 |
-| `sengoku-faint` | `#7A7A7A` | `#8A8A8A` | 準備中表示などの弱い文字 |
-| `sengoku-border` | `#2A2A2E` | `#E3DFD3` | 境界線 |
-| `sengoku-ink` | `#0F1626` (固定) | `#0F1626` (固定) | テーマに関わらず常に濃紺のまま固定したい箇所 (白背景ボタンの文字色など) |
+| `sengoku-bg` | `#0A1E3F` (Deep Indigo) | `#F7F5F0` (Off-White) | ページ背景 |
+| `sengoku-surface` | `#10264D` (Surface Indigo) | `#FFFFFF` | ボトムナビ等の重ね面 |
+| `sengoku-navy` | `#163360` (Surface Indigo 2) | `#FFFFFF` | カード背景 |
+| `sengoku-navy-deep` | `#061124` | `#EBE5D6` | より濃い/淡い背景 (WalletHeroの上端グラデーションなど) |
+| `sengoku-red` | `#B4533C` (Debit Red-Brown) | `#B4533C` | 重要操作・選択状態 (プライマリボタン、失効バッジ、選択中タブ) |
+| `sengoku-gold` | `#C8A45A` (Gold) | `#96762A` | 主要アクセント (残高・獲得金額・見出しリンク) |
+| `sengoku-gold-soft` | `#E7D6A6` (Soft Gold) | `#82622B` | 金の淡色バリアント (単位表示など) |
+| `sengoku-green` | `#22C55E` (Success Green) | `#14A048` | 「獲得(CREDIT)」表示 (取引一覧・詳細で利用=赤と色分け) |
+| `sengoku-text` | `#FFFFFF` (Text On Dark) | `#111827` (Text Primary Dark) | 本文・見出し文字 |
+| `sengoku-muted` | `#D1D5DB` (Text Muted On Dark) | `#374151` (Text Secondary Dark) | 補助文字 |
+| `sengoku-faint` | `#949EAD` | `#6B7280` (Muted Gray) | 準備中表示などの弱い文字 |
+| `sengoku-border` | `#283E64` | `#D8D2C6` (Border Light) | 境界線 |
+| `sengoku-ink` | `#0A1E3F` (Deep Indigo・固定) | `#0A1E3F` (固定) | テーマに関わらず常に濃紺のまま固定したい箇所 (白背景ボタンの文字色など) |
 
 フォントは `next/font/google` の Noto Sans JP (本文) / Noto Serif JP (見出し、
 `font-heading`) を両アプリの `layout.tsx` でCSS変数として読み込んでいる。

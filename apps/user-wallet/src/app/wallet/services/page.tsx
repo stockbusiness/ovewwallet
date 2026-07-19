@@ -50,7 +50,7 @@ export default function LinkedServicesPage() {
       )}
 
       <p className="text-xs leading-relaxed text-sengoku-muted">
-        OVEウォレットと連携しているサービス一覧です。連携すると、各サービスでのOVE獲得・利用が同じウォレットに反映されます。
+        千の国ウォレットと連携しているサービス一覧です。連携すると、各サービスでのOVE獲得・利用が同じウォレットに反映されます。
       </p>
 
       {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}

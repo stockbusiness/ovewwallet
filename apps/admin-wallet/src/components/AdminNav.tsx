@@ -35,7 +35,7 @@ export default function AdminNav() {
   return (
     <nav className="flex items-center justify-between border-b border-neutral-200 bg-white px-6 py-3">
       <div className="flex items-center gap-6">
-        <span className="font-bold text-brand-700">OVE管理画面</span>
+        <span className="font-bold text-brand-700">千の国ウォレット管理画面</span>
         <ul className="flex gap-4 text-sm">
           {LINKS.map((link) => (
             <li key={link.href}>

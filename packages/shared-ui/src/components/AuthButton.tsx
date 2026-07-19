@@ -10,12 +10,12 @@ export interface AuthButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   icon?: ReactNode;
 }
 
-// これらは戦国パスポート/LINE/メールいずれもブランド上「常にこの配色」の指定
+// これらは千の国パスポート/LINE/メールいずれもブランド上「常にこの配色」の指定
 // (仕様書5章)であり、ライト/ダークテーマの影響を受けない固定色で統一する。
 const VARIANT_CLASSES: Record<AuthButtonVariant, string> = {
   line: "bg-[#06C755] text-white hover:bg-[#05b34c] active:bg-[#049a42]",
   email: "bg-white text-sengoku-ink border border-black/10 hover:bg-white/90 active:bg-white/85",
-  sengoku: "bg-black text-white border border-sengoku-gold/40 hover:bg-white/5 active:bg-white/10",
+  sengoku: "bg-sengoku-ink text-white border border-sengoku-gold/40 hover:bg-white/5 active:bg-white/10",
 };
 
 const ICON_WRAP_CLASSES: Record<AuthButtonVariant, string> = {
@@ -24,7 +24,7 @@ const ICON_WRAP_CLASSES: Record<AuthButtonVariant, string> = {
   sengoku: "bg-transparent text-sengoku-gold",
 };
 
-/** ログイン画面の認証手段選択ボタン (LINE=緑/メール=白/戦国パスポート=黒)。常に横幅いっぱいのピル型。 */
+/** ログイン画面の認証手段選択ボタン (LINE=緑/メール=白/千の国パスポート=藍)。常に横幅いっぱいのピル型。 */
 export function AuthButton({ children, variant, icon, className = "", ...props }: AuthButtonProps) {
   return (
     <button

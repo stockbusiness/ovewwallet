@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon } from "@ove/shared-ui";
+import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon, WalletLogo } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
 import {
   isLiffConfigured,
@@ -210,7 +210,7 @@ export default function LoginPage() {
       });
       router.push("/wallet");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "戦国パスポートIDでのログインに失敗しました");
+      setError(err instanceof ApiError ? err.message : "千の国パスポートIDでのログインに失敗しました");
     } finally {
       setLoading(null);
     }
@@ -218,15 +218,15 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-sengoku-bg pb-10">
-      <CastleHero compact={view !== "choose"} />
+      <WalletHero compact={view !== "choose"} />
       <ThemeToggle className="absolute right-4 top-4 z-20 bg-black/20 backdrop-blur" />
 
       <div className="relative z-10 flex flex-1 flex-col gap-8 px-6">
         {view === "choose" && (
           <div className="flex flex-col gap-4">
             <div className="text-center">
-              <h2 className="text-lg font-bold text-sengoku-text">OVEウォレットへようこそ</h2>
-              <p className="mt-1 text-sm text-sengoku-muted">あなたの価値を、未来へつなぐ</p>
+              <h2 className="text-lg font-bold text-sengoku-text">千の国ウォレットへようこそ</h2>
+              <p className="mt-1 text-sm text-sengoku-muted">千の物語と活動を、ひとつにつなぐ</p>
             </div>
             <AuthButton
               variant="line"
@@ -256,7 +256,7 @@ export default function LoginPage() {
               }}
               disabled={loading !== null}
             >
-              戦国パスポートIDでログイン
+              千の国パスポートIDでログイン
             </AuthButton>
             <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <Link href="/terms" className="text-center text-xs font-medium text-sengoku-gold underline underline-offset-2">
@@ -337,7 +337,7 @@ export default function LoginPage() {
         {view === "sengoku" && (
           <form onSubmit={loginWithSengokuPassport} className="flex flex-col gap-4">
             <label className="text-sm font-semibold text-sengoku-text">
-              戦国パスポート会員ID
+              千の国パスポート会員ID
               <input
                 type="text"
                 required
@@ -350,7 +350,7 @@ export default function LoginPage() {
             </label>
             <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
-              {loading === "sengoku" ? "連携中..." : "戦国パスポートIDでログイン"}
+              {loading === "sengoku" ? "連携中..." : "千の国パスポートIDでログイン"}
             </PrimaryButton>
             <button
               type="button"
@@ -412,85 +412,34 @@ function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: 
 }
 
 /**
- * ログイン画面上部の演出。霧の山並み・城のシルエット・金の円弧モチーフ・
- * ロゴロックアップをすべてCSS/SVGで構成する (画像素材は使わない)。
+ * ログイン画面上部の演出。千の国ウォレットの円環ロゴモチーフを中心に据える
+ * (2026-07-19、千の国ブランドへの刷新に伴い旧CastleHero(霧の山並み・城の
+ * シルエット)を置き換え。戦国専用モチーフは共通UIに残さない方針のため)。
  * choose以外のビュー(メール入力等)ではcompactにして操作の邪魔をしない。
  */
-function CastleHero({ compact }: { compact: boolean }) {
+function WalletHero({ compact }: { compact: boolean }) {
   return (
     <div className={`relative overflow-hidden transition-[height] duration-300 ${compact ? "h-40" : "h-[52vh] min-h-[340px]"}`}>
-      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--hero-sky))] via-sengoku-bg to-sengoku-bg" />
-
-      {/* 霧 (常に白系。夜霧・朝霧どちらの配色でも自然に馴染むため固定色) */}
-      <div className="absolute left-[8%] top-6 h-24 w-40 rounded-full bg-white/20 blur-2xl" />
-      <div className="absolute right-[10%] top-16 h-28 w-48 rounded-full bg-white/20 blur-2xl" />
-      <div className="absolute left-1/3 top-2 h-20 w-56 rounded-full bg-white/10 blur-3xl" />
-
-      {/* 山並み (奥) */}
-      <svg
-        className="absolute inset-x-0 bottom-0 h-3/4 w-full text-[rgb(var(--hero-mountain-back))]"
-        viewBox="0 0 400 200"
-        preserveAspectRatio="none"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M0 200V90l30-18 25 14 40-32 35 22 25-12 45 26 20-10 35 18 25-14 45 24 20-8 40 20 30-16 30 16V200Z" />
-      </svg>
-      {/* 山並み (手前・城のシルエット) */}
-      <svg
-        className="absolute inset-x-0 bottom-0 h-3/5 w-full text-[rgb(var(--hero-mountain-front))]"
-        viewBox="0 0 400 160"
-        preserveAspectRatio="none"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M0 160v-55l35-16 20 10 15-22 10 12 20-8 30 20 10-14 12 10 8-6 30 18 15-10 40 20 30-14 10 8 40-6 45 20V160Z" />
-        <path d="M182 79h8v-8h-8Z" />
-        <path d="M175 71l11-12 11 12-4 8h-14Z" />
-      </svg>
+      <div className="absolute inset-0 bg-gradient-to-b from-sengoku-navy-deep via-sengoku-bg to-sengoku-bg" />
 
       {!compact && (
-        <div className="absolute inset-x-0 top-[22%] flex justify-center">
-          <div className="relative flex h-44 w-44 items-center justify-center sm:h-52 sm:w-52">
-            <GoldArc className="absolute inset-0 h-full w-full text-sengoku-gold/80" />
-            <div className="relative text-center">
-              <p className="font-heading text-4xl font-bold leading-tight text-sengoku-text sm:text-5xl">戦国</p>
-              <p className="mt-1 text-sm font-semibold tracking-[0.35em] text-sengoku-gold">WALLET</p>
-            </div>
+        <div className="absolute inset-x-0 top-[18%] flex flex-col items-center gap-4">
+          <WalletLogo className="h-28 w-28 text-sengoku-gold sm:h-32 sm:w-32" />
+          <div className="text-center">
+            <p className="font-heading text-3xl font-bold leading-tight text-sengoku-text sm:text-4xl">千の国ウォレット</p>
+            <p className="mt-1 text-xs font-semibold tracking-[0.35em] text-sengoku-gold">SEN NO KUNI WALLET</p>
           </div>
         </div>
       )}
 
       {compact && (
-        <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center">
-          <p className="font-heading text-2xl font-bold text-sengoku-text">
-            戦国<span className="ml-1.5 text-xs font-semibold tracking-[0.3em] text-sengoku-gold">WALLET</span>
-          </p>
+        <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-center gap-2">
+          <WalletLogo className="h-8 w-8 text-sengoku-gold" />
+          <p className="font-heading text-xl font-bold text-sengoku-text">千の国ウォレット</p>
         </div>
       )}
 
       <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-sengoku-bg to-transparent" />
     </div>
-  );
-}
-
-/** 手描き風の金の円弧 (筆で描いたような、一部が途切れた円)。 */
-function GoldArc({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 200 200" className={className} aria-hidden="true">
-      <circle
-        cx="100"
-        cy="100"
-        r="88"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="5"
-        strokeLinecap="round"
-        strokeDasharray="430 120"
-        strokeDashoffset="60"
-        transform="rotate(-38 100 100)"
-        opacity="0.9"
-      />
-    </svg>
   );
 }
