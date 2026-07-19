@@ -11,7 +11,7 @@
 | アカウント一覧 | `/accounts` | 一覧・状態(PENDING/ACTIVE/RESTRICTED/REVIEWING/LOCKED/CLOSED/MERGED)での絞り込み・ウォレットへのリンク |
 | ウォレット一覧 | `/wallets` | 一覧・詳細へのリンク |
 | ウォレット詳細 | `/wallets/[walletId]` | 残高・個別付与/減算/保留・保留解除・最近の取引 |
-| 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向)・取消 |
+| 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向/取引種別)・取消。取引種別で`EXPIRATION`/`DAILY_LOGIN_BONUS`等を絞り込むことで、失効バッチや継続ログインボーナスの実行履歴確認にも使える |
 | CSV一括付与 | `/bulk-grants` | CSVアップロード・プレビュー・実行・結果サマリ |
 | 外部サービス管理 | `/service-integrations` | 一覧・緊急停止・再開 |
 | 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ・検証待ち(REVIEWING)アカウント一覧 (`docs/migration.md`) |

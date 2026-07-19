@@ -7,6 +7,32 @@ import { apiFetch, ApiError, type TransactionItem } from "@/lib/api";
 
 const STATUS_OPTIONS = ["", "COMPLETED", "HELD", "REVERSED", "FAILED"];
 const DIRECTION_OPTIONS = ["", "CREDIT", "DEBIT"];
+const TRANSACTION_TYPE_OPTIONS = [
+  "",
+  "REGISTRATION_BONUS",
+  "AIART_ATTENDANCE",
+  "EVENT_REWARD",
+  "CAMPAIGN_REWARD",
+  "REFERRAL_REWARD",
+  "PURCHASE_REWARD",
+  "GACHA_REWARD",
+  "DAILY_LOGIN_BONUS",
+  "ADMIN_GRANT",
+  "ADMIN_DEDUCTION",
+  "OPENING_BALANCE",
+  "GACHA_TICKET_EXCHANGE",
+  "COUPON_EXCHANGE",
+  "ITEM_EXCHANGE",
+  "HOLD",
+  "RELEASE",
+  "REVERSAL",
+  "RECOVERY",
+  "ACCOUNT_MERGE_IN",
+  "ACCOUNT_MERGE_OUT",
+  "BLOCKCHAIN_MIGRATION",
+  "MIGRATION_REVERSAL",
+  "EXPIRATION",
+];
 
 export default function TransactionsPage() {
   const router = useRouter();
@@ -14,6 +40,7 @@ export default function TransactionsPage() {
   const [accountCode, setAccountCode] = useState("");
   const [status, setStatus] = useState("");
   const [direction, setDirection] = useState("");
+  const [transactionType, setTransactionType] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -23,6 +50,7 @@ export default function TransactionsPage() {
       if (accountCode) params.set("accountCode", accountCode);
       if (status) params.set("status", status);
       if (direction) params.set("direction", direction);
+      if (transactionType) params.set("transactionType", transactionType);
       params.set("limit", "200");
       const list = await apiFetch<TransactionItem[]>(`/api/v1/admin/transactions?${params.toString()}`);
       setTransactions(list);
@@ -30,7 +58,7 @@ export default function TransactionsPage() {
       if (err instanceof ApiError && err.status === 401) router.push("/login");
       else setError("読み込みに失敗しました");
     }
-  }, [router, accountCode, status, direction]);
+  }, [router, accountCode, status, direction, transactionType]);
 
   useEffect(() => {
     load();
@@ -93,6 +121,20 @@ export default function TransactionsPage() {
               {DIRECTION_OPTIONS.map((d) => (
                 <option key={d} value={d}>
                   {d || "すべて"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs">
+            種別
+            <select
+              value={transactionType}
+              onChange={(e) => setTransactionType(e.target.value)}
+              className="mt-1 block w-48 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+            >
+              {TRANSACTION_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t || "すべて"}
                 </option>
               ))}
             </select>
