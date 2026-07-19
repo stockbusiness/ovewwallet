@@ -71,6 +71,16 @@ export interface RewardRuleItem {
   description: string | null;
 }
 
+export interface NoticeItem {
+  id: string;
+  title: string;
+  message: string;
+  status: "PUBLISHED" | "DRAFT" | "ARCHIVED";
+  publishedAt: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface TransactionItem {
   id: string;
   transaction_code: string;

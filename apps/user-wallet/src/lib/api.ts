@@ -80,6 +80,13 @@ export interface LinkedService {
   linked_at: string | null;
 }
 
+export interface Notice {
+  id: string;
+  title: string;
+  message: string;
+  published_at: string;
+}
+
 export interface RewardRulePublic {
   rule_code: string;
   display_name: string;

@@ -40,6 +40,15 @@ enum IdentityStatus {
   REVOKED
 }
 
+enum NoticeStatus {
+  /// ユーザー向けウォレット画面に表示される
+  PUBLISHED
+  /// 管理画面でのみ確認できる下書き状態
+  DRAFT
+  /// 表示終了 (削除はせず非表示にする)
+  ARCHIVED
+}
+
 enum ServiceCode {
   SENGOKU_PASSPORT
   AIART
@@ -761,4 +770,19 @@ model WalletReferralBenefit {
   @@unique([benefitType, lineUserIdHash])
   @@index([walletUserId])
   @@map("wallet_referral_benefits")
+}
+
+/// ウォレットホーム画面「お知らせ」で表示するお知らせ (管理画面から作成・削除する)。
+model Notice {
+  id          String       @id
+  title       String
+  message     String
+  status      NoticeStatus @default(PUBLISHED)
+  publishedAt DateTime     @default(now()) @map("published_at")
+  createdBy   String       @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@index([status, publishedAt])
+  @@map("notices")
 }

@@ -42,6 +42,12 @@ export class MeController {
   async linkedServices(@Req() req: AuthenticatedUserRequest) {
     return this.wallets.listLinkedServices(req.account.id);
   }
+
+  @Get("notices")
+  @UseGuards(SessionAuthGuard)
+  async notices() {
+    return this.wallets.listPublicNotices();
+  }
 }
 
 /**

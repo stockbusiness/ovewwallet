@@ -87,6 +87,21 @@ export class WalletsService {
       };
     });
   }
+
+  /** ウォレットホーム画面「お知らせ」向け。公開中のお知らせを新しい順に返す。 */
+  async listPublicNotices() {
+    const notices = await this.db.notice.findMany({
+      where: { status: "PUBLISHED" },
+      orderBy: { publishedAt: "desc" },
+      take: 20,
+    });
+    return notices.map((n) => ({
+      id: n.id,
+      title: n.title,
+      message: n.message,
+      published_at: n.publishedAt.toISOString(),
+    }));
+  }
 }
 
 export function serializeTransaction(t: {

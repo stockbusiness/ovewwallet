@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/transactions", label: "取引一覧" },
   { href: "/bulk-grants", label: "CSV一括付与" },
   { href: "/reward-rules", label: "付与ルール管理" },
+  { href: "/notices", label: "お知らせ管理" },
   { href: "/service-integrations", label: "外部サービス管理" },
   { href: "/agency-links", label: "代理店連携状態" },
   { href: "/wallet-referrals", label: "紹介トークン受け入れ" },

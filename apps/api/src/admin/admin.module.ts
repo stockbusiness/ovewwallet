@@ -10,6 +10,7 @@ import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
+import { AdminNoticesService } from "./admin-notices.service";
 import { AccountsModule } from "../accounts/accounts.module";
 
 @Module({
@@ -26,6 +27,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminRewardRulesService,
     AdminAgencyLinksService,
     AdminWalletReferralsService,
+    AdminNoticesService,
   ],
 })
 export class AdminModule {}

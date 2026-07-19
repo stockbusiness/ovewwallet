@@ -20,13 +20,14 @@ import {
   MenuIcon,
   ThemeToggle,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type TransactionSummary, type WalletBalance } from "@/lib/api";
+import { apiFetch, ApiError, type OveAccount, type TransactionSummary, type WalletBalance, type Notice } from "@/lib/api";
 
 export default function WalletTopPage() {
   const router = useRouter();
   const [account, setAccount] = useState<OveAccount | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +47,15 @@ export default function WalletTopPage() {
           return;
         }
         setError("読み込みに失敗しました");
+        return;
+      }
+      // お知らせは補助的な情報のため、取得に失敗してもホーム画面自体は表示する
+      // (デプロイのタイミング差でこのエンドポイントだけ未反映という事態が過去に
+      // 実際に発生したため、致命的な扱いにしない)。
+      try {
+        setNotices(await apiFetch<Notice[]>("/api/v1/me/notices"));
+      } catch {
+        setNotices([]);
       }
     })();
   }, [router]);
@@ -87,12 +97,15 @@ export default function WalletTopPage() {
           ]}
         />
 
-        <InfoCard
-          title="お知らせ"
-          message="現在のOVEは、OVEウォレット内で管理されるサービス内ポイントです。現時点ではブロックチェーン上の暗号資産ではありません。"
-          actionLabel="すべて見る"
-          actionHref="/about"
-        />
+        {notices.length > 0 && (
+          <InfoCard
+            title="お知らせ"
+            message={notices[0].title}
+            date={new Date(notices[0].published_at).toLocaleDateString("ja-JP")}
+            actionLabel="すべて見る"
+            actionHref="/wallet/notices"
+          />
+        )}
 
         <section>
           <SectionHeader title="最近の取引" actionLabel="すべて見る" actionHref="/wallet/transactions" />

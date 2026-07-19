@@ -13,6 +13,7 @@ import { AdminApprovalService } from "./admin-approval.service";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
+import { AdminNoticesService } from "./admin-notices.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -95,6 +96,10 @@ const UpdateRewardRuleSchema = z.object({
   endsAt: z.string().datetime().nullable().optional(),
   approvalType: z.enum(approvalTypeValues).optional(),
 });
+const CreateNoticeSchema = z.object({
+  title: z.string().min(1),
+  message: z.string().min(1),
+});
 
 @ApiTags("admin")
 @Controller("api/v1/admin")
@@ -109,6 +114,7 @@ export class AdminController {
     private readonly rewardRules: AdminRewardRulesService,
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly walletReferrals: AdminWalletReferralsService,
+    private readonly notices: AdminNoticesService,
   ) {}
 
   /**
@@ -544,5 +550,30 @@ export class AdminController {
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
   async walletReferralDetail(@Param("id") id: string): Promise<unknown> {
     return this.walletReferrals.detail(id);
+  }
+
+  /** お知らせ管理 (ウォレットホーム画面「お知らせ」の作成元)。 */
+  @Get("notices")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
+  async listNotices() {
+    return this.notices.list();
+  }
+
+  @Post("notices")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "EVENT_OPERATOR")
+  async createNotice(
+    @Body(new ZodValidationPipe(CreateNoticeSchema)) body: z.infer<typeof CreateNoticeSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.notices.create(body, req.admin.id);
+  }
+
+  @Post("notices/:id/archive")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "EVENT_OPERATOR")
+  async archiveNotice(@Param("id") id: string) {
+    return this.notices.archive(id);
   }
 }
