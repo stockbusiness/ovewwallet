@@ -33,5 +33,11 @@
 ## 動作確認
 
 `apps/api/src/e2e/referral-status.test.ts` (2件): 紹介登録でないユーザーへの応答、
-紹介登録済みユーザーへのPENDING状態の返却を検証済み。実ブラウザでの確認は未実施
+紹介登録済みユーザーへのPENDING状態の返却を検証済み。
+
+2026-07-19、Playwrightによる実ブラウザ確認を実施し、紹介登録でない通常ユーザーの
+`/wallet/menu`画面に「紹介登録特典」セクションが表示されないこと (取得失敗ではなく
+`referred: false`による非表示) を確認した。紹介登録URL経由での新規登録から
+`CONFIRMED`/`PENDING`状態が実際に画面表示されるまでの一連の流れは、
+`ENABLE_WALLET_REFERRAL_TOKEN=true`を設定した起動が必要なため今回は未実施
 (今後の課題)。

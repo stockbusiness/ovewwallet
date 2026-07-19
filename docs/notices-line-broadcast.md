@@ -31,6 +31,10 @@
   チャネルアクセストークンは別途LINE Developersコンソールで発行する必要がある。
 - 実際のLINE Messaging APIチャネルを使った結合テストは未実施 (単体テストで
   `fetch`をモックした範囲のみ検証済み、`apps/api/src/notices/line-broadcast.service.test.ts`)。
+  2026-07-19、Playwrightによる実ブラウザ確認では`LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`
+  未設定の環境で重要度`IMPORTANT`のお知らせ作成を実行し、no-op経路でエラーなく
+  お知らせ作成自体が成功することを確認した。実際のLINEチャネルへの配信確認は
+  引き続き未実施。
 
 ## 設定
 

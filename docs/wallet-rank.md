@@ -29,4 +29,10 @@
 `getWalletRank`/`getNextWalletRank`のロジックは`tsx`での手動実行で境界値
 (しきい値ちょうど・最高位到達時のnull)を確認済み。`packages/shared-ui`には
 テストランナーが導入されていないため (`tsc --noEmit`のみ)、自動テストは追加して
-いない。実ブラウザでの表示確認は未実施 (今後の課題)。
+いない。
+
+2026-07-19、Playwrightによる実ブラウザ確認を実施し、初期状態で「足軽」と表示される
+ことを確認した。その過程で、**継続ログインボーナス受け取り後にランク表示の
+累計獲得量が古いまま更新されない不具合**を発見した (`docs/daily-login-bonus.md`
+参照)。`wallet/page.tsx`の`claimDailyBonus()`が`available_balance`のみを
+楽観的に更新し`lifetime_credited`を更新していなかったことが原因で、修正済み。
