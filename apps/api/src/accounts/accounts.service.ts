@@ -1,4 +1,11 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   generateId,
   nextDisplayCode,
@@ -54,7 +61,15 @@ export class AccountsService {
       },
       include: { account: true },
     });
-    if (existing) return existing.account;
+    if (existing) {
+      // 退会済みアカウントへの再ログインは拒否する (docs/account-closure.md参照)。
+      // 同じidentityで新規アカウントを再作成することもしない (同一のLINEユーザーID等で
+      // 何度も退会/再登録を繰り返す抜け道を作らないため)。
+      if (existing.account.status === "CLOSED") {
+        throw new ForbiddenException("this account has been closed");
+      }
+      return existing.account;
+    }
 
     if (!params.termsAccepted) {
       throw new BadRequestException("terms of service agreement is required to create a new account");
@@ -224,6 +239,48 @@ export class AccountsService {
       where: { id: sessionId },
       data: { revokedAt: new Date(), revokeReason: "USER_REVOKED_DEVICE" },
     });
+  }
+
+  /**
+   * ユーザー本人による退会 (docs/account-closure.md参照)。残高(available/held)が
+   * 0でなければ拒否する (使い切ってから退会してもらう、失効ではなく利用を促す方針)。
+   * 成功時はアカウントをCLOSEDにし、有効なセッションを全て失効させる。
+   */
+  async requestClosure(oveAccountId: string): Promise<{ closed: true }> {
+    const account = await this.db.oveAccount.findUnique({ where: { id: oveAccountId } });
+    if (!account) throw new NotFoundException("account not found");
+    if (account.status === "CLOSED") throw new ConflictException("account is already closed");
+
+    const wallet = await this.db.wallet.findUnique({ where: { oveAccountId } });
+    if (wallet && (wallet.availableBalance > 0n || wallet.heldBalance > 0n)) {
+      throw new BadRequestException("available_balance and held_balance must be zero before closing the account");
+    }
+
+    await this.db.$transaction(async (tx) => {
+      await tx.oveAccount.update({
+        where: { id: oveAccountId },
+        data: { status: "CLOSED", closedAt: new Date() },
+      });
+
+      await tx.userSession.updateMany({
+        where: { oveAccountId, revokedAt: null },
+        data: { revokedAt: new Date(), revokeReason: "USER_ACCOUNT_CLOSURE" },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: "USER",
+          actorId: oveAccountId,
+          actionType: "ACCOUNT_CLOSED",
+          targetType: "ove_account",
+          targetId: oveAccountId,
+          result: "SUCCESS",
+        },
+      });
+    });
+
+    return { closed: true };
   }
 }
 

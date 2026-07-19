@@ -285,3 +285,4 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/wallet-rank.md` | 累計獲得OVEに応じたランク/称号表示 |
 | `docs/daily-login-bonus.md` | 継続ログイン/デイリーボーナス |
 | `docs/login-devices.md` | ユーザー向けログインデバイス一覧 |
+| `docs/account-closure.md` | ユーザー向け退会/アカウント削除フロー |

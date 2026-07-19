@@ -29,6 +29,13 @@ export class AccountsController {
     return { ok: true };
   }
 
+  /** ユーザー本人による退会 (docs/account-closure.md参照)。 */
+  @Post("me/close")
+  @UseGuards(SessionAuthGuard)
+  async close(@Req() req: AuthenticatedUserRequest) {
+    return this.accounts.requestClosure(req.account.id);
+  }
+
   @Get(":oveAccountId")
   async getById(@Param("oveAccountId") oveAccountId: string) {
     const account = await this.accounts.getById(oveAccountId);

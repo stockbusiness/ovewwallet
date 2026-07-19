@@ -30,6 +30,9 @@ export class SessionAuthGuard implements CanActivate {
 
     const account = await this.db.oveAccount.findUnique({ where: { id: session.oveAccountId } });
     if (!account) throw new UnauthorizedException("account not found");
+    // 退会済みアカウント向けにセッションが残っていた場合の保険 (通常は退会処理自体で
+    // 全セッションを失効させるため通らないはずだが、多層防御として置く)。
+    if (account.status === "CLOSED") throw new UnauthorizedException("this account has been closed");
 
     await this.db.userSession.update({
       where: { id: session.id },

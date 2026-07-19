@@ -30,6 +30,7 @@ export default function WalletMenuPage() {
   const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [closingAccount, setClosingAccount] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -65,6 +66,29 @@ export default function WalletMenuPage() {
       // ログアウトAPIが失敗してもローカルでは遷移させる (セッション切れ等)
     } finally {
       router.push("/login");
+    }
+  }
+
+  async function closeAccount() {
+    if (!window.confirm("退会すると、このアカウントには二度とログインできなくなります。よろしいですか？")) return;
+
+    setError(null);
+    setClosingAccount(true);
+    try {
+      await apiFetch("/api/v1/accounts/me/close", { method: "POST" });
+      // 退会成功時点でサーバー側のセッションは既に失効しているため、ここでのlogout呼び出しは
+      // ブラウザ側のCookieを消すためだけのもの (失敗しても退会自体は成立している)。
+      await apiFetch("/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+      router.push("/login");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.status === 400
+            ? "残高が残っているため退会できません。OVEを使い切ってから再度お試しください。"
+            : err.message
+          : "退会に失敗しました",
+      );
+      setClosingAccount(false);
     }
   }
 
@@ -123,6 +147,15 @@ export default function WalletMenuPage() {
         className="rounded-xl border border-sengoku-red/40 bg-sengoku-red/10 py-3 text-sm font-bold text-sengoku-red transition-colors hover:bg-sengoku-red/15 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loggingOut ? "ログアウト中..." : "ログアウト"}
+      </button>
+
+      <button
+        type="button"
+        onClick={closeAccount}
+        disabled={closingAccount}
+        className="py-2 text-xs text-sengoku-faint underline disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {closingAccount ? "退会処理中..." : "退会する"}
       </button>
 
       <BottomNavigation
