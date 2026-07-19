@@ -145,6 +145,80 @@ Explore agentによるコードベース横断調査で、実運用に足りな�
   sengoku-ai.com側API仕様待ちで存在せず、cronだけ追加しても再試行の消費が早まるだけで
   実益が無いため保留。
 
+## フェーズ9: UI刷新v2・ライトモード・未実装4画面・お知らせ機能・不具合修正 (2026-07-19)
+
+「戦国ウォレット UIデザイン仕様 v1.0」への完全準拠を目指した2回目のUI刷新と、
+それ以降にユーザーから報告された不具合の修正、および未実装のまま「準備中」
+トースト止まりだった4画面の実装を行った。
+
+### 9.1 UI刷新v2 (仕様書完全準拠版)
+
+- ログイン画面にCastleHero(自作SVGの山並み演出)・AuthButton(認証方式ごとの
+  配色・アイコン出し分け)を追加。
+- `TransactionItem`/`StatusBadge`を「獲得=緑・利用=赤」の色分けに変更
+  (`sengoku-green`トークン新設)。
+- `AppHeader`/`ActionGrid`/`InfoCard`コンポーネントを新規作成し、ウォレットホームを
+  再構築。`BalanceCard`に金枠グロー・城シルエット装飾を追加。
+- 375px/768px/1280pxでレスポンシブ再確認・スクリーンショット確認。
+
+### 9.2 ライトモード追加
+
+- CSS変数 (`globals.css`の`:root`/`[data-theme="light"]`) + `data-theme`属性による
+  切り替え方式を採用。Tailwind側は`rgb(var(--sengoku-x) / <alpha-value>)`方式で
+  参照するため、透過度モディファイア (`bg-sengoku-gold/10`等) も両テーマで機能する。
+- `packages/shared-ui/src/theme.ts` (`applyTheme()`/`getCurrentTheme()`/
+  `THEME_INIT_SCRIPT`) と `ThemeToggle`コンポーネントを新規作成。
+  `THEME_INIT_SCRIPT`は`layout.tsx`の`<head>`に同期実行スクリプトとして埋め込み、
+  ハイドレーション前に属性を確定させてFOUCを防止。
+- ログイン画面・ウォレットホーム・管理ダッシュボードに`ThemeToggle`を設置。
+- 詳細: `docs/ui-design.md`「ダーク/ライトテーマ」。
+
+### 9.3 不具合修正: 未実装メニューの無反応
+
+`ActionGrid`/`BottomNavigation`の未実装項目 (`href`なし) が非活性な`<div>`扱いで
+タップしても無反応だった問題を、タップ時に「準備中」トーストを表示する方式に修正
+(ユーザー報告「メニューなどクリックしても反応しない」への対応)。
+
+### 9.4 未実装4画面の実装
+
+計画に基づき、それまで「準備中」トースト止まりだった4画面を実装:
+
+- `GET /api/v1/me/linked-services` / `GET /api/v1/rewards/public` を新設。
+- `/wallet/menu` (アカウント情報・残高サマリ・ログアウト)、`/wallet/services`
+  (連携サービス一覧)、`/wallet/earn` (貯める方法一覧)、`/wallet/use`
+  (使えるサービス一覧・残高表示) を実装。
+
+### 9.5 不具合修正: 「読み込み中」固まり (エラーハンドリング統一)
+
+多くの画面のエラーハンドリングが`err.status === 401`のみを処理し、それ以外の
+エラー (5xx・ネットワークエラー等) では何もせず`null`のまま放置していたため、
+「読み込み中」表示のまま画面が固まる (一覧画面では空リストのまま無言で表示される)
+問題を発見。新設4画面・取引履歴一覧・管理ダッシュボードおよび管理画面12画面
+(`agency-links`/`wallets`/`wallets/[walletId]`/`audit-logs`/`api-access-logs`/
+`approval-requests`/`reward-rules`/`outbox`/`service-integrations`/`accounts`/
+`accounts/[accountId]`/`security`) に、エラー状態の保持・表示を追加して修正。
+
+### 9.6 お知らせ機能
+
+- `Notice`モデル・`NoticeStatus`enumを追加 (Prismaマイグレーション)。
+- 管理画面 `/notices`: お知らせの作成・公開・アーカイブ。
+- `GET /api/v1/me/notices`: ウォレットホーム (最新1件をInfoCardに表示、
+  詳細不明時のためお知らせ取得は本体データ取得と別のtry/catchに分離し、失敗しても
+  ホーム画面自体は表示する設計) / `/wallet/notices` (全件一覧) から利用。
+
+### 9.7 不具合修正: ログアウト後の再ログインで「unexpected error」
+
+ユーザー報告 (ログアウトして再ログインすると遷移しなくなる、「unexpected error」表示)
+を、デバッグログのタイムスタンプと画面表示時刻の照合により、iOSのLIFF pageshow
+リロード対策で保存済みIDトークンを複数回再送する構成上、期限切れトークンでの
+再送が発生していることを特定。根本原因は`LineIdTokenVerifier.verifyIdToken()`
+(および`SengokuSsoService.exchangeCode()`・`AgencySsoVerifier.verify()`) が
+検証失敗時に素の`Error`を投げ、呼び出し元で捕捉されないまま`ledger-exception.filter.ts`
+の汎用500フォールバックに落ちていたこと (本番投入前から存在していた既存バグ)。
+`auth.service.ts`に3つのラッパーメソッド (`verifyLineIdToken`/
+`exchangeSengokuSsoCode`/`verifyAgencySso`) を追加し、検証失敗を`UnauthorizedException`
+として401で返すよう修正。ユーザー確認済み (「ログインできました」)。
+
 ## 未着手・今後の課題
 
 `docs/project-status.md` 6章「未実装・今後の課題」および各機能ドキュメントの
@@ -156,3 +230,5 @@ Explore agentによるコードベース横断調査で、実運用に足りな�
 - LINE本番連携の実チャネルでの結合テスト。
 - ステージング環境、コンプライアンス文書 (個人情報保護・データ保持ポリシー)、
   本番相当の負荷テストは業務判断・外部契約が絡むため未着手。
+- 後発5画面 (メニュー・連携サービス・貯める・使う・お知らせ一覧) の768px/1280px
+  確認、管理画面「お知らせ管理」の1280px確認 (`docs/ui-design.md`「レスポンシブ確認」参照)。

@@ -46,16 +46,23 @@
 
 | 画面 | パス | 内容 |
 |---|---|---|
-| ログイン | `/login` | LINE / メール / 戦国パスポートIDの3方式 + 利用規約同意 |
-| ウォレットホーム | `/wallet` | 残高表示 |
+| ログイン | `/login` | LINE / メール / 戦国パスポートIDの3方式 + 利用規約同意、ダーク/ライト切替 |
+| ウォレットホーム | `/wallet` | 残高表示・クイックアクション・お知らせ (最新1件) |
 | 取引履歴一覧 | `/wallet/transactions` | 獲得/利用/失効フィルタ |
 | 取引詳細 | `/wallet/transactions/[transactionId]` | 個別取引の詳細 |
+| メニュー | `/wallet/menu` | アカウント情報・残高サマリ・ログアウト |
+| 連携サービス | `/wallet/services` | 外部サービスとの連携状況一覧 (`GET /api/v1/me/linked-services`) |
+| 貯める | `/wallet/earn` | OVEを貯める方法の一覧 (公開付与ルール、`GET /api/v1/rewards/public`) |
+| 使う | `/wallet/use` | OVEを使える連携サービス一覧・残高表示 |
+| お知らせ一覧 | `/wallet/notices` | 運営からのお知らせ全件 (`GET /api/v1/me/notices`) |
 | 紹介リンク受付 | `/invite/[token]` | 代理店紹介URLの受付 (Cookie発行後ログインへリダイレクト) |
 | 利用規約 | `/terms` | 規約本文 |
 | このアプリについて | `/about` | サービス説明 |
 
 「戦国ウォレット UIデザイン仕様 v1.0」(黒・濃紺・金・深紅) に基づくデザイン。
-375px/768px/1280pxでレスポンシブ確認済み。詳細: `docs/ui-design.md`
+ダーク/ライト両テーマ対応 (CSS変数 + `ThemeToggle`)。375px幅で全画面確認済み、
+うちログイン・ウォレットホーム・取引履歴一覧・取引詳細の4画面は768px/1280pxでも
+確認済み。詳細: `docs/ui-design.md`
 
 ## 4. 管理画面 (`apps/admin-wallet`, PC向け)
 
@@ -78,6 +85,7 @@
 | 外部連携キュー | `/outbox` | Transactional Outboxの一覧・絞り込み・試行回数/エラー確認・手動再送 |
 | 代理店連携状態一覧 | `/agency-links` | 代理店システムとの連携状態を一覧・絞り込み・詳細確認 |
 | 代理店紹介一覧 | `/wallet-referrals` | 紹介トークン受け入れ状況・登録特典の状態を確認 (Phase 1: 確認のみ、手動確定/取消はPhase 3) |
+| お知らせ管理 | `/notices` | ユーザー向けお知らせの作成・公開・アーカイブ (`GET/POST /api/v1/admin/notices`, `POST /api/v1/admin/notices/:id/archive`) |
 
 詳細: `docs/admin-operations.md`
 

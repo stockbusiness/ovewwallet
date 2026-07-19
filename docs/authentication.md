@@ -41,6 +41,22 @@
 実際のIDトークン検証→アカウント作成→ウォレット画面表示までの動作を確認済み。LINEから
 受け取ったプロフィールをそのまま信用しない方針(サーバー側検証必須)は維持している。
 
+### 検証失敗時のエラーハンドリング (2026-07-19修正)
+
+`LineAuthVerifier.verifyIdToken()` (および同様に `SengokuSsoService.exchangeCode()`・
+`AgencySsoVerifier.verify()`) は、期限切れ・無効なトークン等の検証失敗時に素の`Error`を
+投げる実装だった。これを呼び出し元 (`auth.service.ts`) で捕捉していなかったため、
+NestJSのデフォルト処理で原因不明の500として扱われ、`LedgerExceptionFilter`の汎用
+フォールバックメッセージ (`"unexpected error"`) がそのままクライアントに返っていた
+(本番投入前から存在していた既存バグ。iOSのLIFF `pageshow`リロード対策で保存済み
+IDトークンを複数回再送する構成上、期限切れトークンでの再送は通常のフローとして
+発生しうるため、ユーザー影響のある不具合として顕在化した)。
+
+`auth.service.ts`に private な検証ラッパー (`verifyLineIdToken`/`exchangeSengokuSsoCode`/
+`verifyAgencySso`) を追加し、各verifierの例外を捕捉して`UnauthorizedException`として
+再送出するよう修正した。これにより検証失敗は常に401 (`{"message": "...", "error":
+"Unauthorized", "statusCode": 401}`) として返るようになり、原因不明の500は発生しない。
+
 ### フロントエンド (`apps/user-wallet`) 側のLINEログイン (2026-07-18実装・実チャネル結合試験完了)
 
 `apps/user-wallet/src/lib/liff.ts` が `@line/liff` を使ったLIFFログインフローを実装する。
