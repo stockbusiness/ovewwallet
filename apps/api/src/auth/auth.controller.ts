@@ -5,10 +5,15 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
 import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/shared-types";
-import { AuthService } from "./auth.service";
+import { AuthService, type SessionMeta } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS } from "../referrals/referrals.controller";
+
+/** ログインデバイス一覧向けに、リクエストから接続元情報を取り出す。 */
+function sessionMetaFromRequest(req: Request): SessionMeta {
+  return { ipAddress: req.ip, userAgent: req.headers["user-agent"] };
+}
 
 const RequestOtpSchema = z.object({ email: z.string().email() });
 const VerifyOtpSchema = z.object({
@@ -42,9 +47,15 @@ export class AuthController {
   @Post("email/verify-otp")
   async verifyOtp(
     @Body(new ZodValidationPipe(VerifyOtpSchema)) body: z.infer<typeof VerifyOtpSchema>,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.verifyEmailOtpAndLogin(body.email, body.code, body.termsAccepted);
+    const session = await this.auth.verifyEmailOtpAndLogin(
+      body.email,
+      body.code,
+      body.termsAccepted,
+      sessionMetaFromRequest(req),
+    );
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }
@@ -58,7 +69,12 @@ export class AuthController {
   ) {
     const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
     try {
-      const session = await this.auth.loginWithLineMock(body.idToken, body.termsAccepted, referralCookieToken);
+      const session = await this.auth.loginWithLineMock(
+        body.idToken,
+        body.termsAccepted,
+        referralCookieToken,
+        sessionMetaFromRequest(req),
+      );
       setSessionCookie(res, session.token, session.expiresAt);
       return { ove_account_id: session.oveAccountId };
     } finally {
@@ -84,9 +100,10 @@ export class AuthController {
   @Post("sso/sengoku/exchange")
   async ssoExchange(
     @Body(new ZodValidationPipe(SsoExchangeSchema)) body: z.infer<typeof SsoExchangeSchema>,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithSengokuSso(body.code, body.termsAccepted);
+    const session = await this.auth.loginWithSengokuSso(body.code, body.termsAccepted, sessionMetaFromRequest(req));
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }
@@ -95,9 +112,10 @@ export class AuthController {
   @Post("sso/agency")
   async agencySsoLogin(
     @Body(new ZodValidationPipe(AgencySsoLoginRequestSchema)) body: AgencySsoLoginRequest,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.auth.loginWithAgencySso(body.token, body.termsAccepted);
+    const session = await this.auth.loginWithAgencySso(body.token, body.termsAccepted, sessionMetaFromRequest(req));
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
   }

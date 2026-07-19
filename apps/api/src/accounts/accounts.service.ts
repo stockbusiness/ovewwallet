@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   generateId,
   nextDisplayCode,
@@ -190,4 +190,70 @@ export class AccountsService {
       return account;
     });
   }
+
+  /**
+   * ログインデバイス一覧 (docs/login-devices.md参照)。有効なセッションのみ返す
+   * (失効済み・期限切れは含めない)。`currentSessionId`と一致する行にはis_currentを立てる。
+   */
+  async listSessions(oveAccountId: string, currentSessionId: string) {
+    const sessions = await this.db.userSession.findMany({
+      where: { oveAccountId, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { issuedAt: "desc" },
+    });
+
+    return sessions.map((s) => ({
+      id: s.id,
+      device_label: summarizeUserAgent(s.userAgent),
+      ip_address: s.ipAddress,
+      issued_at: s.issuedAt.toISOString(),
+      last_used_at: s.lastUsedAt ? s.lastUsedAt.toISOString() : null,
+      is_current: s.id === currentSessionId,
+    }));
+  }
+
+  /**
+   * 本人によるログインデバイスの個別ログアウト。他人のセッションIDを指定しても
+   * 404になる (`oveAccountId`でスコープするため)。
+   */
+  async revokeSession(oveAccountId: string, sessionId: string): Promise<void> {
+    const session = await this.db.userSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.oveAccountId !== oveAccountId) throw new NotFoundException("session not found");
+    if (session.revokedAt) throw new ForbiddenException("session already revoked");
+
+    await this.db.userSession.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date(), revokeReason: "USER_REVOKED_DEVICE" },
+    });
+  }
+}
+
+/** User-Agent文字列から画面表示用の簡易ラベルを作る (専用ライブラリは使わない軽量実装)。 */
+function summarizeUserAgent(userAgent: string | null): string {
+  if (!userAgent) return "不明な端末";
+
+  const os = userAgent.includes("iPhone")
+    ? "iPhone"
+    : userAgent.includes("iPad")
+      ? "iPad"
+      : userAgent.includes("Android")
+        ? "Android"
+        : userAgent.includes("Mac OS X")
+          ? "Mac"
+          : userAgent.includes("Windows")
+            ? "Windows"
+            : "不明なOS";
+
+  const browser = userAgent.includes("Edg/")
+    ? "Edge"
+    : userAgent.includes("Chrome/")
+      ? "Chrome"
+      : userAgent.includes("CriOS/")
+        ? "Chrome"
+        : userAgent.includes("Safari/") && !userAgent.includes("Chrome/")
+          ? "Safari"
+          : userAgent.includes("Firefox/")
+            ? "Firefox"
+            : "不明なブラウザ";
+
+  return `${os} / ${browser}`;
 }

@@ -57,6 +57,7 @@
 | 貯める | `/wallet/earn` | OVEを貯める方法の一覧 (公開付与ルール、`GET /api/v1/rewards/public`) |
 | 使う | `/wallet/use` | OVEを使える連携サービス一覧・残高表示 |
 | お知らせ一覧 | `/wallet/notices` | 運営からのお知らせ全件 (`GET /api/v1/me/notices`) |
+| ログイン中の端末 | `/wallet/devices` | 有効なセッション一覧・個別ログアウト (`docs/login-devices.md`) |
 | 紹介リンク受付 | `/invite/[token]` | 代理店紹介URLの受付 (Cookie発行後ログインへリダイレクト) |
 | 利用規約 | `/terms` | 規約本文 |
 | このアプリについて | `/about` | サービス説明 |

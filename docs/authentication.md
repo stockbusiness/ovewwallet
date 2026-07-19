@@ -10,6 +10,9 @@
   `SessionAuthGuard` でこのセッションを検証し、`req.account.id` から本人のOVEアカウントを
   特定する。URLで `oveAccountId` を受け取らないため、他人の残高・取引を推測URLで
   参照することはできない (開発ガイドライン12.1章に対応。`docs/external-api.md` 参照)。
+- 2026-07-19: ログイン時に接続元の`ip_address`/`user_agent`を`user_sessions`へ記録する
+  ようにした (ユーザー向けログインデバイス一覧向け、`docs/login-devices.md`参照)。
+  `SessionAuthGuard`は検証済みセッションIDを`req.sessionId`に積み、「この端末」判定に使う。
 
 ## メールワンタイムコード
 

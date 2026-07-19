@@ -89,6 +89,15 @@ export interface Notice {
   is_read: boolean;
 }
 
+export interface LoginDevice {
+  id: string;
+  device_label: string;
+  ip_address: string | null;
+  issued_at: string;
+  last_used_at: string | null;
+  is_current: boolean;
+}
+
 export interface DailyBonusStatus {
   claimed_today: boolean;
   current_streak: number;

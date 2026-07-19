@@ -111,6 +111,7 @@ export default function WalletMenuPage() {
         <MenuLink href="/wallet/services" label="連携サービス" />
         <MenuLink href="/wallet/earn" label="OVEを貯める" />
         <MenuLink href="/wallet/use" label="OVEを使う" />
+        <MenuLink href="/wallet/devices" label="ログイン中の端末" />
         <MenuLink href="/about" label="OVEについて" />
         <MenuLink href="/terms" label="利用規約" />
       </section>

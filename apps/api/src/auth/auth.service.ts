@@ -18,6 +18,12 @@ import { AccountsService } from "../accounts/accounts.service";
 import { AgencyService } from "../agency/agency.service";
 import { ReferralsService } from "../referrals/referrals.service";
 
+/** ログインデバイス一覧 (docs/login-devices.md参照) 向けに記録する接続元情報。 */
+export interface SessionMeta {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 @Injectable()
 export class AuthService {
   private readonly emailOtp: EmailOtpService;
@@ -57,7 +63,12 @@ export class AuthService {
     return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
   }
 
-  async verifyEmailOtpAndLogin(email: string, code: string, termsAccepted?: boolean) {
+  async verifyEmailOtpAndLogin(
+    email: string,
+    code: string,
+    termsAccepted?: boolean,
+    sessionMeta?: SessionMeta,
+  ) {
     let ok: boolean;
     try {
       ok = await this.emailOtp.verify(email, code);
@@ -76,7 +87,7 @@ export class AuthService {
       email,
       termsAccepted,
     });
-    return this.createSessionForAccount(account.id);
+    return this.createSessionForAccount(account.id, sessionMeta);
   }
 
   /**
@@ -85,7 +96,12 @@ export class AuthService {
    * (紹介なしでも登録自体は止めない)。新規アカウント作成時のみ、紹介関係の紐付けを
    * アカウント作成と同一トランザクションで行う。
    */
-  async loginWithLineMock(idToken: string, termsAccepted?: boolean, referralCookieToken?: string) {
+  async loginWithLineMock(
+    idToken: string,
+    termsAccepted?: boolean,
+    referralCookieToken?: string,
+    sessionMeta?: SessionMeta,
+  ) {
     const claims = await this.verifyLineIdToken(idToken);
     const referral = await this.referrals.resolvePendingSession(referralCookieToken);
     const account = await this.accounts.findOrCreateByIdentity({
@@ -98,7 +114,7 @@ export class AuthService {
         ? (tx, newAccount) => this.referrals.attachToNewAccount(tx, referral, newAccount, claims.lineUserId)
         : undefined,
     });
-    return this.createSessionForAccount(account.id);
+    return this.createSessionForAccount(account.id, sessionMeta);
   }
 
   /** 戦国パスポート側 (モック) がSSOコードを発行する。開発・テスト専用エンドポイントで使う。 */
@@ -106,7 +122,7 @@ export class AuthService {
     return this.sengokuSso.issueCode(sengokuMemberId);
   }
 
-  async loginWithSengokuSso(code: string, termsAccepted?: boolean) {
+  async loginWithSengokuSso(code: string, termsAccepted?: boolean, sessionMeta?: SessionMeta) {
     const { sengokuMemberId } = await this.exchangeSengokuSsoCode(code);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "PASSKEY",
@@ -114,14 +130,14 @@ export class AuthService {
       providerSubject: sengokuMemberId,
       termsAccepted,
     });
-    return this.createSessionForAccount(account.id);
+    return this.createSessionForAccount(account.id, sessionMeta);
   }
 
   /**
    * sengoku-ai.com代理店システムのSSO (外部連携API仕様書12章)。
    * RS256+JWKSでJWTを検証し、external_id/subでOVEアカウントを解決してログインさせる。
    */
-  async loginWithAgencySso(token: string, termsAccepted?: boolean) {
+  async loginWithAgencySso(token: string, termsAccepted?: boolean, sessionMeta?: SessionMeta) {
     const claims = await this.verifyAgencySso(token);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "SENGOKU_AGENCY",
@@ -148,7 +164,7 @@ export class AuthService {
         },
       });
     }
-    return this.createSessionForAccount(account.id);
+    return this.createSessionForAccount(account.id, sessionMeta);
   }
 
   async logout(token: string): Promise<void> {
@@ -193,7 +209,7 @@ export class AuthService {
     }
   }
 
-  private async createSessionForAccount(oveAccountId: string) {
+  private async createSessionForAccount(oveAccountId: string, sessionMeta?: SessionMeta) {
     const issued = issueSession();
     await this.db.userSession.create({
       data: {
@@ -201,6 +217,8 @@ export class AuthService {
         oveAccountId,
         sessionTokenHash: issued.tokenHash,
         expiresAt: issued.expiresAt,
+        ipAddress: sessionMeta?.ipAddress,
+        userAgent: sessionMeta?.userAgent,
       },
     });
     return { token: issued.token, expiresAt: issued.expiresAt, oveAccountId };

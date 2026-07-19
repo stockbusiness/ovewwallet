@@ -6,6 +6,8 @@ import { PRISMA } from "./prisma.module";
 
 export interface AuthenticatedUserRequest extends Request {
   account: OveAccount;
+  /** ログインデバイス一覧で「この端末」を判定するための、現在のリクエストのセッションID。 */
+  sessionId: string;
 }
 
 /** OVE独自セッションCookieを検証し、req.account にログイン中のアカウントを積む。 */
@@ -35,6 +37,7 @@ export class SessionAuthGuard implements CanActivate {
     });
 
     (req as AuthenticatedUserRequest).account = account;
+    (req as AuthenticatedUserRequest).sessionId = session.id;
     return true;
   }
 }
