@@ -19,6 +19,8 @@ const envSchema = z.object({
   LINE_CHANNEL_SECRET: z.string().optional().default(""),
   LINE_LIFF_ID: z.string().optional().default(""),
   LINE_CALLBACK_URL: z.string().optional().default(""),
+  // お知らせのLINE配信連携 (docs/notices-line-broadcast.md参照)。未設定時は配信をスキップする。
+  LINE_MESSAGING_CHANNEL_ACCESS_TOKEN: z.string().optional().default(""),
 
   EMAIL_FROM: z.string().optional().default(""),
   EMAIL_PROVIDER: z.string().optional().default("mock"),

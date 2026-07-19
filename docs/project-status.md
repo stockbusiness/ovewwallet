@@ -279,3 +279,4 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/test/LIMITED_RELEASE_TEST_PLAN.md` | 限定公開フェーズ試験計画 |
 | `docs/roadmap.md` | 次に進めるための作業手順 (P0〜P3の順番付きチェックリスト、担当者付き) |
 | `docs/credit-expiry.md` | OVE有効期限・自動失効 (付与ルール単位で設定、FIFO消費) |
+| `docs/notices-line-broadcast.md` | お知らせのLINE配信連携 (LINE Messaging API broadcast) |
