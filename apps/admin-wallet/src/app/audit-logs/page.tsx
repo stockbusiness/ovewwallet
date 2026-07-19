@@ -8,6 +8,7 @@ import { apiFetch, ApiError, type AuditLogItem } from "@/lib/api";
 export default function AuditLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -15,7 +16,11 @@ export default function AuditLogsPage() {
         const list = await apiFetch<AuditLogItem[]>("/api/v1/admin/audit-logs?limit=200");
         setLogs(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -26,6 +31,7 @@ export default function AuditLogsPage() {
       <main className="mx-auto max-w-5xl p-6">
         <h1 className="mb-4 text-xl font-bold">管理者操作ログ</h1>
         <p className="mb-4 text-xs text-neutral-500">監査ログは削除できません (指示書16章)。</p>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>

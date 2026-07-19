@@ -20,7 +20,11 @@ export default function SecuritySettingsPage() {
       const data = await apiFetch<AdminMe>("/api/v1/admin/me");
       setMe(data);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }
 

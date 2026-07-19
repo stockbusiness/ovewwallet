@@ -41,7 +41,11 @@ export default function WalletDetailPage() {
       const data = await apiFetch<WalletDetail>(`/api/v1/admin/wallets/${params.walletId}`);
       setWallet(data);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [params.walletId, router]);
 
@@ -95,6 +99,7 @@ export default function WalletDetailPage() {
     }
   }
 
+  if (!wallet && error) return <p className="p-6 text-sm text-red-600">{error}</p>;
   if (!wallet) return <p className="p-6 text-sm text-neutral-500">読み込み中...</p>;
 
   return (

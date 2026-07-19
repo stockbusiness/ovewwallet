@@ -9,6 +9,7 @@ import { apiFetch, ApiError, type WalletListItem } from "@/lib/api";
 export default function WalletsPage() {
   const router = useRouter();
   const [wallets, setWallets] = useState<WalletListItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -16,7 +17,11 @@ export default function WalletsPage() {
         const list = await apiFetch<WalletListItem[]>("/api/v1/admin/wallets?limit=200");
         setWallets(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -26,6 +31,7 @@ export default function WalletsPage() {
       <AdminNav />
       <main className="mx-auto max-w-5xl p-6">
         <h1 className="mb-4 text-xl font-bold">ウォレット一覧</h1>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>

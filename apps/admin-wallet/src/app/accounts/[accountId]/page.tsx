@@ -23,8 +23,15 @@ export default function AccountDetailPage() {
       const data = await apiFetch<AccountDetailItem>(`/api/v1/admin/accounts/${params.accountId}`);
       setAccount(data);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
-      else if (err instanceof ApiError && err.status === 404) setError("アカウントが見つかりません");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (err instanceof ApiError && err.status === 404) {
+        setError("アカウントが見つかりません");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [params.accountId, router]);
 

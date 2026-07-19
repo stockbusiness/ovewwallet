@@ -33,7 +33,11 @@ export default function ApprovalRequestsPage() {
       const list = await apiFetch<ApprovalRequestItem[]>("/api/v1/admin/approval-requests");
       setRequests(list);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [router]);
 

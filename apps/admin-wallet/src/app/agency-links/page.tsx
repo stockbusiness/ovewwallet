@@ -27,14 +27,20 @@ export default function AgencyLinksPage() {
   const [items, setItems] = useState<AgencyLinkItem[]>([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const query = statusFilter ? `?status=${statusFilter}` : "";
       const list = await apiFetch<AgencyLinkItem[]>(`/api/v1/admin/agency-links${query}`);
       setItems(list);
+      setError(null);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [router, statusFilter]);
 
@@ -52,6 +58,8 @@ export default function AgencyLinksPage() {
           OVEアカウントとの紐付け状態。「未紐付け」は同期のみ受信済みで、まだSSOログインが
           行われていない状態 (詳細は docs/agency-integration.md 参照)。
         </p>
+
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
           <label htmlFor="statusFilter">状態:</label>

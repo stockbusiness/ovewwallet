@@ -9,6 +9,7 @@ export default function ApiAccessLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<ApiAccessLogItem[]>([]);
   const [statusCode, setStatusCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -17,7 +18,11 @@ export default function ApiAccessLogsPage() {
         const list = await apiFetch<ApiAccessLogItem[]>(`/api/v1/admin/api-access-logs?limit=200${query}`);
         setLogs(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router, statusCode]);
@@ -30,6 +35,7 @@ export default function ApiAccessLogsPage() {
         <p className="mb-4 text-xs text-neutral-500">
           外部サービスAPI (指示書11章) へのリクエスト履歴。認証失敗も含めて記録される。
         </p>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         <div className="mb-4 flex items-center gap-2 text-sm">
           <label htmlFor="statusCode">ステータスコード:</label>
           <input

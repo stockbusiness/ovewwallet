@@ -15,7 +15,11 @@ export default function ServiceIntegrationsPage() {
       const list = await apiFetch<ServiceIntegrationItem[]>("/api/v1/admin/service-integrations");
       setItems(list);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [router]);
 

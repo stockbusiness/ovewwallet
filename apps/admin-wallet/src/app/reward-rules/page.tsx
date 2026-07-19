@@ -33,7 +33,11 @@ export default function RewardRulesPage() {
       const list = await apiFetch<RewardRuleItem[]>("/api/v1/admin/reward-rules");
       setRules(list);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [router]);
 

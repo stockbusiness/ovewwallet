@@ -9,6 +9,7 @@ import { apiFetch, ApiError, type AccountListItem } from "@/lib/api";
 export default function AccountsPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<AccountListItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -16,7 +17,11 @@ export default function AccountsPage() {
         const list = await apiFetch<AccountListItem[]>("/api/v1/admin/accounts?limit=200");
         setAccounts(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -31,6 +36,7 @@ export default function AccountsPage() {
             アカウント統合
           </Link>
         </div>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
           <thead className="bg-neutral-50 text-xs text-neutral-500">
             <tr>

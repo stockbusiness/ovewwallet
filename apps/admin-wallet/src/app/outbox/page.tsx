@@ -32,6 +32,7 @@ export default function OutboxPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [destinationFilter, setDestinationFilter] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +49,11 @@ export default function OutboxPage() {
       setEvents(eventList);
       setFlags(flagList);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) router.push("/login");
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
     }
   }, [router, statusFilter, destinationFilter]);
 
@@ -88,6 +93,7 @@ export default function OutboxPage() {
           代理店システム等への連携イベントの送信状況。開発ガイドライン10章 (Transactional Outbox) に基づき、
           送信失敗時は指数バックオフで自動再送し、上限到達後は「失敗」として手動再送が必要になる。
         </p>
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
         <section className="mb-6 rounded-lg border border-neutral-200 bg-white p-4">
           <h2 className="mb-3 text-sm font-semibold">Feature Flag (開発ガイドライン13章)</h2>
