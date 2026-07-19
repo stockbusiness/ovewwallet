@@ -50,7 +50,7 @@
 |---|---|---|
 | ログイン | `/login` | LINE / メール / 戦国パスポートIDの3方式 + 利用規約同意、ダーク/ライト切替 |
 | ウォレットホーム | `/wallet` | 残高表示・クイックアクション・お知らせ (最新1件)・保留中残高の内訳 (`GET /api/v1/me/wallet/holds`、進行中の保留のみ理由・金額・保留日を表示)・累計獲得OVEに応じた階級表示 (`docs/wallet-rank.md`)・継続ログインボーナス (`docs/daily-login-bonus.md`) |
-| 取引履歴一覧 | `/wallet/transactions` | 獲得/利用/失効フィルタ |
+| 取引履歴一覧 | `/wallet/transactions` | 獲得/利用/失効フィルタ、CSVダウンロード (`docs/transaction-export.md`) |
 | 取引詳細 | `/wallet/transactions/[transactionId]` | 個別取引の詳細 |
 | メニュー | `/wallet/menu` | アカウント情報・残高サマリ・紹介登録特典状況 (紹介登録済みの場合のみ、`docs/referral-status.md`)・ログアウト・退会 (`docs/account-closure.md`) |
 | 連携サービス | `/wallet/services` | 外部サービスとの連携状況一覧 (`GET /api/v1/me/linked-services`) |

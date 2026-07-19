@@ -144,6 +144,43 @@ export class WalletsService {
       held_at: h.heldAt.toISOString(),
     }));
   }
+
+  /**
+   * 自分の取引履歴CSVエクスポート (docs/transaction-export.md参照)。
+   * `GET /me/transactions`(一覧画面用、100件上限)とは別に、全件相当を返す
+   * (直近10,000件を上限とし、無制限のフルスキャンは避ける)。
+   */
+  async exportTransactionsCsv(oveAccountId: string): Promise<string> {
+    const wallet = await this.requireWalletForAccount(oveAccountId);
+    const transactions = await this.db.oveTransaction.findMany({
+      where: { walletId: wallet.id },
+      orderBy: { occurredAt: "desc" },
+      take: 10000,
+    });
+
+    const header = ["取引コード", "日時", "種別", "方向", "金額", "状態", "取引後残高", "内容"];
+    const rows = transactions.map((t) => [
+      t.transactionCode,
+      t.occurredAt.toISOString(),
+      t.transactionType,
+      t.direction === "CREDIT" ? "獲得" : "利用",
+      t.amount.toString(),
+      t.status,
+      t.balanceAfter.toString(),
+      t.displayName,
+    ]);
+
+    // Excel(日本語版)でも文字化けせず開けるよう、UTF-8 BOM付きで返す。
+    const BOM = "﻿";
+    return BOM + [header, ...rows].map((row) => row.map(csvEscapeField).join(",")).join("\r\n");
+  }
+}
+
+function csvEscapeField(value: string): string {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }
 
 export function serializeTransaction(t: {

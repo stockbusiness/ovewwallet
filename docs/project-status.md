@@ -286,3 +286,4 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/daily-login-bonus.md` | 継続ログイン/デイリーボーナス |
 | `docs/login-devices.md` | ユーザー向けログインデバイス一覧 |
 | `docs/account-closure.md` | ユーザー向け退会/アカウント削除フロー |
+| `docs/transaction-export.md` | 自分の取引履歴CSVエクスポート |

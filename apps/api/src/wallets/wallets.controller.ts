@@ -1,5 +1,6 @@
-import { Controller, Get, Param, Post, Query, Req, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query, Req, Res, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import type { Response } from "express";
 import { WalletsService } from "./wallets.service";
 import { ReferralsService } from "../referrals/referrals.service";
 import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
@@ -33,6 +34,20 @@ export class MeController {
     @Query("before") before?: string,
   ) {
     return this.wallets.listTransactions(req.account.id, limit ? Number(limit) : undefined, before);
+  }
+
+  /**
+   * 取引履歴CSVエクスポート (docs/transaction-export.md参照)。動的セグメント
+   * `transactions/:transactionId` より前に登録し、"export"がtransactionIdとして
+   * 誤って解決されないようにする。
+   */
+  @Get("transactions/export")
+  @UseGuards(SessionAuthGuard)
+  async exportTransactions(@Req() req: AuthenticatedUserRequest, @Res() res: Response) {
+    const csv = await this.wallets.exportTransactionsCsv(req.account.id);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="transactions.csv"');
+    res.send(csv);
   }
 
   @Get("transactions/:transactionId")

@@ -9,6 +9,7 @@ import {
   TRANSACTION_TYPE_LABEL,
   ArrowLeftIcon,
   FilterIcon,
+  DownloadIcon,
   HomeIcon,
   ClockIcon,
   GiftIcon,
@@ -47,6 +48,26 @@ export default function TransactionHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("ALL");
+  const [exporting, setExporting] = useState(false);
+
+  async function downloadCsv() {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/v1/me/transactions/export", { credentials: "include" });
+      if (!res.ok) throw new Error("failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "transactions.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("CSVのダウンロードに失敗しました");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -86,6 +107,15 @@ export default function TransactionHistoryPage() {
         </Link>
         <h1 className="flex-1 font-heading text-lg font-bold text-sengoku-text">取引履歴</h1>
         <ThemeToggle className="h-8 w-8 border-none" />
+        <button
+          type="button"
+          onClick={downloadCsv}
+          disabled={exporting}
+          aria-label="CSVダウンロード"
+          className="flex h-8 w-8 items-center justify-center text-sengoku-muted disabled:opacity-50"
+        >
+          <DownloadIcon className="h-5 w-5" />
+        </button>
         <span className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <FilterIcon className="h-5 w-5" />
         </span>
