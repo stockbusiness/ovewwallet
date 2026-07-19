@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Req, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query, Req, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { WalletsService } from "./wallets.service";
 import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
@@ -45,8 +45,14 @@ export class MeController {
 
   @Get("notices")
   @UseGuards(SessionAuthGuard)
-  async notices() {
-    return this.wallets.listPublicNotices();
+  async notices(@Req() req: AuthenticatedUserRequest) {
+    return this.wallets.listPublicNotices(req.account.id);
+  }
+
+  @Post("notices/:noticeId/read")
+  @UseGuards(SessionAuthGuard)
+  async markNoticeRead(@Req() req: AuthenticatedUserRequest, @Param("noticeId") noticeId: string) {
+    return this.wallets.markNoticeRead(req.account.id, noticeId);
   }
 }
 

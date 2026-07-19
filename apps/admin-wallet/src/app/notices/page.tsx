@@ -13,6 +13,7 @@ export default function NoticesPage() {
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [importance, setImportance] = useState<"NORMAL" | "IMPORTANT">("NORMAL");
 
   const load = useCallback(async () => {
     try {
@@ -37,11 +38,12 @@ export default function NoticesPage() {
     try {
       await apiFetch("/api/v1/admin/notices", {
         method: "POST",
-        body: JSON.stringify({ title, message: body }),
+        body: JSON.stringify({ title, message: body, importance }),
       });
       setMessage("お知らせを公開しました");
       setTitle("");
       setBody("");
+      setImportance("NORMAL");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "作成に失敗しました");
@@ -88,6 +90,17 @@ export default function NoticesPage() {
                 className="mt-1 block w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
               />
             </label>
+            <label className="text-xs">
+              重要度
+              <select
+                value={importance}
+                onChange={(e) => setImportance(e.target.value as "NORMAL" | "IMPORTANT")}
+                className="mt-1 block w-40 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              >
+                <option value="NORMAL">通常</option>
+                <option value="IMPORTANT">重要</option>
+              </select>
+            </label>
             <button
               onClick={createNotice}
               disabled={!title || !body}
@@ -106,6 +119,7 @@ export default function NoticesPage() {
               <th className="p-3">公開日時</th>
               <th className="p-3">タイトル</th>
               <th className="p-3">本文</th>
+              <th className="p-3">重要度</th>
               <th className="p-3">状態</th>
               <th className="p-3"></th>
             </tr>
@@ -116,6 +130,13 @@ export default function NoticesPage() {
                 <td className="p-3">{new Date(n.publishedAt).toLocaleString("ja-JP")}</td>
                 <td className="p-3">{n.title}</td>
                 <td className="max-w-sm p-3 text-neutral-600">{n.message}</td>
+                <td className="p-3">
+                  {n.importance === "IMPORTANT" ? (
+                    <span className="font-semibold text-red-600">重要</span>
+                  ) : (
+                    <span className="text-neutral-400">通常</span>
+                  )}
+                </td>
                 <td className="p-3">
                   <span className={n.status === "PUBLISHED" ? "text-emerald-600" : "text-neutral-400"}>
                     {n.status}
@@ -132,7 +153,7 @@ export default function NoticesPage() {
             ))}
             {notices.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-4 text-center text-neutral-400">
+                <td colSpan={6} className="p-4 text-center text-neutral-400">
                   お知らせはまだありません
                 </td>
               </tr>

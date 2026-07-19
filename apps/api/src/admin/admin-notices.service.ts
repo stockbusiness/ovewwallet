@@ -6,6 +6,7 @@ import { LineBroadcastService } from "../notices/line-broadcast.service";
 export interface CreateNoticeParams {
   title: string;
   message: string;
+  importance?: "NORMAL" | "IMPORTANT";
 }
 
 /** ウォレットホーム画面「お知らせ」の作成・一覧・アーカイブ (削除はせず非表示にする)。 */
@@ -29,6 +30,7 @@ export class AdminNoticesService {
         title: params.title,
         message: params.message,
         status: "PUBLISHED",
+        importance: params.importance ?? "NORMAL",
         createdBy: adminId,
       },
     });
@@ -36,7 +38,8 @@ export class AdminNoticesService {
     // LINE配信の失敗でお知らせ作成自体を失敗させない (wallet/page.tsxのお知らせ取得を
     // 本体データ取得と別try/catchにしているのと同じ「補助的な機能は本体を巻き込まない」方針)。
     try {
-      await this.lineBroadcast.broadcastText(`【お知らせ】${params.title}\n${params.message}`);
+      const prefix = params.importance === "IMPORTANT" ? "【重要なお知らせ】" : "【お知らせ】";
+      await this.lineBroadcast.broadcastText(`${prefix}${params.title}\n${params.message}`);
     } catch (err) {
       this.logger.warn(`LINE broadcast failed for notice ${notice.id}: ${err instanceof Error ? err.message : err}`);
     }

@@ -84,7 +84,9 @@ export interface Notice {
   id: string;
   title: string;
   message: string;
+  importance: "NORMAL" | "IMPORTANT";
   published_at: string;
+  is_read: boolean;
 }
 
 export interface RewardRulePublic {

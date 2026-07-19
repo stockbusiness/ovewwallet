@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   AppHeader,
   BalanceCard,
@@ -60,6 +61,8 @@ export default function WalletTopPage() {
     })();
   }, [router]);
 
+  const unreadCount = useMemo(() => notices.filter((n) => !n.is_read).length, [notices]);
+
   if (error) return <p className="p-6 text-sm text-sengoku-gold-soft">{error}</p>;
   if (!account || !balance) return <p className="p-6 text-sm text-sengoku-muted">読み込み中...</p>;
 
@@ -69,10 +72,13 @@ export default function WalletTopPage() {
         right={
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sengoku-border text-sengoku-muted">
+            <Link
+              href="/wallet/notices"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sengoku-border text-sengoku-muted"
+            >
               <BellIcon className="h-4 w-4" />
-              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-sengoku-red" />
-            </span>
+              {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-sengoku-red" />}
+            </Link>
           </div>
         }
       />
@@ -104,6 +110,8 @@ export default function WalletTopPage() {
             date={new Date(notices[0].published_at).toLocaleDateString("ja-JP")}
             actionLabel="すべて見る"
             actionHref="/wallet/notices"
+            important={notices[0].importance === "IMPORTANT"}
+            unread={!notices[0].is_read}
           />
         )}
 

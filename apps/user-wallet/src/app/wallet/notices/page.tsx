@@ -16,6 +16,13 @@ export default function NoticesPage() {
       try {
         const list = await apiFetch<Notice[]>("/api/v1/me/notices");
         setNotices(list);
+
+        // 一覧を開いた時点で未読分をまとめて既読にする (メール受信箱等でよくある挙動)。
+        // 失敗しても一覧表示自体は継続する (既読化は補助的な機能のため)。
+        const unread = list.filter((n) => !n.is_read);
+        await Promise.all(
+          unread.map((n) => apiFetch(`/api/v1/me/notices/${n.id}/read`, { method: "POST" }).catch(() => undefined)),
+        );
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           router.push("/login");
@@ -45,8 +52,15 @@ export default function NoticesPage() {
 
       <ul className="flex flex-col gap-2">
         {notices?.map((n) => (
-          <li key={n.id} className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
-            <p className="text-sm font-semibold text-sengoku-text">{n.title}</p>
+          <li
+            key={n.id}
+            className={`rounded-xl border bg-sengoku-navy p-4 ${n.importance === "IMPORTANT" ? "border-sengoku-red" : "border-sengoku-border"}`}
+          >
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-sengoku-text">
+              {!n.is_read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sengoku-red" aria-hidden />}
+              {n.importance === "IMPORTANT" && <span className="text-xs font-bold text-sengoku-red">【重要】</span>}
+              {n.title}
+            </p>
             <p className="mt-1.5 text-sm leading-relaxed text-sengoku-muted">{n.message}</p>
             <p className="mt-2 text-xs text-sengoku-faint">{new Date(n.published_at).toLocaleDateString("ja-JP")}</p>
           </li>

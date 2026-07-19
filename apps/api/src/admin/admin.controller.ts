@@ -101,6 +101,7 @@ const UpdateRewardRuleSchema = z.object({
 const CreateNoticeSchema = z.object({
   title: z.string().min(1),
   message: z.string().min(1),
+  importance: z.enum(["NORMAL", "IMPORTANT"]).optional(),
 });
 
 @ApiTags("admin")

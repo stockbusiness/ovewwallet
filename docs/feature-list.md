@@ -87,7 +87,7 @@
 | 外部連携キュー | `/outbox` | Transactional Outboxの一覧・絞り込み・試行回数/エラー確認・手動再送 |
 | 代理店連携状態一覧 | `/agency-links` | 代理店システムとの連携状態を一覧・絞り込み・詳細確認 |
 | 代理店紹介一覧 | `/wallet-referrals` | 紹介トークン受け入れ状況・登録特典の状態を確認 (Phase 1: 確認のみ、手動確定/取消はPhase 3) |
-| お知らせ管理 | `/notices` | ユーザー向けお知らせの作成・公開・アーカイブ (`GET/POST /api/v1/admin/notices`, `POST /api/v1/admin/notices/:id/archive`)。公開時にLINE Messaging APIへも配信 (`docs/notices-line-broadcast.md`、`LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`未設定時はスキップ) |
+| お知らせ管理 | `/notices` | ユーザー向けお知らせの作成 (通常/重要の重要度選択込み)・公開・アーカイブ (`GET/POST /api/v1/admin/notices`, `POST /api/v1/admin/notices/:id/archive`)。公開時にLINE Messaging APIへも配信 (`docs/notices-line-broadcast.md`、`LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`未設定時はスキップ)。既読管理は`docs/notices-read-tracking.md`参照 |
 
 詳細: `docs/admin-operations.md`
 

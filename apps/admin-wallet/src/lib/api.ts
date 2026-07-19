@@ -77,6 +77,7 @@ export interface NoticeItem {
   title: string;
   message: string;
   status: "PUBLISHED" | "DRAFT" | "ARCHIVED";
+  importance: "NORMAL" | "IMPORTANT";
   publishedAt: string;
   createdBy: string;
   createdAt: string;

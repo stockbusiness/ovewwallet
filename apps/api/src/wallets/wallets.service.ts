@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { PrismaClient } from "@ove/database";
+import { generateId, type PrismaClient } from "@ove/database";
 import { getWalletBalance, listWalletTransactions } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 
@@ -88,19 +88,42 @@ export class WalletsService {
     });
   }
 
-  /** ウォレットホーム画面「お知らせ」向け。公開中のお知らせを新しい順に返す。 */
-  async listPublicNotices() {
+  /**
+   * ウォレットホーム画面「お知らせ」向け。公開中のお知らせを新しい順に返す。
+   * 本人の既読状態 (notice_reads) を突き合わせて is_read を付与する
+   * (お知らせ自体は全ユーザー共通、既読状態のみアカウント単位)。
+   */
+  async listPublicNotices(oveAccountId: string) {
     const notices = await this.db.notice.findMany({
       where: { status: "PUBLISHED" },
       orderBy: { publishedAt: "desc" },
       take: 20,
     });
+    const reads = await this.db.noticeRead.findMany({
+      where: { oveAccountId, noticeId: { in: notices.map((n) => n.id) } },
+    });
+    const readNoticeIds = new Set(reads.map((r) => r.noticeId));
     return notices.map((n) => ({
       id: n.id,
       title: n.title,
       message: n.message,
+      importance: n.importance,
       published_at: n.publishedAt.toISOString(),
+      is_read: readNoticeIds.has(n.id),
     }));
+  }
+
+  /** お知らせを既読にする (アカウント単位、複数回呼んでも冪等)。 */
+  async markNoticeRead(oveAccountId: string, noticeId: string) {
+    const notice = await this.db.notice.findUnique({ where: { id: noticeId } });
+    if (!notice) throw new NotFoundException("notice not found");
+
+    await this.db.noticeRead.upsert({
+      where: { noticeId_oveAccountId: { noticeId, oveAccountId } },
+      create: { id: generateId(), noticeId, oveAccountId },
+      update: {},
+    });
+    return { ok: true };
   }
 }
 

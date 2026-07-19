@@ -49,6 +49,11 @@ enum NoticeStatus {
   ARCHIVED
 }
 
+enum NoticeImportance {
+  NORMAL
+  IMPORTANT
+}
+
 enum ServiceCode {
   SENGOKU_PASSPORT
   AIART
@@ -251,6 +256,7 @@ model OveAccount {
   wallet          Wallet?
   sessions        UserSession[]
   walletReferrals WalletReferral[]
+  noticeReads     NoticeRead[]
 
   @@map("ove_accounts")
 }
@@ -803,15 +809,34 @@ model WalletReferralBenefit {
 
 /// ウォレットホーム画面「お知らせ」で表示するお知らせ (管理画面から作成・削除する)。
 model Notice {
-  id          String       @id
+  id          String           @id
   title       String
   message     String
-  status      NoticeStatus @default(PUBLISHED)
-  publishedAt DateTime     @default(now()) @map("published_at")
-  createdBy   String       @map("created_by")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  status      NoticeStatus     @default(PUBLISHED)
+  /// IMPORTANTは一覧で強調表示する (docs/notices-read-tracking.md参照)。
+  importance  NoticeImportance @default(NORMAL)
+  publishedAt DateTime         @default(now()) @map("published_at")
+  createdBy   String           @map("created_by")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  reads NoticeRead[]
 
   @@index([status, publishedAt])
   @@map("notices")
+}
+
+/// お知らせの既読状態 (アカウント単位)。行が存在すれば既読、存在しなければ未読。
+model NoticeRead {
+  id           String   @id
+  noticeId     String   @map("notice_id")
+  oveAccountId String   @map("ove_account_id")
+  readAt       DateTime @default(now()) @map("read_at")
+
+  notice  Notice     @relation(fields: [noticeId], references: [id])
+  account OveAccount @relation(fields: [oveAccountId], references: [id])
+
+  @@unique([noticeId, oveAccountId])
+  @@index([oveAccountId])
+  @@map("notice_reads")
 }
