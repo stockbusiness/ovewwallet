@@ -24,7 +24,7 @@
 | 外部連携キュー | `/outbox` | Transactional Outboxの一覧・ステータス/連携先での絞り込み・試行回数/最終エラー確認・手動再送・Feature Flag確認 (`docs/integration-outbox.md` 参照) |
 | 代理店連携状態一覧 | `/agency-links` | 代理店システム(sengoku-ai.com)との連携状態を一覧・絞り込み・詳細確認 (`docs/agency-integration.md` 参照) |
 | 代理店紹介一覧 | `/wallet-referrals` | 紹介トークン受け入れ状況・登録特典の状態を確認 (`docs/agency-referral.md` 参照) |
-| お知らせ管理 | `/notices` | ユーザー向けお知らせの作成・公開・アーカイブ。公開中のお知らせは `GET /api/v1/me/notices` 経由でウォレットホーム・お知らせ一覧に表示される |
+| お知らせ管理 | `/notices` | ユーザー向けお知らせの作成 (公開日時の予約投稿込み)・公開・アーカイブ。公開中のお知らせは `GET /api/v1/me/notices` 経由でウォレットホーム・お知らせ一覧に表示される |
 
 ## 外部サービス緊急停止 (指示書5章)
 

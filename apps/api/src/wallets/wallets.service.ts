@@ -96,7 +96,9 @@ export class WalletsService {
    */
   async listPublicNotices(oveAccountId: string) {
     const notices = await this.db.notice.findMany({
-      where: { status: "PUBLISHED" },
+      // publishedAtが未来 (予約投稿, docs/notices-line-broadcast.md「予約投稿」参照) の
+      // ものは、その日時になるまでユーザー向け一覧に含めない。
+      where: { status: "PUBLISHED", publishedAt: { lte: new Date() } },
       orderBy: { publishedAt: "desc" },
       take: 20,
     });

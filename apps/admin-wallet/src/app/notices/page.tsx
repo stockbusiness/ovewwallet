@@ -14,6 +14,7 @@ export default function NoticesPage() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [importance, setImportance] = useState<"NORMAL" | "IMPORTANT">("NORMAL");
+  const [publishedAt, setPublishedAt] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -38,12 +39,18 @@ export default function NoticesPage() {
     try {
       await apiFetch("/api/v1/admin/notices", {
         method: "POST",
-        body: JSON.stringify({ title, message: body, importance }),
+        body: JSON.stringify({
+          title,
+          message: body,
+          importance,
+          publishedAt: publishedAt ? new Date(publishedAt).toISOString() : undefined,
+        }),
       });
-      setMessage("お知らせを公開しました");
+      setMessage(publishedAt && new Date(publishedAt) > new Date() ? "お知らせを予約投稿しました" : "お知らせを公開しました");
       setTitle("");
       setBody("");
       setImportance("NORMAL");
+      setPublishedAt("");
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "作成に失敗しました");
@@ -101,6 +108,15 @@ export default function NoticesPage() {
                 <option value="IMPORTANT">重要</option>
               </select>
             </label>
+            <label className="text-xs">
+              公開日時 (空欄なら即時公開、未来日時を指定すると予約投稿)
+              <input
+                type="datetime-local"
+                value={publishedAt}
+                onChange={(e) => setPublishedAt(e.target.value)}
+                className="mt-1 block w-64 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              />
+            </label>
             <button
               onClick={createNotice}
               disabled={!title || !body}
@@ -127,7 +143,14 @@ export default function NoticesPage() {
           <tbody>
             {notices.map((n) => (
               <tr key={n.id} className="border-t border-neutral-100 align-top">
-                <td className="p-3">{new Date(n.publishedAt).toLocaleString("ja-JP")}</td>
+                <td className="p-3">
+                  {new Date(n.publishedAt).toLocaleString("ja-JP")}
+                  {new Date(n.publishedAt) > new Date() && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      公開予定
+                    </span>
+                  )}
+                </td>
                 <td className="p-3">{n.title}</td>
                 <td className="max-w-sm p-3 text-neutral-600">{n.message}</td>
                 <td className="p-3">

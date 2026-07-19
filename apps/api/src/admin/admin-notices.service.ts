@@ -7,6 +7,8 @@ export interface CreateNoticeParams {
   title: string;
   message: string;
   importance?: "NORMAL" | "IMPORTANT";
+  /** 未来日時を指定すると、その日時になるまで一般ユーザーには表示されない (予約投稿)。未指定なら即時公開。 */
+  publishedAt?: string;
 }
 
 /** ウォレットホーム画面「お知らせ」の作成・一覧・アーカイブ (削除はせず非表示にする)。 */
@@ -24,6 +26,9 @@ export class AdminNoticesService {
   }
 
   async create(params: CreateNoticeParams, adminId: string) {
+    const publishedAt = params.publishedAt ? new Date(params.publishedAt) : new Date();
+    const isScheduledForFuture = publishedAt.getTime() > Date.now();
+
     const notice = await this.db.notice.create({
       data: {
         id: generateId(),
@@ -31,17 +36,25 @@ export class AdminNoticesService {
         message: params.message,
         status: "PUBLISHED",
         importance: params.importance ?? "NORMAL",
+        publishedAt,
         createdBy: adminId,
       },
     });
 
-    // LINE配信の失敗でお知らせ作成自体を失敗させない (wallet/page.tsxのお知らせ取得を
-    // 本体データ取得と別try/catchにしているのと同じ「補助的な機能は本体を巻き込まない」方針)。
-    try {
-      const prefix = params.importance === "IMPORTANT" ? "【重要なお知らせ】" : "【お知らせ】";
-      await this.lineBroadcast.broadcastText(`${prefix}${params.title}\n${params.message}`);
-    } catch (err) {
-      this.logger.warn(`LINE broadcast failed for notice ${notice.id}: ${err instanceof Error ? err.message : err}`);
+    // 予約投稿 (未来のpublishedAt) の場合、公開時刻になった時点で改めてLINE配信する
+    // 仕組みはこのリポジトリには無い (cron等の外部スケジューラ未接続、
+    // docs/credit-expiry.md「運用」と同じ制約)。公開前に配信してしまうと画面にはまだ
+    // 表示されていないお知らせをLINEで告知することになり矛盾するため、
+    // 予約投稿の場合はLINE配信自体をスキップする (今後の課題)。
+    if (!isScheduledForFuture) {
+      // LINE配信の失敗でお知らせ作成自体を失敗させない (wallet/page.tsxのお知らせ取得を
+      // 本体データ取得と別try/catchにしているのと同じ「補助的な機能は本体を巻き込まない」方針)。
+      try {
+        const prefix = params.importance === "IMPORTANT" ? "【重要なお知らせ】" : "【お知らせ】";
+        await this.lineBroadcast.broadcastText(`${prefix}${params.title}\n${params.message}`);
+      } catch (err) {
+        this.logger.warn(`LINE broadcast failed for notice ${notice.id}: ${err instanceof Error ? err.message : err}`);
+      }
     }
 
     return notice;

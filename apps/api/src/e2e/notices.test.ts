@@ -105,4 +105,56 @@ describe("お知らせの重要度・既読管理", () => {
     // 二重に既読にしても冪等 (エラーにならない)
     await request(server).post(`/api/v1/me/notices/${created.body.id}/read`).set("Cookie", cookieA).expect(201);
   });
+
+  it("予約投稿 (未来のpublishedAt) はその日時になるまでユーザー向け一覧に含まれない", async () => {
+    const server = app.getHttpServer();
+
+    const adminLogin = await request(server)
+      .post("/api/v1/admin/login")
+      .send({ email: adminEmail, password: adminPassword })
+      .expect(201);
+    const adminCookie = adminLogin.headers["set-cookie"] as unknown as string[];
+
+    const futurePublishedAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const scheduled = await request(server)
+      .post("/api/v1/admin/notices")
+      .set("Cookie", adminCookie)
+      .send({ title: "予約投稿テスト", message: "明日公開されるはずのお知らせ", publishedAt: futurePublishedAt })
+      .expect(201);
+    expect(new Date(scheduled.body.publishedAt).toISOString()).toBe(futurePublishedAt);
+
+    const idToken = `mock.${generateId()}`;
+    const userLogin = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const userCookie = userLogin.headers["set-cookie"] as unknown as string[];
+
+    const list = await request(server).get("/api/v1/me/notices").set("Cookie", userCookie).expect(200);
+    expect(list.body.find((n: { id: string }) => n.id === scheduled.body.id)).toBeUndefined();
+
+    // 管理画面の一覧には (公開前でも) 表示される。
+    const adminList = await request(server).get("/api/v1/admin/notices").set("Cookie", adminCookie).expect(200);
+    expect(adminList.body.find((n: { id: string }) => n.id === scheduled.body.id)).toBeDefined();
+  });
+
+  it("publishedAtを指定しない場合は即時公開される", async () => {
+    const server = app.getHttpServer();
+
+    const adminLogin = await request(server)
+      .post("/api/v1/admin/login")
+      .send({ email: adminEmail, password: adminPassword })
+      .expect(201);
+    const adminCookie = adminLogin.headers["set-cookie"] as unknown as string[];
+
+    const created = await request(server)
+      .post("/api/v1/admin/notices")
+      .set("Cookie", adminCookie)
+      .send({ title: "即時公開テスト", message: "本文" })
+      .expect(201);
+
+    const idToken = `mock.${generateId()}`;
+    const userLogin = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const userCookie = userLogin.headers["set-cookie"] as unknown as string[];
+
+    const list = await request(server).get("/api/v1/me/notices").set("Cookie", userCookie).expect(200);
+    expect(list.body.find((n: { id: string }) => n.id === created.body.id)).toBeDefined();
+  });
 });
