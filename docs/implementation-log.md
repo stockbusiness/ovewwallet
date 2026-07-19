@@ -280,6 +280,48 @@ e2eテストはAPI層のみを検証しており、クライアント側の楽�
 (`ulimit`権限エラー) が継続しているため、確認は`node`直接実行によるローカル起動で
 行った。
 
+## フェーズ11: 管理側・ウォレット側の追加機能13件 (2026-07-19)
+
+ユーザーからの依頼で、フェーズ10に続いて管理画面・ウォレット画面それぞれの機能
+アイデアをブレインストームし、優先度順に1件ずつ実装・テスト・コミットした。
+
+管理側:
+1. **取引一覧に取引種別フィルタ** (`docs/admin-operations.md`): 既存APIのUI露出のみ。
+   `EXPIRATION`/`DAILY_LOGIN_BONUS`等で絞り込むことでバッチ実行履歴を確認できる。
+2. **失効予告レポート** (`docs/credit-expiry.md`): `previewExpiringCreditLots()`
+   (`packages/ledger/src/expiry.ts`) を新設し、失効バッチ実行前に書き込みなしで
+   影響範囲を確認できるようにした。
+3. **会員ランク分布** (`docs/wallet-rank.md`): ダッシュボードに足軽〜天下人の人数分布を
+   横棒グラフで表示。
+4. **付与ルール別発行量集計** (`docs/admin-operations.md`): `rewards.service.ts`の
+   `RULE_CODE_BY_TRANSACTION_TYPE`をexportして再利用し、ルールごとの累計発行額・
+   件数を表示 (対応表に無いルールは「集計不可」)。
+5. **監査ログCSVエクスポート**・**アカウント一覧CSVエクスポート**
+   (`docs/admin-operations.md`): CSV生成ロジックを`apps/api/src/common/csv.ts`に
+   切り出し、既存の取引履歴CSVエクスポートと共通化した。
+6. **二段階承認のSLA可視化**: 承認待ち一覧に経過時間列を追加し、24時間以上放置を
+   強調表示 (バックエンド変更無し、クライアント側の表示加工のみ)。
+7. **お知らせの予約投稿** (`docs/notices-read-tracking.md`): 既存の`publishedAt`
+   カラムを使い、未来日時を指定すると公開日時になるまでユーザー向け一覧に表示
+   されないようにした。外部スケジューラが無いため、予約投稿時はLINE配信をスキップする。
+
+ウォレット側:
+1. **失効間近OVEの警告バナー** (`docs/credit-expiry.md`): `GET /api/v1/me/wallet/expiring-credits`
+   で30日以内の失効予定額を表示。
+2. **ランク進捗バー** (`docs/wallet-rank.md`): `RankBadge`に次の階級までの視覚的な
+   プログレスバーを追加。
+3. **お知らせ「重要のみ」タブ** (`docs/notices-read-tracking.md`): クライアント側の
+   絞り込みのみ。
+4. **全端末からログアウトボタン** (`docs/login-devices.md`): `POST /api/v1/accounts/me/sessions/revoke-others`
+   で現在のセッション以外を一括無効化。
+5. **デイリーボーナス受け取り履歴カレンダー** (`docs/daily-login-bonus.md`):
+   `GET /api/v1/me/daily-bonus/history`で直近90日分を返し、月単位のカレンダー
+   グリッドで表示。
+
+13機能すべてにe2eテストを追加し (計約16件)、既存110件と合わせて計123件のAPIテスト
++ 27件のledgerテストが全てグリーンであることを確認済み。実ブラウザでの確認は
+このフェーズでは未実施 (今後の課題)。
+
 ## 未着手・今後の課題
 
 `docs/project-status.md` 6章「未実装・今後の課題」および各機能ドキュメントの
