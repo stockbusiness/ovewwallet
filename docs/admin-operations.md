@@ -8,7 +8,7 @@
 |---|---|---|
 | 管理者ログイン | `/login` | メール+パスワード |
 | OVEダッシュボード | `/dashboard` | ウォレット数・発行済み残高・累計付与/利用・残高整合性チェック結果 |
-| アカウント一覧 | `/accounts` | 一覧・ウォレットへのリンク |
+| アカウント一覧 | `/accounts` | 一覧・状態(PENDING/ACTIVE/RESTRICTED/REVIEWING/LOCKED/CLOSED/MERGED)での絞り込み・ウォレットへのリンク |
 | ウォレット一覧 | `/wallets` | 一覧・詳細へのリンク |
 | ウォレット詳細 | `/wallets/[walletId]` | 残高・個別付与/減算/保留・保留解除・最近の取引 |
 | 取引一覧 | `/transactions` | 全ウォレット横断の検索 (アカウントコード/状態/方向)・取消 |
@@ -175,7 +175,8 @@ E2Eテスト (`apps/api/src/e2e/api-access-logs.test.ts`) で、認証失敗・�
 
 ## 未実装画面 (今後の課題)
 
-発行量の時系列グラフ。
+なし。発行量の時系列グラフはダッシュボード画面 (`/dashboard`) の`TrendChart`
+(過去30日のCREDIT/DEBIT推移) として実装済み。
 
 ## 管理者権限
 
