@@ -357,6 +357,17 @@ export class AdminController {
     return this.admin.listAuditLogs({ targetType, limit: limit ? Number(limit) : undefined });
   }
 
+  /** 監査ログCSVエクスポート (docs/admin-operations.md参照)。 */
+  @Get("audit-logs/export")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "AUDITOR")
+  async exportAuditLogs(@Query("targetType") targetType: string | undefined, @Res() res: Response) {
+    const csv = await this.admin.exportAuditLogsCsv({ targetType });
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="audit-logs.csv"');
+    res.send(csv);
+  }
+
   /** APIアクセスログ一覧。指示書13章の「APIアクセスログ」画面。 */
   @Get("api-access-logs")
   @UseGuards(AdminAuthGuard, RolesGuard)

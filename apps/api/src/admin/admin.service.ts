@@ -9,6 +9,7 @@ import {
   reverseTransaction,
 } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
+import { toCsv } from "../common/csv";
 import { serializeTransaction } from "../wallets/wallets.service";
 import { AdminApprovalService, HIGH_VALUE_THRESHOLD } from "./admin-approval.service";
 
@@ -411,6 +412,33 @@ export class AdminService {
       orderBy: { createdAt: "desc" },
       take: Math.min(params.limit ?? 100, 500),
     });
+  }
+
+  /**
+   * 監査ログCSVエクスポート (docs/admin-operations.md参照)。画面の一覧 (500件上限)
+   * とは別に、直近10,000件を上限として返す (`docs/transaction-export.md`と同じ方針)。
+   */
+  async exportAuditLogsCsv(params: { targetType?: string }): Promise<string> {
+    const logs = await this.db.auditLog.findMany({
+      where: params.targetType ? { targetType: params.targetType } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: 10000,
+    });
+
+    const header = ["日時", "実行者種別", "実行者ID", "操作種別", "対象種別", "対象ID", "結果", "理由", "IPアドレス"];
+    const rows = logs.map((l) => [
+      l.createdAt.toISOString(),
+      l.actorType,
+      l.actorId ?? "",
+      l.actionType,
+      l.targetType,
+      l.targetId ?? "",
+      l.result,
+      l.reason ?? "",
+      l.ipAddress ?? "",
+    ]);
+
+    return toCsv(header, rows);
   }
 
   /** 指示書13章「APIアクセスログ」画面: 外部サービスAPIへのリクエスト履歴。 */

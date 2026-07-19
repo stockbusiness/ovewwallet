@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
 import { getWalletBalance, listWalletTransactions } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
+import { toCsv } from "../common/csv";
 
 @Injectable()
 export class WalletsService {
@@ -200,17 +201,8 @@ export class WalletsService {
       t.displayName,
     ]);
 
-    // Excel(日本語版)でも文字化けせず開けるよう、UTF-8 BOM付きで返す。
-    const BOM = "﻿";
-    return BOM + [header, ...rows].map((row) => row.map(csvEscapeField).join(",")).join("\r\n");
+    return toCsv(header, rows);
   }
-}
-
-function csvEscapeField(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 }
 
 export function serializeTransaction(t: {

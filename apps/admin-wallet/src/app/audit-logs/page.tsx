@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, ApiError, type AuditLogItem } from "@/lib/api";
+import { apiFetch, ApiError, API_BASE_URL, type AuditLogItem } from "@/lib/api";
 
 export default function AuditLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -25,11 +26,40 @@ export default function AuditLogsPage() {
     })();
   }, [router]);
 
+  async function downloadCsv() {
+    setExporting(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/audit-logs/export`, { credentials: "include" });
+      if (!res.ok) throw new Error("failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "audit-logs.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("CSVのダウンロードに失敗しました");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div>
       <AdminNav />
       <main className="mx-auto max-w-5xl p-6">
-        <h1 className="mb-4 text-xl font-bold">管理者操作ログ</h1>
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold">管理者操作ログ</h1>
+          <button
+            onClick={downloadCsv}
+            disabled={exporting}
+            className="rounded-md border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 disabled:opacity-50"
+          >
+            {exporting ? "ダウンロード中..." : "CSVダウンロード"}
+          </button>
+        </div>
         <p className="mb-4 text-xs text-neutral-500">監査ログは削除できません (指示書16章)。</p>
         {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
         <table className="w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">

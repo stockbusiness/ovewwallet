@@ -13,6 +13,9 @@
   こちらは常にUTF-8のみ)。
 - `Content-Type: text/csv; charset=utf-8`、
   `Content-Disposition: attachment; filename="transactions.csv"`。
+- CSV生成 (BOM付与・フィールドエスケープ) は`apps/api/src/common/csv.ts`の`toCsv()`に
+  切り出し済み (2026-07-19、監査ログCSVエクスポート追加時に共通化。
+  `docs/admin-operations.md`「監査ログCSVエクスポート」参照)。
 
 ## ルーティング上の注意
 

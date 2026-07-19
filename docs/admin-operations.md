@@ -17,7 +17,7 @@
 | 既存ユーザー移行 | `/migrations` | CSVアップロード・実行・結果サマリ・検証待ち(REVIEWING)アカウント一覧 (`docs/migration.md`) |
 | アカウント統合 | `/accounts/merge` | 統合元→統合先へ残高・連携情報を移管 |
 | 二段階承認 | `/approval-requests` | 高額付与・高額減算の承認待ち一覧、承認/却下、履歴 |
-| 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし) |
+| 管理者操作ログ | `/audit-logs` | 監査ログ一覧 (削除UIなし)・CSVダウンロード |
 | APIアクセスログ | `/api-access-logs` | 外部サービスAPI (指示書11章) へのリクエスト履歴。認証失敗 (401) も含む。ステータスコードで絞り込み可 |
 | アカウント詳細 | `/accounts/[accountId]` | 基本情報・連携ID・外部サービス連携・ウォレットへのリンク・当該アカウントの操作ログ・REVIEWING時は検証者による解消フォーム (`docs/migration.md`) |
 | セキュリティ設定 | `/security` | 自分自身のMFA (二要素認証) の設定・有効化・無効化 (`docs/authentication.md` 参照) |
@@ -165,6 +165,21 @@ SUPER_ADMIN/OVE_OPERATOR/EVENT_OPERATOR/AUDITORに許可している。
 E2Eテスト (`apps/api/src/e2e/api-access-logs.test.ts`) で、認証失敗・認証成功後の
 業務エラーの両方が記録されること、管理APIのフィルタが機能すること、権限のない
 ロールでは403になることを検証済み。実ブラウザでも一覧表示・フィルタ操作を確認済み。
+
+## 監査ログCSVエクスポート (2026-07-19追加)
+
+`GET /api/v1/admin/audit-logs/export`: `/audit-logs`画面の一覧 (500件上限) とは別に、
+直近10,000件を上限としてCSVでダウンロードできる。`docs/transaction-export.md`と同じ
+方式でUTF-8 BOM付き・`text/csv`。列: 日時・実行者種別・実行者ID・操作種別・対象種別・
+対象ID・結果・理由・IPアドレス。`targetType`クエリパラメータで絞り込み可能 (一覧画面の
+絞り込みと同じ)。閲覧権限も一覧画面と同じ`SUPER_ADMIN`/`AUDITOR`のみ。
+
+CSV生成ロジック (BOM付与・フィールドエスケープ) は`apps/api/src/common/csv.ts`に
+切り出し、`docs/transaction-export.md`のCSVエクスポートと共通化した。
+
+`apps/api/src/e2e/audit-logs-export.test.ts` (2件): ヘッダー行・BOM・監査ログの内容
+(全セッション無効化操作) が含まれること、`targetType`で絞り込めることを検証済み。
+実ブラウザでのダウンロード確認は未実施 (今後の課題)。
 
 ## アカウント詳細 (指示書13章)
 
