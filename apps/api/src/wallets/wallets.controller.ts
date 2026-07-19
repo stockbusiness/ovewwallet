@@ -85,6 +85,12 @@ export class MeController {
   async referralStatus(@Req() req: AuthenticatedUserRequest) {
     return this.referrals.getMyReferralStatus(req.account.id);
   }
+
+  @Get("wallet/expiring-credits")
+  @UseGuards(SessionAuthGuard)
+  async expiringCredits(@Req() req: AuthenticatedUserRequest) {
+    return this.wallets.getExpiringCreditsSummary(req.account.id);
+  }
 }
 
 /**

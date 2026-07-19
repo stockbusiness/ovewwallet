@@ -146,6 +146,36 @@ export class WalletsService {
   }
 
   /**
+   * 30日以内に失効予定のOVE合計額と最短の失効日を返す (docs/credit-expiry.md参照)。
+   * ウォレットホームの警告バナー用。既に失効バッチが実行済みの分は
+   * `expiredAt`が設定されるため対象から自然に外れる。
+   */
+  async getExpiringCreditsSummary(oveAccountId: string) {
+    const wallet = await this.requireWalletForAccount(oveAccountId);
+    const withinDays = 30;
+    const threshold = new Date();
+    threshold.setDate(threshold.getDate() + withinDays);
+
+    const lots = await this.db.oveCreditLot.findMany({
+      where: {
+        walletId: wallet.id,
+        expiresAt: { lte: threshold },
+        expiredAt: null,
+        voidedAt: null,
+        remainingAmount: { gt: 0n },
+      },
+      orderBy: { expiresAt: "asc" },
+    });
+
+    const totalAmount = lots.reduce((sum, lot) => sum + lot.remainingAmount, 0n);
+    return {
+      within_days: withinDays,
+      total_amount: totalAmount.toString(),
+      nearest_expires_at: lots[0]?.expiresAt.toISOString() ?? null,
+    };
+  }
+
+  /**
    * 自分の取引履歴CSVエクスポート (docs/transaction-export.md参照)。
    * `GET /me/transactions`(一覧画面用、100件上限)とは別に、全件相当を返す
    * (直近10,000件を上限とし、無制限のフルスキャンは避ける)。

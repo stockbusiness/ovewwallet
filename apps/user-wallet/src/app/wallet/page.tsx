@@ -32,6 +32,7 @@ import {
   type WalletHoldItem,
   type DailyBonusStatus,
   type DailyBonusClaimResult,
+  type ExpiringCreditsSummary,
 } from "@/lib/api";
 
 export default function WalletTopPage() {
@@ -42,6 +43,7 @@ export default function WalletTopPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [holds, setHolds] = useState<WalletHoldItem[]>([]);
   const [dailyBonus, setDailyBonus] = useState<DailyBonusStatus | null>(null);
+  const [expiringCredits, setExpiringCredits] = useState<ExpiringCreditsSummary | null>(null);
   const [claimingBonus, setClaimingBonus] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +84,11 @@ export default function WalletTopPage() {
         setDailyBonus(await apiFetch<DailyBonusStatus>("/api/v1/me/daily-bonus/status"));
       } catch {
         setDailyBonus(null);
+      }
+      try {
+        setExpiringCredits(await apiFetch<ExpiringCreditsSummary>("/api/v1/me/wallet/expiring-credits"));
+      } catch {
+        setExpiringCredits(null);
       }
     })();
   }, [router]);
@@ -157,6 +164,20 @@ export default function WalletTopPage() {
             { label: "回収予定残高", value: `${Number(balance.pending_balance).toLocaleString("ja-JP")} OVE` },
           ]}
         />
+
+        {expiringCredits && Number(expiringCredits.total_amount) > 0 && (
+          <section className="rounded-xl border border-sengoku-gold/40 bg-sengoku-gold/10 p-4">
+            <p className="text-sm font-bold text-sengoku-gold-soft">
+              まもなく{Number(expiringCredits.total_amount).toLocaleString("ja-JP")} OVEが失効します
+            </p>
+            {expiringCredits.nearest_expires_at && (
+              <p className="mt-0.5 text-xs text-sengoku-gold-soft">
+                最短の失効日: {new Date(expiringCredits.nearest_expires_at).toLocaleDateString("ja-JP")}
+                (今後{expiringCredits.within_days}日以内)
+              </p>
+            )}
+          </section>
+        )}
 
         <RankBadge lifetimeCredited={Number(balance.lifetime_credited)} />
 

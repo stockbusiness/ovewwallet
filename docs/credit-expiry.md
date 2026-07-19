@@ -53,3 +53,16 @@
 ユーザー向け「貯める」画面 (`/wallet/earn`) には有効期限が設定されたルールについて
 「獲得から○日で失効します」という案内を表示する。取引履歴一覧 (`/wallet/transactions`)
 には「失効」フィルタタブを追加した。
+
+## 失効間近OVEの警告バナー (2026-07-19追加)
+
+`GET /api/v1/me/wallet/expiring-credits`: 30日以内に失効予定 (`expiresAt`が30日以内、
+`expiredAt`/`voidedAt`が未設定、`remainingAmount > 0`) のロットの合計額と最短の失効日を
+返す。ウォレットホーム画面のランク表示直上に、失効予定額が1以上の場合のみ警告バナーを
+表示する (`apps/user-wallet/src/app/wallet/page.tsx`)。他の補助情報 (お知らせ・保留内訳等)
+と同様、取得失敗時はバナーを表示しないだけでホーム画面自体は表示を継続する。
+
+`apps/api/src/e2e/expiring-credits.test.ts` (2件): 30日以内・以降のロットが混在する
+場合に30日以内の分のみ合計され最短の失効日が返ること、失効予定が無い場合は
+`total_amount: "0"`・`nearest_expires_at: null`を返すことを検証済み。実ブラウザでの
+確認は未実施 (今後の課題)。

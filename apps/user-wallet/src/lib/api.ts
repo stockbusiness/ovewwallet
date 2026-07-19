@@ -128,6 +128,12 @@ export interface WalletHoldItem {
   held_at: string;
 }
 
+export interface ExpiringCreditsSummary {
+  within_days: number;
+  total_amount: string;
+  nearest_expires_at: string | null;
+}
+
 export interface RewardRulePublic {
   rule_code: string;
   display_name: string;
