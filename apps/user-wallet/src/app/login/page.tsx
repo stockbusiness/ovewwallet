@@ -210,7 +210,7 @@ export default function LoginPage() {
       });
       router.push("/wallet");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "千の国パスポートIDでのログインに失敗しました");
+      setError(err instanceof ApiError ? err.message : "千ノ国パスポートIDでのログインに失敗しました");
     } finally {
       setLoading(null);
     }
@@ -225,7 +225,7 @@ export default function LoginPage() {
         {view === "choose" && (
           <div className="flex flex-col gap-4">
             <div className="text-center">
-              <h2 className="text-lg font-bold text-sengoku-text">千の国ウォレットへようこそ</h2>
+              <h2 className="text-lg font-bold text-sengoku-text">千ノ国ウォレットへようこそ</h2>
               <p className="mt-1 text-sm text-sengoku-muted">千の物語と活動を、ひとつにつなぐ</p>
             </div>
             <AuthButton
@@ -256,7 +256,7 @@ export default function LoginPage() {
               }}
               disabled={loading !== null}
             >
-              千の国パスポートIDでログイン
+              千ノ国パスポートIDでログイン
             </AuthButton>
             <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <Link href="/terms" className="text-center text-xs font-medium text-sengoku-gold underline underline-offset-2">
@@ -337,7 +337,7 @@ export default function LoginPage() {
         {view === "sengoku" && (
           <form onSubmit={loginWithSengokuPassport} className="flex flex-col gap-4">
             <label className="text-sm font-semibold text-sengoku-text">
-              千の国パスポート会員ID
+              千ノ国パスポート会員ID
               <input
                 type="text"
                 required
@@ -350,7 +350,7 @@ export default function LoginPage() {
             </label>
             <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <PrimaryButton type="submit" fullWidth disabled={loading !== null}>
-              {loading === "sengoku" ? "連携中..." : "千の国パスポートIDでログイン"}
+              {loading === "sengoku" ? "連携中..." : "千ノ国パスポートIDでログイン"}
             </PrimaryButton>
             <button
               type="button"
@@ -412,8 +412,8 @@ function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: 
 }
 
 /**
- * ログイン画面上部の演出。千の国ウォレットの円環ロゴモチーフを中心に据える
- * (2026-07-19、千の国ブランドへの刷新に伴い旧CastleHero(霧の山並み・城の
+ * ログイン画面上部の演出。千ノ国ウォレットの円環ロゴモチーフを中心に据える
+ * (2026-07-19、千ノ国ブランドへの刷新に伴い旧CastleHero(霧の山並み・城の
  * シルエット)を置き換え。戦国専用モチーフは共通UIに残さない方針のため)。
  * choose以外のビュー(メール入力等)ではcompactにして操作の邪魔をしない。
  */
@@ -426,7 +426,7 @@ function WalletHero({ compact }: { compact: boolean }) {
         <div className="absolute inset-x-0 top-[18%] flex flex-col items-center gap-4">
           <WalletLogo className="h-28 w-28 text-sengoku-gold sm:h-32 sm:w-32" />
           <div className="text-center">
-            <p className="font-heading text-3xl font-bold leading-tight text-sengoku-text sm:text-4xl">千の国ウォレット</p>
+            <p className="font-heading text-3xl font-bold leading-tight text-sengoku-text sm:text-4xl">千ノ国ウォレット</p>
             <p className="mt-1 text-xs font-semibold tracking-[0.35em] text-sengoku-gold">SEN NO KUNI WALLET</p>
           </div>
         </div>
@@ -435,7 +435,7 @@ function WalletHero({ compact }: { compact: boolean }) {
       {compact && (
         <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-center gap-2">
           <WalletLogo className="h-8 w-8 text-sengoku-gold" />
-          <p className="font-heading text-xl font-bold text-sengoku-text">千の国ウォレット</p>
+          <p className="font-heading text-xl font-bold text-sengoku-text">千ノ国ウォレット</p>
         </div>
       )}
 

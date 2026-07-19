@@ -6,7 +6,7 @@ export interface AppHeaderProps {
   right?: ReactNode;
 }
 
-/** 「千の国ウォレット」ブランドロゴを左上に据えるアプリ共通ヘッダー。 */
+/** 「千ノ国ウォレット」ブランドロゴを左上に据えるアプリ共通ヘッダー。 */
 export function AppHeader({ right }: AppHeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 pb-4 pt-5">
@@ -14,7 +14,7 @@ export function AppHeader({ right }: AppHeaderProps) {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sengoku-gold/70 bg-gradient-to-br from-sengoku-navy to-sengoku-navy-deep text-sengoku-gold">
           <WalletLogo className="h-6 w-6" />
         </span>
-        <p className="font-heading text-base font-bold leading-none text-sengoku-text">千の国ウォレット</p>
+        <p className="font-heading text-base font-bold leading-none text-sengoku-text">千ノ国ウォレット</p>
       </div>
       {right}
     </header>

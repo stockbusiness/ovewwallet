@@ -18,8 +18,8 @@ const notoSerifJp = Noto_Serif_JP({
 });
 
 export const metadata: Metadata = {
-  title: "千の国ウォレット管理画面",
-  description: "千の国ウォレット管理者向け画面",
+  title: "千ノ国ウォレット管理画面",
+  description: "千ノ国ウォレット管理者向け画面",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

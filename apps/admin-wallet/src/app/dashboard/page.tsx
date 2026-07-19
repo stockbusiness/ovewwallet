@@ -76,7 +76,7 @@ export default function DashboardPage() {
         <main className="mx-auto max-w-6xl">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className="font-heading text-xl font-bold text-sengoku-text">千の国ウォレット ダッシュボード</h1>
+              <h1 className="font-heading text-xl font-bold text-sengoku-text">千ノ国ウォレット ダッシュボード</h1>
               <p className="mt-1 text-sm text-sengoku-muted">
                 ログイン中: {me.displayName} ({me.role})
               </p>
