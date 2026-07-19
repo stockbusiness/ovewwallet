@@ -97,8 +97,17 @@ export default function WalletTopPage() {
         next_amount: result.amount,
       });
       setToast(`${result.amount} OVEを受け取りました (${result.current_streak}日連続)`);
+      // 継続ログインボーナスもCREDITのため、階級表示(RankBadge)が参照する
+      // lifetime_creditedも合わせて更新する (available_balanceだけ更新すると、
+      // 再読み込みするまで階級表示が古い累計獲得量のまま止まって見える不具合になる)。
       setBalance((prev) =>
-        prev ? { ...prev, available_balance: String(Number(prev.available_balance) + Number(result.amount)) } : prev,
+        prev
+          ? {
+              ...prev,
+              available_balance: String(Number(prev.available_balance) + Number(result.amount)),
+              lifetime_credited: String(Number(prev.lifetime_credited) + Number(result.amount)),
+            }
+          : prev,
       );
     } catch {
       setToast("受け取りに失敗しました");
