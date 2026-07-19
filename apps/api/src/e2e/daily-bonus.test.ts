@@ -92,4 +92,21 @@ describe("継続ログインボーナス", () => {
     const claim = await request(server).post("/api/v1/me/daily-bonus/claim").set("Cookie", cookie).expect(201);
     expect(claim.body).toEqual({ claimed_today: true, current_streak: 4, amount: "20" });
   });
+
+  it("受け取り履歴を新しい順で返す", async () => {
+    const server = app.getHttpServer();
+    const idToken = `mock.${generateId()}`;
+    const login = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const cookie = login.headers["set-cookie"] as unknown as string[];
+
+    const historyBefore = await request(server).get("/api/v1/me/daily-bonus/history").set("Cookie", cookie).expect(200);
+    expect(historyBefore.body).toEqual([]);
+
+    await request(server).post("/api/v1/me/daily-bonus/claim").set("Cookie", cookie).expect(201);
+
+    const historyAfter = await request(server).get("/api/v1/me/daily-bonus/history").set("Cookie", cookie).expect(200);
+    expect(historyAfter.body).toHaveLength(1);
+    expect(historyAfter.body[0]).toMatchObject({ streak_count: 1, amount: "10" });
+    expect(historyAfter.body[0].claimed_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
 });

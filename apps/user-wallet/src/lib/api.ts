@@ -111,6 +111,12 @@ export interface DailyBonusClaimResult {
   amount: string;
 }
 
+export interface DailyBonusHistoryItem {
+  claimed_date: string;
+  streak_count: number;
+  amount: string;
+}
+
 export type ReferralStatus =
   | { referred: false }
   | {

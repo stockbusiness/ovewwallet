@@ -201,6 +201,9 @@ export default function WalletTopPage() {
                 {dailyBonus.claimed_today ? "受取済み" : claimingBonus ? "受取中..." : "受け取る"}
               </button>
             </div>
+            <Link href="/wallet/daily-bonus/history" className="mt-2 inline-block text-xs text-sengoku-gold-soft underline">
+              受け取り履歴を見る
+            </Link>
           </section>
         )}
 

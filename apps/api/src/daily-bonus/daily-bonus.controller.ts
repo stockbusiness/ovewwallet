@@ -20,4 +20,10 @@ export class DailyBonusController {
   async claim(@Req() req: AuthenticatedUserRequest) {
     return this.dailyBonus.claim(req.account.id);
   }
+
+  @Get("history")
+  @UseGuards(SessionAuthGuard)
+  async history(@Req() req: AuthenticatedUserRequest) {
+    return this.dailyBonus.getHistory(req.account.id);
+  }
 }

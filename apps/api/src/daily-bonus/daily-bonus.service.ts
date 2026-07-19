@@ -55,6 +55,27 @@ export class DailyBonusService {
     };
   }
 
+  /**
+   * 受け取り履歴カレンダー用 (docs/daily-login-bonus.md参照)。直近90日分の請求記録を
+   * 新しい順で返す。連続していない日はレコード自体が存在しない (「飛んだ日」は
+   * クライアント側で日付の抜けとして表現する)。
+   */
+  async getHistory(oveAccountId: string) {
+    const since = new Date();
+    since.setDate(since.getDate() - 90);
+
+    const claims = await this.db.dailyBonusClaim.findMany({
+      where: { oveAccountId, claimedDate: { gte: startOfDay(since) } },
+      orderBy: { claimedDate: "desc" },
+    });
+
+    return claims.map((c) => ({
+      claimed_date: c.claimedDate.toISOString().slice(0, 10),
+      streak_count: c.streakCount,
+      amount: c.amount.toString(),
+    }));
+  }
+
   /** 本日分を請求する。既に本日分を請求済みなら409。 */
   async claim(oveAccountId: string) {
     const wallet = await this.db.wallet.findUnique({ where: { oveAccountId } });
