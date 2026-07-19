@@ -1,5 +1,5 @@
 export type TransactionDirection = "CREDIT" | "DEBIT";
-export type StatusTone = "success" | "warning" | "danger" | "neutral";
+export type StatusTone = "credit" | "success" | "warning" | "danger" | "neutral";
 
 /** 取引ステータス・方向から、画面表示用の日本語ラベルを決める。 */
 export function transactionStatusLabel(status: string, direction: TransactionDirection): string {
@@ -17,11 +17,11 @@ export function transactionStatusLabel(status: string, direction: TransactionDir
   }
 }
 
-/** 取引ステータスから StatusBadge の色調を決める。 */
-export function transactionStatusTone(status: string): StatusTone {
+/** 取引ステータス・方向から StatusBadge の色調を決める。獲得=緑、利用=深紅、保留=金。 */
+export function transactionStatusTone(status: string, direction: TransactionDirection): StatusTone {
   switch (status) {
     case "COMPLETED":
-      return "success";
+      return direction === "CREDIT" ? "credit" : "danger";
     case "HELD":
       return "warning";
     case "REVERSED":

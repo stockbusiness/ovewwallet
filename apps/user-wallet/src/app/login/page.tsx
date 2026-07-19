@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PrimaryButton, SecondaryButton, ChatBubbleIcon, IdCardIcon } from "@ove/shared-ui";
+import { PrimaryButton, AuthButton, ChatBubbleIcon, MailIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
 import {
   isLiffConfigured,
@@ -217,33 +217,27 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden px-6 pb-10 pt-16">
-      <BackgroundGlow />
+    <main className="relative flex min-h-screen flex-col overflow-hidden bg-sengoku-bg pb-10">
+      <CastleHero compact={view !== "choose"} />
 
-      <div className="relative flex flex-1 flex-col justify-center gap-8">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-sengoku-gold/50 bg-sengoku-navy">
-            <span className="font-heading text-2xl font-bold text-sengoku-gold">戦</span>
-          </div>
-          <h1 className="font-heading text-2xl font-bold tracking-wide text-white">戦国ウォレット</h1>
-          <p className="mt-1 text-xs font-semibold tracking-[0.2em] text-sengoku-gold">OVE WALLET</p>
-        </div>
-
+      <div className="relative z-10 flex flex-1 flex-col gap-8 px-6">
         {view === "choose" && (
           <div className="flex flex-col gap-4">
-            <p className="text-center text-sm leading-relaxed text-sengoku-muted">
-              OVEウォレットへようこそ。
-              <br />
-              ご利用のログイン方法を選択してください。
-            </p>
-            <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
-            <PrimaryButton fullWidth onClick={loginWithLine} disabled={loading !== null}>
-              <ChatBubbleIcon className="h-5 w-5" />
+            <div className="text-center">
+              <h2 className="text-lg font-bold text-white">OVEウォレットへようこそ</h2>
+              <p className="mt-1 text-sm text-sengoku-muted">あなたの価値を、未来へつなぐ</p>
+            </div>
+            <AuthButton
+              variant="line"
+              icon={<ChatBubbleIcon className="h-4 w-4" />}
+              onClick={loginWithLine}
+              disabled={loading !== null}
+            >
               {loading === "line" ? "ログイン中..." : "LINEでログイン"}
-            </PrimaryButton>
-            <SecondaryButton
-              fullWidth
-              tone="gold"
+            </AuthButton>
+            <AuthButton
+              variant="email"
+              icon={<MailIcon className="h-4 w-4" />}
               onClick={() => {
                 setError(null);
                 setView("email-request");
@@ -251,19 +245,22 @@ export default function LoginPage() {
               disabled={loading !== null}
             >
               メールでログイン
-            </SecondaryButton>
-            <SecondaryButton
-              fullWidth
-              tone="neutral"
+            </AuthButton>
+            <AuthButton
+              variant="sengoku"
+              icon={<IdCardIcon className="h-4 w-4" />}
               onClick={() => {
                 setError(null);
                 setView("sengoku");
               }}
               disabled={loading !== null}
             >
-              <IdCardIcon className="h-5 w-5" />
               戦国パスポートIDでログイン
-            </SecondaryButton>
+            </AuthButton>
+            <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
+            <Link href="/terms" className="text-center text-xs font-medium text-sengoku-gold underline underline-offset-2">
+              ログインに関するヘルプ
+            </Link>
           </div>
         )}
 
@@ -413,19 +410,74 @@ function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: 
   );
 }
 
-function BackgroundGlow() {
+/**
+ * ログイン画面上部の演出。霧の山並み・城のシルエット・金の円弧モチーフ・
+ * ロゴロックアップをすべてCSS/SVGで構成する (画像素材は使わない)。
+ * choose以外のビュー(メール入力等)ではcompactにして操作の邪魔をしない。
+ */
+function CastleHero({ compact }: { compact: boolean }) {
   return (
-    <div className="pointer-events-none absolute inset-0 -z-10">
-      <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-sengoku-gold/10 blur-3xl" />
-      <svg
-        className="absolute inset-x-0 bottom-0 h-40 w-full text-sengoku-navy"
-        viewBox="0 0 400 120"
-        preserveAspectRatio="none"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M0 120V70l40-22 25 12 35-30 30 20 20-10 45 24 15-8 30 16 20-14 40 22 20-6 30 14 20-10 35 18V120Z" />
+    <div className={`relative overflow-hidden transition-[height] duration-300 ${compact ? "h-40" : "h-[52vh] min-h-[340px]"}`}>
+      <div className="absolute inset-0 bg-gradient-to-b from-[#050506] via-sengoku-bg to-sengoku-bg" />
+
+      {/* 霧 */}
+      <div className="absolute left-[8%] top-6 h-24 w-40 rounded-full bg-white/5 blur-2xl" />
+      <div className="absolute right-[10%] top-16 h-28 w-48 rounded-full bg-white/5 blur-2xl" />
+      <div className="absolute left-1/3 top-2 h-20 w-56 rounded-full bg-white/[0.04] blur-3xl" />
+
+      {/* 山並み (奥) */}
+      <svg className="absolute inset-x-0 bottom-0 h-3/4 w-full text-[#17181d]" viewBox="0 0 400 200" preserveAspectRatio="none" fill="currentColor" aria-hidden="true">
+        <path d="M0 200V90l30-18 25 14 40-32 35 22 25-12 45 26 20-10 35 18 25-14 45 24 20-8 40 20 30-16 30 16V200Z" />
       </svg>
+      {/* 山並み (手前・城のシルエット) */}
+      <svg className="absolute inset-x-0 bottom-0 h-3/5 w-full text-black" viewBox="0 0 400 160" preserveAspectRatio="none" fill="currentColor" aria-hidden="true">
+        <path d="M0 160v-55l35-16 20 10 15-22 10 12 20-8 30 20 10-14 12 10 8-6 30 18 15-10 40 20 30-14 10 8 40-6 45 20V160Z" />
+        <path d="M182 79h8v-8h-8Z" />
+        <path d="M175 71l11-12 11 12-4 8h-14Z" />
+      </svg>
+
+      {!compact && (
+        <div className="absolute inset-x-0 top-[22%] flex justify-center">
+          <div className="relative flex h-44 w-44 items-center justify-center sm:h-52 sm:w-52">
+            <GoldArc className="absolute inset-0 h-full w-full text-sengoku-gold/80" />
+            <div className="relative text-center">
+              <p className="font-heading text-4xl font-bold leading-tight text-white sm:text-5xl">戦国</p>
+              <p className="mt-1 text-sm font-semibold tracking-[0.35em] text-sengoku-gold">WALLET</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {compact && (
+        <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center">
+          <p className="font-heading text-2xl font-bold text-white">
+            戦国<span className="ml-1.5 text-xs font-semibold tracking-[0.3em] text-sengoku-gold">WALLET</span>
+          </p>
+        </div>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-sengoku-bg to-transparent" />
     </div>
+  );
+}
+
+/** 手描き風の金の円弧 (筆で描いたような、一部が途切れた円)。 */
+function GoldArc({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 200 200" className={className} aria-hidden="true">
+      <circle
+        cx="100"
+        cy="100"
+        r="88"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray="430 120"
+        strokeDashoffset="60"
+        transform="rotate(-38 100 100)"
+        opacity="0.9"
+      />
+    </svg>
   );
 }

@@ -9,3 +9,7 @@ export * from "./components/BottomNavigation";
 export * from "./components/SectionHeader";
 export * from "./components/StatusBadge";
 export * from "./components/ServiceLinkCard";
+export * from "./components/AppHeader";
+export * from "./components/ActionGrid";
+export * from "./components/InfoCard";
+export * from "./components/AuthButton";

@@ -58,44 +58,44 @@ export default function TransactionDetailPage() {
   }
 
   const title = transaction.display_name || TRANSACTION_TYPE_LABEL[transaction.transaction_type] || transaction.transaction_type;
-  const signedAmount = `${transaction.direction === "CREDIT" ? "+" : "-"}${Number(transaction.amount).toLocaleString("ja-JP")}`;
+  const isCredit = transaction.direction === "CREDIT";
+  const signedAmount = `${isCredit ? "+" : "-"}${Number(transaction.amount).toLocaleString("ja-JP")}`;
+  const iconClasses = isCredit ? "bg-sengoku-green text-white" : "bg-sengoku-red text-white";
+  const amountColor = isCredit ? "text-sengoku-green" : "text-sengoku-red";
 
   return (
     <main className="flex flex-col gap-6 px-4 pb-10 pt-6">
       <BackHeader />
 
       <section className="flex flex-col items-center gap-3 rounded-xl border border-sengoku-border bg-sengoku-navy px-5 py-8 text-center">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sengoku-gold/10 text-sengoku-gold">
-          {transaction.direction === "CREDIT" ? <GiftIcon className="h-7 w-7" /> : <CartIcon className="h-7 w-7" />}
+        <span className={`flex h-16 w-16 items-center justify-center rounded-full shadow-lg shadow-black/30 ${iconClasses}`}>
+          {isCredit ? <GiftIcon className="h-8 w-8" /> : <CartIcon className="h-8 w-8" />}
         </span>
-        <p className="text-sm text-sengoku-muted">{title}</p>
-        <p className={transaction.direction === "CREDIT" ? "text-3xl font-bold text-sengoku-gold" : "text-3xl font-bold text-white"}>
+        <p className="text-lg font-bold text-white">{title}</p>
+        <p className={`text-3xl font-bold ${amountColor}`}>
           {signedAmount} <span className="text-lg font-semibold text-sengoku-gold-soft">OVE</span>
         </p>
-        <StatusBadge
-          label={transactionStatusLabel(transaction.status, transaction.direction)}
-          tone={transactionStatusTone(transaction.status)}
-        />
       </section>
 
       <section className="divide-y divide-sengoku-border overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
+        <div className="flex items-center justify-between px-4 py-3">
+          <span className="text-xs text-sengoku-muted">ステータス</span>
+          <StatusBadge
+            label={transactionStatusLabel(transaction.status, transaction.direction)}
+            tone={transactionStatusTone(transaction.status, transaction.direction)}
+          />
+        </div>
         <DetailRow label="取引日時" value={new Date(transaction.occurred_at).toLocaleString("ja-JP")} />
         <DetailRow label="取引ID" value={transaction.transaction_code} mono />
         <DetailRow label="取引種別" value={TRANSACTION_TYPE_LABEL[transaction.transaction_type] ?? transaction.transaction_type} />
-        <DetailRow label="方向" value={transaction.direction === "CREDIT" ? "獲得" : "利用"} />
-        <DetailRow label="金額" value={`${signedAmount} OVE`} />
+        <DetailRow label="方向" value={isCredit ? "獲得" : "利用"} />
+        <DetailRow label="金額" value={`${signedAmount} OVE`} valueColor={amountColor} />
         <DetailRow label="残高 (取引前)" value={`${Number(transaction.balance_before).toLocaleString("ja-JP")} OVE`} />
         <DetailRow label="残高 (取引後)" value={`${Number(transaction.balance_after).toLocaleString("ja-JP")} OVE`} />
         {transaction.source_service && <DetailRow label="提供元サービス" value={transaction.source_service} />}
         {transaction.source_reference_id && <DetailRow label="関連ID" value={transaction.source_reference_id} mono />}
+        {transaction.description && <DetailRow label="説明" value={transaction.description} wrap />}
       </section>
-
-      {transaction.description && (
-        <section className="rounded-xl border border-sengoku-border bg-sengoku-navy/50 p-4">
-          <p className="text-xs font-semibold text-sengoku-muted">説明</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-white">{transaction.description}</p>
-        </section>
-      )}
     </main>
   );
 }
@@ -111,11 +111,29 @@ function BackHeader() {
   );
 }
 
-function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function DetailRow({
+  label,
+  value,
+  mono,
+  wrap,
+  valueColor = "text-white",
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  wrap?: boolean;
+  valueColor?: string;
+}) {
   return (
-    <div className="flex items-center justify-between px-4 py-3">
-      <span className="text-xs text-sengoku-muted">{label}</span>
-      <span className={`text-sm font-semibold text-white ${mono ? "font-mono text-xs" : ""}`}>{value}</span>
+    <div className="flex items-start justify-between gap-4 px-4 py-3">
+      <span className="shrink-0 pt-0.5 text-xs text-sengoku-muted">{label}</span>
+      <span
+        className={`text-right text-sm font-semibold ${valueColor} ${mono ? "font-mono text-xs" : ""} ${
+          wrap ? "leading-relaxed" : ""
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

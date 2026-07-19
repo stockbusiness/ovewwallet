@@ -8,27 +8,29 @@ import {
   TransactionItem,
   TRANSACTION_TYPE_LABEL,
   ArrowLeftIcon,
+  FilterIcon,
   HomeIcon,
   ClockIcon,
   GiftIcon,
   CartIcon,
+  MenuIcon,
 } from "@ove/shared-ui";
 import { apiFetch, ApiError, type TransactionSummary } from "@/lib/api";
 
-type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "VOID";
+type FilterKey = "ALL" | "CREDIT" | "DEBIT" | "HELD";
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "ALL", label: "すべて" },
   { key: "CREDIT", label: "獲得" },
   { key: "DEBIT", label: "利用" },
-  { key: "VOID", label: "失効" },
+  { key: "HELD", label: "保留" },
 ];
 
 function matchesFilter(t: TransactionSummary, filter: FilterKey): boolean {
   if (filter === "ALL") return true;
-  if (filter === "VOID") return t.status === "REVERSED" || t.status === "FAILED";
-  if (filter === "CREDIT") return t.direction === "CREDIT" && t.status !== "REVERSED" && t.status !== "FAILED";
-  return t.direction === "DEBIT" && t.status !== "REVERSED" && t.status !== "FAILED";
+  if (filter === "HELD") return t.status === "HELD";
+  if (filter === "CREDIT") return t.direction === "CREDIT" && t.status === "COMPLETED";
+  return t.direction === "DEBIT" && t.status === "COMPLETED";
 }
 
 function monthGroupLabel(iso: string): string {
@@ -77,10 +79,13 @@ export default function TransactionHistoryPage() {
         <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="font-heading text-lg font-bold text-white">取引履歴</h1>
+        <h1 className="flex-1 font-heading text-lg font-bold text-white">取引履歴</h1>
+        <span className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
+          <FilterIcon className="h-5 w-5" />
+        </span>
       </header>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-1 overflow-x-auto pb-1">
         {FILTERS.map((f) => {
           const active = filter === f.key;
           return (
@@ -89,7 +94,7 @@ export default function TransactionHistoryPage() {
               type="button"
               onClick={() => setFilter(f.key)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                active ? "bg-sengoku-red text-white" : "border border-sengoku-border text-sengoku-muted"
+                active ? "bg-sengoku-red text-white" : "text-sengoku-muted hover:text-white"
               }`}
             >
               {f.label}
@@ -134,6 +139,7 @@ export default function TransactionHistoryPage() {
           { href: "/wallet/transactions", label: "履歴", icon: <ClockIcon className="h-5 w-5" />, matchPrefix: true },
           { href: "/wallet/save", label: "貯める", icon: <GiftIcon className="h-5 w-5" />, disabled: true },
           { href: "/wallet/use", label: "使う", icon: <CartIcon className="h-5 w-5" />, disabled: true },
+          { href: "/wallet/menu", label: "メニュー", icon: <MenuIcon className="h-5 w-5" />, disabled: true },
         ]}
       />
     </main>

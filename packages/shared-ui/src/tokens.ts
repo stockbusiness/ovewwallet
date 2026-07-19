@@ -10,6 +10,9 @@ export const colors = {
   samuraiRed: "#B3202A",
   gold: "#D4AF37",
   softGold: "#F5E6B3",
+  // 取引一覧・詳細の「獲得(CREDIT)」表示用。仕様書のテキストには無いが、
+  // 見本画像のピクセルサンプリングにより特定した色 (獲得=緑/利用=深紅で色分けするため)。
+  creditGreen: "#35B072",
   textPrimary: "#FFFFFF",
   textSecondary: "#BFBFBF",
   textMuted: "#7A7A7A",

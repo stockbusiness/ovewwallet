@@ -129,6 +129,15 @@ export function ChatBubbleIcon(props: IconProps) {
   );
 }
 
+export function MailIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="1.4" />
+      <path d="m4 6.5 8 6.5 8-6.5" />
+    </svg>
+  );
+}
+
 export function IdCardIcon(props: IconProps) {
   return (
     <svg {...base(props)}>

@@ -20,6 +20,7 @@ const config: Config = {
           red: "#B3202A",
           gold: "#D4AF37",
           "gold-soft": "#F5E6B3",
+          green: "#35B072",
           muted: "#BFBFBF",
           faint: "#7A7A7A",
           border: "#2A2A2E",
