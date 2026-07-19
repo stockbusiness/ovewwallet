@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [wallets, setWallets] = useState<WalletListItem[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<TransactionItemType[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -39,11 +40,16 @@ export default function DashboardPage() {
         setStats(statsRes);
         setRecentTransactions(txnsRes);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
 
+  if (error) return <p className="p-6 text-sm text-sengoku-red">{error}</p>;
   if (!me || !stats) return <p className="p-6 text-sm text-neutral-500">読み込み中...</p>;
 
   const totalAvailable = wallets.reduce((sum, w) => sum + Number(w.availableBalance), 0);

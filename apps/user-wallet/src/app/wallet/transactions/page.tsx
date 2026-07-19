@@ -43,6 +43,7 @@ export default function TransactionHistoryPage() {
   const router = useRouter();
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>("ALL");
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function TransactionHistoryPage() {
           router.push("/login");
           return;
         }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       } finally {
         setLoading(false);
       }
@@ -106,8 +108,9 @@ export default function TransactionHistoryPage() {
       </div>
 
       {loading && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+      {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && !error && filtered.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
           該当する取引はありません
         </p>
