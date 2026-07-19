@@ -10,6 +10,7 @@ export default function NoticesPage() {
   const router = useRouter();
   const [notices, setNotices] = useState<Notice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importantOnly, setImportantOnly] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -44,14 +45,41 @@ export default function NoticesPage() {
 
       {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
       {!error && notices === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+
+      {notices !== null && notices.length > 0 && (
+        <div className="flex gap-2">
+          {([false, true] as const).map((value) => {
+            const active = importantOnly === value;
+            return (
+              <button
+                key={String(value)}
+                type="button"
+                onClick={() => setImportantOnly(value)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                  active ? "bg-sengoku-red text-white" : "text-sengoku-muted hover:text-sengoku-text"
+                }`}
+              >
+                {value ? "重要のみ" : "すべて"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {notices?.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
           お知らせはありません
         </p>
       )}
 
+      {notices !== null && notices.length > 0 && importantOnly && notices.every((n) => n.importance !== "IMPORTANT") && (
+        <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
+          重要なお知らせはありません
+        </p>
+      )}
+
       <ul className="flex flex-col gap-2">
-        {notices?.map((n) => (
+        {notices?.filter((n) => !importantOnly || n.importance === "IMPORTANT").map((n) => (
           <li
             key={n.id}
             className={`rounded-xl border bg-sengoku-navy p-4 ${n.importance === "IMPORTANT" ? "border-sengoku-red" : "border-sengoku-border"}`}
