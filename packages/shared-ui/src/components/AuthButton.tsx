@@ -10,15 +10,17 @@ export interface AuthButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   icon?: ReactNode;
 }
 
+// これらは戦国パスポート/LINE/メールいずれもブランド上「常にこの配色」の指定
+// (仕様書5章)であり、ライト/ダークテーマの影響を受けない固定色で統一する。
 const VARIANT_CLASSES: Record<AuthButtonVariant, string> = {
   line: "bg-[#06C755] text-white hover:bg-[#05b34c] active:bg-[#049a42]",
-  email: "bg-white text-sengoku-navy hover:bg-white/90 active:bg-white/85",
+  email: "bg-white text-sengoku-ink border border-black/10 hover:bg-white/90 active:bg-white/85",
   sengoku: "bg-black text-white border border-sengoku-gold/40 hover:bg-white/5 active:bg-white/10",
 };
 
 const ICON_WRAP_CLASSES: Record<AuthButtonVariant, string> = {
   line: "bg-white text-[#06C755]",
-  email: "bg-sengoku-navy text-white",
+  email: "bg-sengoku-ink text-white",
   sengoku: "bg-transparent text-sengoku-gold",
 };
 

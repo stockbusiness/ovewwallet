@@ -18,9 +18,12 @@ const PAD_LEFT = 56;
 const PAD_RIGHT = 16;
 const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
-const GOLD = "#D4AF37";
-const RED = "#B3202A";
-const SURFACE = "#0F1626";
+// CSS変数を参照し、ダーク/ライト両テーマに追従させる (globals.css参照)。
+const GOLD = "rgb(var(--sengoku-gold))";
+const RED = "rgb(var(--sengoku-red))";
+const SURFACE = "rgb(var(--sengoku-navy))";
+const GRID_LINE = "rgb(var(--sengoku-border))";
+const AXIS_TEXT = "rgb(var(--sengoku-faint))";
 
 function niceMax(value: number): number {
   if (value <= 0) return 10;
@@ -96,8 +99,8 @@ export function TrendChart({ data }: TrendChartProps) {
           const y = PAD_TOP + plotHeight * (1 - tick / maxValue);
           return (
             <g key={tick}>
-              <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={y} y2={y} stroke="#2A2A2E" strokeWidth={1} />
-              <text x={PAD_LEFT - 8} y={y + 3} textAnchor="end" fontSize={10} fill="#7A7A7A">
+              <line x1={PAD_LEFT} x2={WIDTH - PAD_RIGHT} y1={y} y2={y} stroke={GRID_LINE} strokeWidth={1} />
+              <text x={PAD_LEFT - 8} y={y + 3} textAnchor="end" fontSize={10} fill={AXIS_TEXT}>
                 {tick.toLocaleString("ja-JP")}
               </text>
             </g>
@@ -122,7 +125,7 @@ export function TrendChart({ data }: TrendChartProps) {
             x2={PAD_LEFT + (plotWidth / Math.max(1, data.length - 1)) * hoverIndex}
             y1={PAD_TOP}
             y2={PAD_TOP + plotHeight}
-            stroke="#7A7A7A"
+            stroke={AXIS_TEXT}
             strokeWidth={1}
             strokeDasharray="3,3"
           />
@@ -136,7 +139,7 @@ export function TrendChart({ data }: TrendChartProps) {
 
       {hovered && (
         <div className="mt-2 rounded-lg border border-sengoku-border bg-sengoku-bg px-3 py-2 text-xs text-sengoku-muted">
-          <span className="font-semibold text-white">{hovered.date}</span>
+          <span className="font-semibold text-sengoku-text">{hovered.date}</span>
           <span className="ml-3" style={{ color: GOLD }}>
             発行 {Number(hovered.credited).toLocaleString("ja-JP")} OVE
           </span>

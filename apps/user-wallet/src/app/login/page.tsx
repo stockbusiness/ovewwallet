@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PrimaryButton, AuthButton, ChatBubbleIcon, MailIcon, IdCardIcon } from "@ove/shared-ui";
+import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
 import {
   isLiffConfigured,
@@ -219,12 +219,13 @@ export default function LoginPage() {
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-sengoku-bg pb-10">
       <CastleHero compact={view !== "choose"} />
+      <ThemeToggle className="absolute right-4 top-4 z-20 bg-black/20 backdrop-blur" />
 
       <div className="relative z-10 flex flex-1 flex-col gap-8 px-6">
         {view === "choose" && (
           <div className="flex flex-col gap-4">
             <div className="text-center">
-              <h2 className="text-lg font-bold text-white">OVEウォレットへようこそ</h2>
+              <h2 className="text-lg font-bold text-sengoku-text">OVEウォレットへようこそ</h2>
               <p className="mt-1 text-sm text-sengoku-muted">あなたの価値を、未来へつなぐ</p>
             </div>
             <AuthButton
@@ -266,7 +267,7 @@ export default function LoginPage() {
 
         {view === "email-request" && (
           <form onSubmit={requestOtp} className="flex flex-col gap-4">
-            <label className="text-sm font-semibold text-white">
+            <label className="text-sm font-semibold text-sengoku-text">
               メールアドレス
               <input
                 type="email"
@@ -274,7 +275,7 @@ export default function LoginPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-sengoku-text placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
                 placeholder="you@example.com"
               />
             </label>
@@ -302,7 +303,7 @@ export default function LoginPage() {
                 開発環境用コード: <span className="font-mono text-sm font-bold">{devCode}</span>
               </p>
             )}
-            <label className="text-sm font-semibold text-white">
+            <label className="text-sm font-semibold text-sengoku-text">
               確認コード
               <input
                 type="text"
@@ -312,7 +313,7 @@ export default function LoginPage() {
                 autoFocus
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-center text-lg tracking-[0.5em] text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-center text-lg tracking-[0.5em] text-sengoku-text placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
                 placeholder="000000"
               />
             </label>
@@ -335,7 +336,7 @@ export default function LoginPage() {
 
         {view === "sengoku" && (
           <form onSubmit={loginWithSengokuPassport} className="flex flex-col gap-4">
-            <label className="text-sm font-semibold text-white">
+            <label className="text-sm font-semibold text-sengoku-text">
               戦国パスポート会員ID
               <input
                 type="text"
@@ -343,7 +344,7 @@ export default function LoginPage() {
                 autoFocus
                 value={sengokuMemberId}
                 onChange={(e) => setSengokuMemberId(e.target.value)}
-                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-white placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
+                className="mt-1.5 w-full rounded-lg border border-sengoku-border bg-sengoku-navy px-4 py-3 text-base text-sengoku-text placeholder:text-sengoku-faint focus:border-sengoku-gold focus:outline-none"
                 placeholder="SP-000000"
               />
             </label>
@@ -418,19 +419,31 @@ function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: 
 function CastleHero({ compact }: { compact: boolean }) {
   return (
     <div className={`relative overflow-hidden transition-[height] duration-300 ${compact ? "h-40" : "h-[52vh] min-h-[340px]"}`}>
-      <div className="absolute inset-0 bg-gradient-to-b from-[#050506] via-sengoku-bg to-sengoku-bg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--hero-sky))] via-sengoku-bg to-sengoku-bg" />
 
-      {/* 霧 */}
-      <div className="absolute left-[8%] top-6 h-24 w-40 rounded-full bg-white/5 blur-2xl" />
-      <div className="absolute right-[10%] top-16 h-28 w-48 rounded-full bg-white/5 blur-2xl" />
-      <div className="absolute left-1/3 top-2 h-20 w-56 rounded-full bg-white/[0.04] blur-3xl" />
+      {/* 霧 (常に白系。夜霧・朝霧どちらの配色でも自然に馴染むため固定色) */}
+      <div className="absolute left-[8%] top-6 h-24 w-40 rounded-full bg-white/20 blur-2xl" />
+      <div className="absolute right-[10%] top-16 h-28 w-48 rounded-full bg-white/20 blur-2xl" />
+      <div className="absolute left-1/3 top-2 h-20 w-56 rounded-full bg-white/10 blur-3xl" />
 
       {/* 山並み (奥) */}
-      <svg className="absolute inset-x-0 bottom-0 h-3/4 w-full text-[#17181d]" viewBox="0 0 400 200" preserveAspectRatio="none" fill="currentColor" aria-hidden="true">
+      <svg
+        className="absolute inset-x-0 bottom-0 h-3/4 w-full text-[rgb(var(--hero-mountain-back))]"
+        viewBox="0 0 400 200"
+        preserveAspectRatio="none"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         <path d="M0 200V90l30-18 25 14 40-32 35 22 25-12 45 26 20-10 35 18 25-14 45 24 20-8 40 20 30-16 30 16V200Z" />
       </svg>
       {/* 山並み (手前・城のシルエット) */}
-      <svg className="absolute inset-x-0 bottom-0 h-3/5 w-full text-black" viewBox="0 0 400 160" preserveAspectRatio="none" fill="currentColor" aria-hidden="true">
+      <svg
+        className="absolute inset-x-0 bottom-0 h-3/5 w-full text-[rgb(var(--hero-mountain-front))]"
+        viewBox="0 0 400 160"
+        preserveAspectRatio="none"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         <path d="M0 160v-55l35-16 20 10 15-22 10 12 20-8 30 20 10-14 12 10 8-6 30 18 15-10 40 20 30-14 10 8 40-6 45 20V160Z" />
         <path d="M182 79h8v-8h-8Z" />
         <path d="M175 71l11-12 11 12-4 8h-14Z" />
@@ -441,7 +454,7 @@ function CastleHero({ compact }: { compact: boolean }) {
           <div className="relative flex h-44 w-44 items-center justify-center sm:h-52 sm:w-52">
             <GoldArc className="absolute inset-0 h-full w-full text-sengoku-gold/80" />
             <div className="relative text-center">
-              <p className="font-heading text-4xl font-bold leading-tight text-white sm:text-5xl">戦国</p>
+              <p className="font-heading text-4xl font-bold leading-tight text-sengoku-text sm:text-5xl">戦国</p>
               <p className="mt-1 text-sm font-semibold tracking-[0.35em] text-sengoku-gold">WALLET</p>
             </div>
           </div>
@@ -450,7 +463,7 @@ function CastleHero({ compact }: { compact: boolean }) {
 
       {compact && (
         <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col items-center">
-          <p className="font-heading text-2xl font-bold text-white">
+          <p className="font-heading text-2xl font-bold text-sengoku-text">
             戦国<span className="ml-1.5 text-xs font-semibold tracking-[0.3em] text-sengoku-gold">WALLET</span>
           </p>
         </div>

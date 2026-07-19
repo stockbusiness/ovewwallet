@@ -13,3 +13,5 @@ export * from "./components/AppHeader";
 export * from "./components/ActionGrid";
 export * from "./components/InfoCard";
 export * from "./components/AuthButton";
+export * from "./components/ThemeToggle";
+export * from "./theme";

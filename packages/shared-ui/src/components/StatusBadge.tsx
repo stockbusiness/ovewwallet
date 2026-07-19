@@ -7,7 +7,7 @@ export interface StatusBadgeProps {
 
 const TONE_CLASSES: Record<StatusTone, string> = {
   credit: "bg-sengoku-green text-white",
-  success: "bg-sengoku-gold text-sengoku-navy",
+  success: "bg-sengoku-gold text-sengoku-ink",
   warning: "border border-sengoku-gold text-sengoku-gold bg-transparent",
   danger: "bg-sengoku-red text-white",
   neutral: "border border-sengoku-border text-sengoku-muted bg-transparent",

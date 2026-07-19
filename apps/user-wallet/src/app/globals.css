@@ -2,6 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * 戦国ウォレット デザイントークン (ダーク/ライト)。
+ * Tailwind側 (tailwind.config.ts) は rgb(var(--sengoku-x) / <alpha-value>) 方式で
+ * これらを参照するため、値は "R G B" のスペース区切りで定義する。
+ * デフォルト(:root)はダーク。[data-theme="light"] がライトモードの上書き値。
+ */
+:root {
+  --sengoku-bg: 14 14 17;
+  --sengoku-surface: 11 11 13;
+  --sengoku-navy: 15 22 38;
+  --sengoku-navy-deep: 3 3 4;
+  --sengoku-red: 179 32 42;
+  --sengoku-gold: 212 175 55;
+  --sengoku-gold-soft: 245 230 179;
+  --sengoku-green: 53 176 114;
+  --sengoku-text: 255 255 255;
+  --sengoku-muted: 191 191 191;
+  --sengoku-faint: 122 122 122;
+  --sengoku-border: 42 42 46;
+  /* ライトでもダークでも変化しない固定の濃紺 (白背景ボタンの文字色など) */
+  --sengoku-ink: 15 22 38;
+  /* ログイン画面CastleHero専用 (夜の山並み → 朝焼けの山並みに切り替える) */
+  --hero-sky: 5 5 6;
+  --hero-mountain-back: 23 24 29;
+  --hero-mountain-front: 0 0 0;
+}
+
+[data-theme="light"] {
+  --sengoku-bg: 247 244 236;
+  --sengoku-surface: 255 255 255;
+  --sengoku-navy: 255 255 255;
+  --sengoku-navy-deep: 239 234 217;
+  --sengoku-red: 179 32 42;
+  --sengoku-gold: 154 111 15;
+  --sengoku-gold-soft: 138 106 47;
+  --sengoku-green: 30 143 87;
+  --sengoku-text: 26 26 26;
+  --sengoku-muted: 91 91 91;
+  --sengoku-faint: 138 138 138;
+  --sengoku-border: 227 223 211;
+  --hero-sky: 237 230 211;
+  --hero-mountain-back: 201 191 160;
+  --hero-mountain-front: 156 143 107;
+}
+
 body {
-  @apply bg-sengoku-bg text-white;
+  @apply bg-sengoku-bg text-sengoku-text;
 }

@@ -18,6 +18,7 @@ import {
   BellIcon,
   LinkIcon,
   MenuIcon,
+  ThemeToggle,
 } from "@ove/shared-ui";
 import { apiFetch, ApiError, type OveAccount, type TransactionSummary, type WalletBalance } from "@/lib/api";
 
@@ -56,10 +57,13 @@ export default function WalletTopPage() {
     <main className="flex flex-col gap-6 pb-24">
       <AppHeader
         right={
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sengoku-border text-sengoku-muted">
-            <BellIcon className="h-4 w-4" />
-            <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-sengoku-red" />
-          </span>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-sengoku-border text-sengoku-muted">
+              <BellIcon className="h-4 w-4" />
+              <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-sengoku-red" />
+            </span>
+          </div>
         }
       />
 

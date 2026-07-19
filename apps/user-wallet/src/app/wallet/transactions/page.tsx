@@ -14,6 +14,7 @@ import {
   GiftIcon,
   CartIcon,
   MenuIcon,
+  ThemeToggle,
 } from "@ove/shared-ui";
 import { apiFetch, ApiError, type TransactionSummary } from "@/lib/api";
 
@@ -79,7 +80,8 @@ export default function TransactionHistoryPage() {
         <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="flex-1 font-heading text-lg font-bold text-white">取引履歴</h1>
+        <h1 className="flex-1 font-heading text-lg font-bold text-sengoku-text">取引履歴</h1>
+        <ThemeToggle className="h-8 w-8 border-none" />
         <span className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <FilterIcon className="h-5 w-5" />
         </span>
@@ -94,7 +96,7 @@ export default function TransactionHistoryPage() {
               type="button"
               onClick={() => setFilter(f.key)}
               className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                active ? "bg-sengoku-red text-white" : "text-sengoku-muted hover:text-white"
+                active ? "bg-sengoku-red text-white" : "text-sengoku-muted hover:text-sengoku-text"
               }`}
             >
               {f.label}

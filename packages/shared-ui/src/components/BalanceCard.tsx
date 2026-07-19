@@ -20,7 +20,7 @@ export interface BalanceCardProps {
 export function BalanceCard({ label = "利用可能残高", amount, unit = "OVE", stats = [], footnote }: BalanceCardProps) {
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-sengoku-gold/50 bg-gradient-to-br from-sengoku-navy via-sengoku-navy to-black p-5"
+      className="relative overflow-hidden rounded-2xl border border-sengoku-gold/50 bg-gradient-to-br from-sengoku-navy via-sengoku-navy to-sengoku-navy-deep p-5"
       style={{ boxShadow: "0 0 0 1px rgba(212,175,55,0.08), 0 12px 32px rgba(0,0,0,0.45), 0 0 24px rgba(212,175,55,0.1)" }}
     >
       <CastleSilhouette className="pointer-events-none absolute -bottom-2 -right-4 h-32 w-32 text-sengoku-gold opacity-[0.14]" />
@@ -38,7 +38,7 @@ export function BalanceCard({ label = "利用可能残高", amount, unit = "OVE"
             {stats.map((s) => (
               <div key={s.label}>
                 <dt className="text-xs text-sengoku-muted">{s.label}</dt>
-                <dd className="mt-0.5 text-sm font-semibold text-white">{s.value}</dd>
+                <dd className="mt-0.5 text-sm font-semibold text-sengoku-text">{s.value}</dd>
               </div>
             ))}
           </dl>

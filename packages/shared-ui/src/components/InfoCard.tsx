@@ -13,7 +13,7 @@ export function InfoCard({ title, message, date, actionLabel, actionHref }: Info
   return (
     <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-white">{title}</h2>
+        <h2 className="text-sm font-bold text-sengoku-text">{title}</h2>
         {actionLabel && actionHref && (
           <Link href={actionHref} className="text-xs font-semibold text-sengoku-gold">
             {actionLabel} ›

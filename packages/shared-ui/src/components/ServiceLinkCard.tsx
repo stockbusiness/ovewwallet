@@ -14,7 +14,7 @@ export interface ServiceLinkCardProps {
  */
 export function ServiceLinkCard({ icon, label, href, disabled }: ServiceLinkCardProps) {
   const iconColor = disabled ? "text-sengoku-faint" : "text-sengoku-gold";
-  const labelColor = disabled ? "text-sengoku-faint" : "text-white";
+  const labelColor = disabled ? "text-sengoku-faint" : "text-sengoku-text";
   const classes =
     "flex flex-col items-center justify-center gap-1.5 rounded-xl border border-sengoku-border bg-sengoku-navy px-2 py-3.5 text-center transition-colors";
 
@@ -30,7 +30,7 @@ export function ServiceLinkCard({ icon, label, href, disabled }: ServiceLinkCard
     return <div className={`${classes} opacity-70`}>{inner}</div>;
   }
   return (
-    <Link href={href} className={`${classes} hover:border-sengoku-gold/60 active:bg-black/20`}>
+    <Link href={href} className={`${classes} hover:border-sengoku-gold/60 active:bg-sengoku-text/10`}>
       {inner}
     </Link>
   );

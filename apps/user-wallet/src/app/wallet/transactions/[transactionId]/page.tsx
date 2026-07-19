@@ -71,7 +71,7 @@ export default function TransactionDetailPage() {
         <span className={`flex h-16 w-16 items-center justify-center rounded-full shadow-lg shadow-black/30 ${iconClasses}`}>
           {isCredit ? <GiftIcon className="h-8 w-8" /> : <CartIcon className="h-8 w-8" />}
         </span>
-        <p className="text-lg font-bold text-white">{title}</p>
+        <p className="text-lg font-bold text-sengoku-text">{title}</p>
         <p className={`text-3xl font-bold ${amountColor}`}>
           {signedAmount} <span className="text-lg font-semibold text-sengoku-gold-soft">OVE</span>
         </p>
@@ -106,7 +106,7 @@ function BackHeader() {
       <Link href="/wallet/transactions" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
         <ArrowLeftIcon className="h-5 w-5" />
       </Link>
-      <h1 className="font-heading text-lg font-bold text-white">取引詳細</h1>
+      <h1 className="font-heading text-lg font-bold text-sengoku-text">取引詳細</h1>
     </header>
   );
 }
@@ -116,7 +116,7 @@ function DetailRow({
   value,
   mono,
   wrap,
-  valueColor = "text-white",
+  valueColor = "text-sengoku-text",
 }: {
   label: string;
   value: string;

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
-import { TransactionItem, GiftIcon, CartIcon, StatusBadge } from "@ove/shared-ui";
+import { TransactionItem, GiftIcon, CartIcon, StatusBadge, ThemeToggle } from "@ove/shared-ui";
 import {
   apiFetch,
   ApiError,
@@ -65,11 +65,12 @@ export default function DashboardPage() {
         <main className="mx-auto max-w-6xl">
           <div className="mb-6 flex items-center justify-between">
             <div>
-              <h1 className="font-heading text-xl font-bold text-white">戦国ウォレット ダッシュボード</h1>
+              <h1 className="font-heading text-xl font-bold text-sengoku-text">戦国ウォレット ダッシュボード</h1>
               <p className="mt-1 text-sm text-sengoku-muted">
                 ログイン中: {me.displayName} ({me.role})
               </p>
             </div>
+            <ThemeToggle />
           </div>
 
           <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -81,12 +82,12 @@ export default function DashboardPage() {
 
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5 lg:col-span-2">
-              <h2 className="mb-4 text-sm font-bold text-white">OVE発行・利用推移 (過去30日)</h2>
+              <h2 className="mb-4 text-sm font-bold text-sengoku-text">OVE発行・利用推移 (過去30日)</h2>
               <TrendChart data={stats.dailyTrend} />
             </section>
 
             <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5">
-              <h2 className="mb-3 text-sm font-bold text-white">最近の取引</h2>
+              <h2 className="mb-3 text-sm font-bold text-sengoku-text">最近の取引</h2>
               {recentTransactions.length === 0 ? (
                 <p className="text-xs text-sengoku-faint">取引はありません</p>
               ) : (
@@ -115,7 +116,7 @@ export default function DashboardPage() {
 
           <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white">残高整合性チェック (指示書17章)</h2>
+              <h2 className="text-sm font-bold text-sengoku-text">残高整合性チェック (指示書17章)</h2>
               <StatusBadge
                 label={reconciliation && reconciliation.mismatchedWalletCount > 0 ? "要確認" : "正常"}
                 tone={reconciliation && reconciliation.mismatchedWalletCount > 0 ? "danger" : "success"}
@@ -125,7 +126,7 @@ export default function DashboardPage() {
               <>
                 <p className="mb-2 text-sm text-sengoku-muted">
                   検査対象: {reconciliation.checkedWalletCount}件 / 不一致:{" "}
-                  <span className={reconciliation.mismatchedWalletCount > 0 ? "font-bold text-sengoku-red" : "text-white"}>
+                  <span className={reconciliation.mismatchedWalletCount > 0 ? "font-bold text-sengoku-red" : "text-sengoku-text"}>
                     {reconciliation.mismatchedWalletCount}件
                   </span>
                 </p>
@@ -142,7 +143,7 @@ export default function DashboardPage() {
                     <tbody>
                       {reconciliation.mismatched.map((m) => (
                         <tr key={m.walletId} className="border-t border-sengoku-border">
-                          <td className="py-1.5 text-white">{m.walletCode}</td>
+                          <td className="py-1.5 text-sengoku-text">{m.walletCode}</td>
                           <td className="py-1.5 text-sengoku-muted">{m.computedBalance}</td>
                           <td className="py-1.5 text-sengoku-muted">{m.cachedBalance}</td>
                           <td className="py-1.5 font-semibold text-sengoku-red">{m.difference}</td>

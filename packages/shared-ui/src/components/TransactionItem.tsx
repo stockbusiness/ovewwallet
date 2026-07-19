@@ -22,7 +22,7 @@ export function TransactionItem({ icon, title, subtitle, amount, direction, unit
     <div className="flex items-center gap-3 px-4 py-3">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconClasses}`}>{icon}</span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{title}</p>
+        <p className="truncate text-sm font-semibold text-sengoku-text">{title}</p>
         <p className="mt-0.5 truncate text-xs text-sengoku-muted">{subtitle}</p>
       </div>
       <span className={`shrink-0 text-right text-sm font-bold ${amountColor}`}>
@@ -34,7 +34,7 @@ export function TransactionItem({ icon, title, subtitle, amount, direction, unit
 
   if (href) {
     return (
-      <Link href={href} className="block transition-colors hover:bg-white/5 active:bg-white/10">
+      <Link href={href} className="block transition-colors hover:bg-sengoku-text/5 active:bg-sengoku-text/10">
         {content}
       </Link>
     );

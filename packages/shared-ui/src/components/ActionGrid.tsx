@@ -21,7 +21,7 @@ export function ActionGrid({ items }: ActionGridProps) {
         const inner = (
           <>
             <span className={disabled ? "text-sengoku-faint" : "text-sengoku-gold"}>{item.icon}</span>
-            <span className={`text-[11px] font-semibold ${disabled ? "text-sengoku-faint" : "text-white"}`}>{item.label}</span>
+            <span className={`text-[11px] font-semibold ${disabled ? "text-sengoku-faint" : "text-sengoku-text"}`}>{item.label}</span>
           </>
         );
         const classes = "flex flex-col items-center gap-2 rounded-lg py-2 text-center transition-colors";
@@ -33,7 +33,7 @@ export function ActionGrid({ items }: ActionGridProps) {
           );
         }
         return (
-          <Link key={item.label} href={item.href!} className={`${classes} active:bg-white/5`}>
+          <Link key={item.label} href={item.href!} className={`${classes} active:bg-sengoku-text/5`}>
             {inner}
           </Link>
         );

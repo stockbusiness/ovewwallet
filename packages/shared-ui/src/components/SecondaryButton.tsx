@@ -12,7 +12,7 @@ export interface SecondaryButtonProps extends ButtonHTMLAttributes<HTMLButtonEle
 
 const TONE_CLASSES: Record<NonNullable<SecondaryButtonProps["tone"]>, string> = {
   gold: "border-sengoku-gold text-sengoku-gold hover:bg-sengoku-gold/10 active:bg-sengoku-gold/15",
-  neutral: "border-sengoku-border text-white hover:bg-white/5 active:bg-white/10",
+  neutral: "border-sengoku-border text-sengoku-text hover:bg-sengoku-text/5 active:bg-sengoku-text/10",
 };
 
 const BASE_CLASSES =

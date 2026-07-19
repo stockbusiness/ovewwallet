@@ -10,10 +10,10 @@ export function AppHeader({ right }: AppHeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 pb-4 pt-5">
       <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sengoku-gold/70 bg-gradient-to-br from-sengoku-navy to-black text-sengoku-gold">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-sengoku-gold/70 bg-gradient-to-br from-sengoku-navy to-sengoku-navy-deep text-sengoku-gold">
           <KabutoMark className="h-5 w-5" />
         </span>
-        <p className="font-heading leading-none text-white">
+        <p className="font-heading leading-none text-sengoku-text">
           <span className="text-lg font-bold tracking-wide">戦国</span>
           <span className="ml-1 text-[11px] font-semibold tracking-[0.2em] text-sengoku-gold">WALLET</span>
         </p>

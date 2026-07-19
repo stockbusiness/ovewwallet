@@ -8,7 +8,7 @@ export default function TermsPage() {
         <Link href="/login" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="font-heading text-lg font-bold text-white">OVE利用規約</h1>
+        <h1 className="font-heading text-lg font-bold text-sengoku-text">OVE利用規約</h1>
       </header>
       <p className="text-xs text-sengoku-faint">バージョン 1.0</p>
 
@@ -44,7 +44,7 @@ export default function TermsPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1 text-sm font-bold text-white">{title}</h2>
+      <h2 className="mb-1 text-sm font-bold text-sengoku-text">{title}</h2>
       <p>{children}</p>
     </section>
   );
