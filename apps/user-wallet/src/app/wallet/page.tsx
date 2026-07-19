@@ -30,6 +30,8 @@ import {
   type WalletBalance,
   type Notice,
   type WalletHoldItem,
+  type DailyBonusStatus,
+  type DailyBonusClaimResult,
 } from "@/lib/api";
 
 export default function WalletTopPage() {
@@ -39,6 +41,9 @@ export default function WalletTopPage() {
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [holds, setHolds] = useState<WalletHoldItem[]>([]);
+  const [dailyBonus, setDailyBonus] = useState<DailyBonusStatus | null>(null);
+  const [claimingBonus, setClaimingBonus] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,9 +65,9 @@ export default function WalletTopPage() {
         setError("読み込みに失敗しました");
         return;
       }
-      // お知らせ・保留内訳は補助的な情報のため、取得に失敗してもホーム画面自体は表示する
-      // (デプロイのタイミング差でこのエンドポイントだけ未反映という事態が過去に
-      // 実際に発生したため、致命的な扱いにしない)。
+      // お知らせ・保留内訳・継続ログインボーナスは補助的な情報のため、取得に失敗しても
+      // ホーム画面自体は表示する (デプロイのタイミング差でこのエンドポイントだけ
+      // 未反映という事態が過去に実際に発生したため、致命的な扱いにしない)。
       try {
         setNotices(await apiFetch<Notice[]>("/api/v1/me/notices"));
       } catch {
@@ -73,8 +78,35 @@ export default function WalletTopPage() {
       } catch {
         setHolds([]);
       }
+      try {
+        setDailyBonus(await apiFetch<DailyBonusStatus>("/api/v1/me/daily-bonus/status"));
+      } catch {
+        setDailyBonus(null);
+      }
     })();
   }, [router]);
+
+  async function claimDailyBonus() {
+    setClaimingBonus(true);
+    try {
+      const result = await apiFetch<DailyBonusClaimResult>("/api/v1/me/daily-bonus/claim", { method: "POST" });
+      setDailyBonus({
+        claimed_today: true,
+        current_streak: result.current_streak,
+        next_streak: result.current_streak,
+        next_amount: result.amount,
+      });
+      setToast(`${result.amount} OVEを受け取りました (${result.current_streak}日連続)`);
+      setBalance((prev) =>
+        prev ? { ...prev, available_balance: String(Number(prev.available_balance) + Number(result.amount)) } : prev,
+      );
+    } catch {
+      setToast("受け取りに失敗しました");
+    } finally {
+      setClaimingBonus(false);
+      window.setTimeout(() => setToast(null), 2000);
+    }
+  }
 
   const unreadCount = useMemo(() => notices.filter((n) => !n.is_read).length, [notices]);
 
@@ -82,7 +114,15 @@ export default function WalletTopPage() {
   if (!account || !balance) return <p className="p-6 text-sm text-sengoku-muted">読み込み中...</p>;
 
   return (
-    <main className="flex flex-col gap-6 pb-24">
+    <main className="relative flex flex-col gap-6 pb-24">
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 flex justify-center px-6">
+          <div className="rounded-full bg-sengoku-ink px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-black/30">
+            {toast}
+          </div>
+        </div>
+      )}
+
       <AppHeader
         right={
           <div className="flex items-center gap-2">
@@ -110,6 +150,29 @@ export default function WalletTopPage() {
         />
 
         <RankBadge lifetimeCredited={Number(balance.lifetime_credited)} />
+
+        {dailyBonus && (
+          <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-sengoku-text">継続ログインボーナス</h2>
+                <p className="mt-0.5 text-xs text-sengoku-muted">
+                  {dailyBonus.claimed_today
+                    ? `本日は受け取り済み (${dailyBonus.current_streak}日連続)`
+                    : `${dailyBonus.next_streak}日目・${Number(dailyBonus.next_amount).toLocaleString("ja-JP")} OVE`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={claimDailyBonus}
+                disabled={dailyBonus.claimed_today || claimingBonus}
+                className="shrink-0 rounded-full bg-sengoku-red px-4 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:bg-sengoku-border disabled:text-sengoku-faint"
+              >
+                {dailyBonus.claimed_today ? "受取済み" : claimingBonus ? "受取中..." : "受け取る"}
+              </button>
+            </div>
+          </section>
+        )}
 
         {holds.length > 0 && (
           <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">

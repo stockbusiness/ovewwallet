@@ -118,6 +118,7 @@ enum TransactionType {
   REFERRAL_REWARD
   PURCHASE_REWARD
   GACHA_REWARD
+  DAILY_LOGIN_BONUS
   ADMIN_GRANT
   ADMIN_DEDUCTION
   OPENING_BALANCE
@@ -251,12 +252,13 @@ model OveAccount {
   mergedIntoAccount OveAccount?  @relation("AccountMerge", fields: [mergedIntoAccountId], references: [id])
   mergedAccounts    OveAccount[] @relation("AccountMerge")
 
-  identities      AccountIdentity[]
-  links           AccountLink[]
-  wallet          Wallet?
-  sessions        UserSession[]
-  walletReferrals WalletReferral[]
-  noticeReads     NoticeRead[]
+  identities        AccountIdentity[]
+  links             AccountLink[]
+  wallet            Wallet?
+  sessions          UserSession[]
+  walletReferrals   WalletReferral[]
+  noticeReads       NoticeRead[]
+  dailyBonusClaims  DailyBonusClaim[]
 
   @@map("ove_accounts")
 }
@@ -440,10 +442,32 @@ model OveTransaction {
   relatedTransaction OveTransaction?  @relation("TransactionReversal", fields: [relatedTransactionId], references: [id])
   reversals          OveTransaction[] @relation("TransactionReversal")
   creditLot          OveCreditLot?
+  dailyBonusClaim    DailyBonusClaim?
 
   @@index([walletId])
   @@index([sourceService, sourceReferenceId])
   @@map("ove_transactions")
+}
+
+/// 継続ログイン(デイリー)ボーナス。1アカウント・1暦日につき1回のみ請求できる
+/// (`@@unique([oveAccountId, claimedDate])`)。前日分の請求が無い状態で請求すると
+/// streak_countは1にリセットされる。詳細: docs/daily-login-bonus.md
+model DailyBonusClaim {
+  id            String   @id
+  oveAccountId  String   @map("ove_account_id")
+  /// 暦日 (時刻情報を持たない、サーバーのローカル日付基準)。
+  claimedDate   DateTime @map("claimed_date") @db.Date
+  streakCount   Int      @map("streak_count")
+  amount        BigInt
+  transactionId String   @unique @map("transaction_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  account     OveAccount     @relation(fields: [oveAccountId], references: [id])
+  transaction OveTransaction @relation(fields: [transactionId], references: [id])
+
+  @@unique([oveAccountId, claimedDate])
+  @@index([oveAccountId, claimedDate])
+  @@map("daily_bonus_claims")
 }
 
 /// 有効期限付き獲得OVEの「ロット」。reward_rules.expiry_days が設定された

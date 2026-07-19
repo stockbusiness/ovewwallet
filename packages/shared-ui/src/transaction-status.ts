@@ -46,6 +46,7 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   RELEASE: "保留解除",
   CAMPAIGN_REWARD: "キャンペーン特典",
   EXPIRATION: "OVE失効",
+  DAILY_LOGIN_BONUS: "継続ログインボーナス",
 };
 
 /** サービスコード (ServiceCode enum) から画面表示用の日本語名を決める。 */

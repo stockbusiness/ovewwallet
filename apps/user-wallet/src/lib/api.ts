@@ -89,6 +89,19 @@ export interface Notice {
   is_read: boolean;
 }
 
+export interface DailyBonusStatus {
+  claimed_today: boolean;
+  current_streak: number;
+  next_streak: number;
+  next_amount: string;
+}
+
+export interface DailyBonusClaimResult {
+  claimed_today: true;
+  current_streak: number;
+  amount: string;
+}
+
 export type ReferralStatus =
   | { referred: false }
   | {
