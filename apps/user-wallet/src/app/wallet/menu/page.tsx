@@ -20,6 +20,7 @@ export default function WalletMenuPage() {
   const router = useRouter();
   const [account, setAccount] = useState<OveAccount | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -32,7 +33,11 @@ export default function WalletMenuPage() {
         setAccount(acc);
         setBalance(bal);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -56,6 +61,8 @@ export default function WalletMenuPage() {
         </Link>
         <h1 className="font-heading text-lg font-bold text-sengoku-text">メニュー</h1>
       </header>
+
+      {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
 
       <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
         <p className="text-sm font-bold text-sengoku-text">{account?.displayName || "表示名未設定"}</p>

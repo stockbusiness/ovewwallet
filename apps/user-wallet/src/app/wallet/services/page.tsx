@@ -9,6 +9,7 @@ import { apiFetch, ApiError, type LinkedService } from "@/lib/api";
 export default function LinkedServicesPage() {
   const router = useRouter();
   const [services, setServices] = useState<LinkedService[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,7 +18,11 @@ export default function LinkedServicesPage() {
         const list = await apiFetch<LinkedService[]>("/api/v1/me/linked-services");
         setServices(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -48,7 +53,8 @@ export default function LinkedServicesPage() {
         OVEウォレットと連携しているサービス一覧です。連携すると、各サービスでのOVE獲得・利用が同じウォレットに反映されます。
       </p>
 
-      {services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+      {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
+      {!error && services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
       {services?.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
           連携可能なサービスはまだありません

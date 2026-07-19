@@ -18,6 +18,7 @@ import { apiFetch, ApiError, type RewardRulePublic } from "@/lib/api";
 export default function EarnOvePage() {
   const router = useRouter();
   const [rules, setRules] = useState<RewardRulePublic[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,7 +27,11 @@ export default function EarnOvePage() {
         const list = await apiFetch<RewardRulePublic[]>("/api/v1/rewards/public");
         setRules(list);
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -57,7 +62,8 @@ export default function EarnOvePage() {
         連携サービスでの活動に応じてOVEを獲得できます。現在開催中の獲得機会は以下の通りです。
       </p>
 
-      {rules === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+      {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
+      {!error && rules === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
       {rules?.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
           現在開催中の獲得機会はありません

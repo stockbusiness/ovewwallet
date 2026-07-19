@@ -10,6 +10,7 @@ export default function UseOvePage() {
   const router = useRouter();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [services, setServices] = useState<LinkedService[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -22,7 +23,11 @@ export default function UseOvePage() {
         setBalance(bal);
         setServices(list.filter((s) => s.linked));
       } catch (err) {
-        if (err instanceof ApiError && err.status === 401) router.push("/login");
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+        setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     })();
   }, [router]);
@@ -61,7 +66,8 @@ export default function UseOvePage() {
 
       <p className="text-xs leading-relaxed text-sengoku-muted">連携済みサービスでOVEを利用できます。</p>
 
-      {services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+      {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
+      {!error && services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
       {services?.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
           利用可能な連携サービスがまだありません。まずは
