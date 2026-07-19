@@ -86,7 +86,7 @@ export class AuthService {
    * アカウント作成と同一トランザクションで行う。
    */
   async loginWithLineMock(idToken: string, termsAccepted?: boolean, referralCookieToken?: string) {
-    const claims = await this.lineVerifier.verifyIdToken(idToken);
+    const claims = await this.verifyLineIdToken(idToken);
     const referral = await this.referrals.resolvePendingSession(referralCookieToken);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "LINE",
@@ -107,7 +107,7 @@ export class AuthService {
   }
 
   async loginWithSengokuSso(code: string, termsAccepted?: boolean) {
-    const { sengokuMemberId } = await this.sengokuSso.exchangeCode(code);
+    const { sengokuMemberId } = await this.exchangeSengokuSsoCode(code);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "PASSKEY",
       provider: "SENGOKU_PASSPORT_SSO",
@@ -122,7 +122,7 @@ export class AuthService {
    * RS256+JWKSでJWTを検証し、external_id/subでOVEアカウントを解決してログインさせる。
    */
   async loginWithAgencySso(token: string, termsAccepted?: boolean) {
-    const claims = await this.agencySso.verify(token);
+    const claims = await this.verifyAgencySso(token);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "SENGOKU_AGENCY",
       provider: "sengoku-ai",
@@ -156,6 +156,41 @@ export class AuthService {
       where: { sessionTokenHash: hashSessionToken(token), revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: "USER_LOGOUT" },
     });
+  }
+
+  /**
+   * `LineAuthVerifier.verifyIdToken()`は期限切れ・無効トークン等を素のErrorで投げる
+   * (LINE Platform APIへの問い合わせ結果をそのまま表す一般的な例外であり、NestJSの
+   * HttpExceptionではない)。ここで捕まえずに素通りさせると、NestJSのデフォルト処理で
+   * 「原因不明の500」扱いとなり、ledger-exception.filter.tsの汎用フォールバック
+   * メッセージ("unexpected error") が返ってしまう。iOSのLIFF pageshowリロード対策で
+   * 保存済みIDトークンを複数回再送する構成上、期限切れトークンでの再送は普通に起こりうる
+   * ため、401として明確なメッセージを返す。
+   */
+  private async verifyLineIdToken(idToken: string) {
+    try {
+      return await this.lineVerifier.verifyIdToken(idToken);
+    } catch (err) {
+      throw new UnauthorizedException(err instanceof Error ? err.message : "LINE ID token verification failed");
+    }
+  }
+
+  /** 戦国パスポートSSOコードの検証失敗(無効・期限切れ・使用済み)を401として返す。 */
+  private async exchangeSengokuSsoCode(code: string) {
+    try {
+      return await this.sengokuSso.exchangeCode(code);
+    } catch (err) {
+      throw new UnauthorizedException(err instanceof Error ? err.message : "SSO code verification failed");
+    }
+  }
+
+  /** 代理店SSOのJWT検証失敗(署名不正・期限切れ等)を401として返す。 */
+  private async verifyAgencySso(token: string) {
+    try {
+      return await this.agencySso.verify(token);
+    } catch (err) {
+      throw new UnauthorizedException(err instanceof Error ? err.message : "agency SSO token verification failed");
+    }
   }
 
   private async createSessionForAccount(oveAccountId: string) {
