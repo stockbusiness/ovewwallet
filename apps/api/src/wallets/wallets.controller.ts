@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Post, Query, Req, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { WalletsService } from "./wallets.service";
+import { ReferralsService } from "../referrals/referrals.service";
 import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
 import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
@@ -13,7 +14,10 @@ import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
 @ApiTags("me")
 @Controller("api/v1/me")
 export class MeController {
-  constructor(private readonly wallets: WalletsService) {}
+  constructor(
+    private readonly wallets: WalletsService,
+    private readonly referrals: ReferralsService,
+  ) {}
 
   @Get("wallet")
   @UseGuards(SessionAuthGuard)
@@ -59,6 +63,12 @@ export class MeController {
   @UseGuards(SessionAuthGuard)
   async walletHolds(@Req() req: AuthenticatedUserRequest) {
     return this.wallets.listActiveHolds(req.account.id);
+  }
+
+  @Get("referral-status")
+  @UseGuards(SessionAuthGuard)
+  async referralStatus(@Req() req: AuthenticatedUserRequest) {
+    return this.referrals.getMyReferralStatus(req.account.id);
   }
 }
 

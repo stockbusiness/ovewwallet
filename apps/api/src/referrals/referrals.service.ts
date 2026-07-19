@@ -159,4 +159,25 @@ export class ReferralsService {
       },
     });
   }
+
+  /**
+   * ウォレット画面「紹介特典状況」向け。このシステムでの「紹介」は代理店システムが
+   * 発行した紹介URL経由の新規登録 (指示書上の「紹介者」は代理店であり、既存ユーザーが
+   * 友人を紹介する仕組みではない) であるため、本人が確認できるのは「自分が紹介登録
+   * された結果、登録特典がどうなっているか」のみ。紹介登録でない場合は`referred: false`。
+   */
+  async getMyReferralStatus(oveAccountId: string) {
+    const benefit = await this.db.walletReferralBenefit.findUnique({
+      where: { benefitType_walletUserId: { benefitType: "REFERRAL_SIGNUP_BONUS", walletUserId: oveAccountId } },
+    });
+    if (!benefit) return { referred: false as const };
+
+    return {
+      referred: true as const,
+      status: benefit.status,
+      amount: benefit.amount.toString(),
+      confirmed_at: benefit.confirmedAt ? benefit.confirmedAt.toISOString() : null,
+      reason: benefit.reason,
+    };
+  }
 }

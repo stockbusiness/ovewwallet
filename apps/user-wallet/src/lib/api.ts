@@ -89,6 +89,16 @@ export interface Notice {
   is_read: boolean;
 }
 
+export type ReferralStatus =
+  | { referred: false }
+  | {
+      referred: true;
+      status: "PENDING" | "CONFIRMED" | "REJECTED" | "REVOKED";
+      amount: string;
+      confirmed_at: string | null;
+      reason: string | null;
+    };
+
 export interface WalletHoldItem {
   id: string;
   amount: string;

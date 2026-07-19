@@ -14,12 +14,20 @@ import {
   CartIcon,
   MenuIcon,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type WalletBalance } from "@/lib/api";
+import { apiFetch, ApiError, type OveAccount, type WalletBalance, type ReferralStatus } from "@/lib/api";
+
+const REFERRAL_STATUS_LABEL: Record<"PENDING" | "CONFIRMED" | "REJECTED" | "REVOKED", string> = {
+  PENDING: "審査中",
+  CONFIRMED: "付与済み",
+  REJECTED: "対象外",
+  REVOKED: "取消済み",
+};
 
 export default function WalletMenuPage() {
   const router = useRouter();
   const [account, setAccount] = useState<OveAccount | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
+  const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -38,6 +46,13 @@ export default function WalletMenuPage() {
           return;
         }
         setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
+        return;
+      }
+      // 紹介登録でないユーザーが大多数のため、取得失敗はメニュー画面自体を止めない
+      try {
+        setReferralStatus(await apiFetch<ReferralStatus>("/api/v1/me/referral-status"));
+      } catch {
+        setReferralStatus({ referred: false });
       }
     })();
   }, [router]);
@@ -69,6 +84,24 @@ export default function WalletMenuPage() {
         <p className="mt-1 text-xs text-sengoku-muted">{account?.accountCode}</p>
         {balance && <p className="mt-0.5 text-xs text-sengoku-muted">{balance.wallet_code}</p>}
       </section>
+
+      {referralStatus?.referred && (
+        <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
+          <p className="text-sm font-bold text-sengoku-text">紹介登録特典</p>
+          <div className="mt-2 flex items-center justify-between text-sm">
+            <span className="text-sengoku-muted">{REFERRAL_STATUS_LABEL[referralStatus.status]}</span>
+            <span className="font-bold text-sengoku-gold">{Number(referralStatus.amount).toLocaleString("ja-JP")} OVE</span>
+          </div>
+          {referralStatus.status === "CONFIRMED" && referralStatus.confirmed_at && (
+            <p className="mt-1 text-xs text-sengoku-faint">
+              {new Date(referralStatus.confirmed_at).toLocaleDateString("ja-JP")}付与
+            </p>
+          )}
+          {(referralStatus.status === "REJECTED" || referralStatus.status === "REVOKED") && referralStatus.reason && (
+            <p className="mt-1 text-xs text-sengoku-faint">{referralStatus.reason}</p>
+          )}
+        </section>
+      )}
 
       <section className="overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
         <div className="flex items-center justify-between px-4 py-3">

@@ -281,3 +281,4 @@ Phase 1 (`/invite/{token}`受付・LINEログイン時の紐付け・特典保�
 | `docs/credit-expiry.md` | OVE有効期限・自動失効 (付与ルール単位で設定、FIFO消費) |
 | `docs/notices-line-broadcast.md` | お知らせのLINE配信連携 (LINE Messaging API broadcast) |
 | `docs/notices-read-tracking.md` | お知らせの既読管理・重要度フラグ |
+| `docs/referral-status.md` | 紹介登録特典状況の確認 (ユーザー向け) |
