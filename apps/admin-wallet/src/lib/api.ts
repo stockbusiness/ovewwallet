@@ -77,6 +77,13 @@ export interface RewardRuleItem {
   expiryDays: number | null;
 }
 
+export interface RewardRuleIssuanceSummaryItem {
+  ruleCode: string;
+  displayName: string;
+  totalAmount: string | null;
+  count: number | null;
+}
+
 export interface NoticeItem {
   id: string;
   title: string;

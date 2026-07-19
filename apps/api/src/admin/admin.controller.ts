@@ -500,6 +500,14 @@ export class AdminController {
     return this.rewardRules.list();
   }
 
+  /** ルール別発行量集計 (docs/admin-operations.md参照)。 */
+  @Get("reward-rules/issuance-summary")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
+  async rewardRuleIssuanceSummary() {
+    return this.rewardRules.getIssuanceSummary();
+  }
+
   @Post("reward-rules")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN")

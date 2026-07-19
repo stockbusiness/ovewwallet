@@ -1,7 +1,8 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { generateId, type PrismaClient } from "@ove/database";
+import { generateId, type PrismaClient, type TransactionType } from "@ove/database";
 import { expireDueCreditLots, previewExpiringCreditLots } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
+import { RULE_CODE_BY_TRANSACTION_TYPE } from "../rewards/rewards.service";
 
 export interface CreateRewardRuleParams {
   ruleCode: string;
@@ -52,6 +53,42 @@ export class AdminRewardRulesService {
 
   async list() {
     return this.db.rewardRule.findMany({ orderBy: { createdAt: "desc" } });
+  }
+
+  /**
+   * ルールごとの累計発行額・件数 (docs/admin-operations.md「付与ルール別発行量集計」
+   * 参照)。`RULE_CODE_BY_TRANSACTION_TYPE`に対応するtransaction_typeが登録されている
+   * ルールのみ集計可能 (取引には`rule_code`への直接参照が無く、ルール↔取引種別の
+   * 固定対応表でしか判定できないため)。対応の無いルールは`total_amount`/`count`が
+   * `null`になる (0件ではなく「集計不能」を意味する)。
+   */
+  async getIssuanceSummary() {
+    const rules = await this.db.rewardRule.findMany({ orderBy: { createdAt: "desc" } });
+    const transactionTypeByRuleCode = new Map(
+      Object.entries(RULE_CODE_BY_TRANSACTION_TYPE).map(([transactionType, ruleCode]) => [ruleCode, transactionType]),
+    );
+
+    return Promise.all(
+      rules.map(async (rule) => {
+        const transactionType = transactionTypeByRuleCode.get(rule.ruleCode);
+        if (!transactionType) {
+          return { ruleCode: rule.ruleCode, displayName: rule.displayName, totalAmount: null, count: null };
+        }
+
+        const aggregate = await this.db.oveTransaction.aggregate({
+          where: { transactionType: transactionType as TransactionType, direction: "CREDIT", status: "COMPLETED" },
+          _sum: { amount: true },
+          _count: true,
+        });
+
+        return {
+          ruleCode: rule.ruleCode,
+          displayName: rule.displayName,
+          totalAmount: (aggregate._sum.amount ?? 0n).toString(),
+          count: aggregate._count,
+        };
+      }),
+    );
   }
 
   async create(params: CreateRewardRuleParams) {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminNav from "@/components/AdminNav";
-import { apiFetch, ApiError, type RewardRuleItem } from "@/lib/api";
+import { apiFetch, ApiError, type RewardRuleItem, type RewardRuleIssuanceSummaryItem } from "@/lib/api";
 
 const SERVICE_CODES = [
   "SENGOKU_PASSPORT",
@@ -18,6 +18,7 @@ const SERVICE_CODES = [
 export default function RewardRulesPage() {
   const router = useRouter();
   const [rules, setRules] = useState<RewardRuleItem[]>([]);
+  const [issuanceSummary, setIssuanceSummary] = useState<Map<string, RewardRuleIssuanceSummaryItem>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -37,6 +38,8 @@ export default function RewardRulesPage() {
     try {
       const list = await apiFetch<RewardRuleItem[]>("/api/v1/admin/reward-rules");
       setRules(list);
+      const summary = await apiFetch<RewardRuleIssuanceSummaryItem[]>("/api/v1/admin/reward-rules/issuance-summary");
+      setIssuanceSummary(new Map(summary.map((s) => [s.ruleCode, s])));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.push("/login");
@@ -197,33 +200,47 @@ export default function RewardRulesPage() {
               <th className="p-3">付与額</th>
               <th className="p-3">上限 (ユーザー/イベント)</th>
               <th className="p-3">有効期限</th>
+              <th className="p-3">累計発行 (額/件数)</th>
               <th className="p-3">状態</th>
               <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
-            {rules.map((r) => (
-              <tr key={r.id} className="border-t border-neutral-100">
-                <td className="p-3">
-                  {r.ruleCode}
-                  <p className="text-xs text-neutral-400">{r.displayName}</p>
-                </td>
-                <td className="p-3">{r.sourceService}</td>
-                <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} OVE</td>
-                <td className="p-3">
-                  {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
-                </td>
-                <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
-                <td className="p-3">
-                  <span className={r.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-400"}>{r.status}</span>
-                </td>
-                <td className="p-3">
-                  <button onClick={() => toggleStatus(r)} className="text-xs text-brand-600 underline">
-                    {r.status === "ACTIVE" ? "無効化" : "有効化"}
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {rules.map((r) => {
+              const summary = issuanceSummary.get(r.ruleCode);
+              return (
+                <tr key={r.id} className="border-t border-neutral-100">
+                  <td className="p-3">
+                    {r.ruleCode}
+                    <p className="text-xs text-neutral-400">{r.displayName}</p>
+                  </td>
+                  <td className="p-3">{r.sourceService}</td>
+                  <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} OVE</td>
+                  <td className="p-3">
+                    {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
+                  </td>
+                  <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
+                  <td className="p-3">
+                    {summary && summary.totalAmount !== null ? (
+                      <>
+                        {Number(summary.totalAmount).toLocaleString("ja-JP")} OVE
+                        <p className="text-xs text-neutral-400">{summary.count}件</p>
+                      </>
+                    ) : (
+                      <span className="text-xs text-neutral-400">集計不可</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <span className={r.status === "ACTIVE" ? "text-emerald-600" : "text-neutral-400"}>{r.status}</span>
+                  </td>
+                  <td className="p-3">
+                    <button onClick={() => toggleStatus(r)} className="text-xs text-brand-600 underline">
+                      {r.status === "ACTIVE" ? "無効化" : "有効化"}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 

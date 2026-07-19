@@ -128,6 +128,20 @@ SUPER_ADMIN/OVE_OPERATOR/EVENT_OPERATOR/AUDITORに許可している。
 同画面には有効期限日数の設定・失効バッチの手動実行・失効予告レポート
 (`docs/credit-expiry.md`参照) もある。
 
+### 付与ルール別発行量集計 (2026-07-19追加)
+
+`GET /api/v1/admin/reward-rules/issuance-summary`: ルールごとの累計発行額・件数を
+返す。取引には`rule_code`への直接参照が無く、`RULE_CODE_BY_TRANSACTION_TYPE`
+(`rewards.service.ts`からexport) を使ってtransaction_type経由で判定するため、
+このマッピングに載っていないルール (上記「既知の制約」参照) は`totalAmount`/`count`
+が`null`になり、画面上は「集計不可」と表示される (0件ではなく「集計できない」ことを
+明示するため)。一覧テーブルの新しい列として表示する。
+
+`apps/api/src/e2e/reward-rule-issuance-summary.test.ts` (1件):
+`AIART_ATTENDANCE_REWARD`のような対応表に載っているルールは累計額・件数が返り、
+対応表に無い新規ルールは`null`になることを検証済み。実ブラウザでの確認は未実施
+(今後の課題)。
+
 ## APIアクセスログ (指示書11章・13章)
 
 外部サービスAPI (`/api/v1/rewards/grant`, `/api/v1/transactions/debit`,

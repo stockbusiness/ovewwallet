@@ -6,8 +6,13 @@ import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { serializeTransaction } from "../wallets/wallets.service";
 
-/** transaction_type -> reward_rules.rule_code の対応 (指示書9章の初期2ルール分)。 */
-const RULE_CODE_BY_TRANSACTION_TYPE: Record<string, string> = {
+/**
+ * transaction_type -> reward_rules.rule_code の対応 (指示書9章の初期2ルール分)。
+ * `AdminRewardRulesService.getIssuanceSummary()` (docs/admin-operations.md
+ * 「付与ルール別発行量集計」参照) からも、どのtransaction_typeがどのルール経由の
+ * 付与かを判定するために参照する。
+ */
+export const RULE_CODE_BY_TRANSACTION_TYPE: Record<string, string> = {
   REGISTRATION_BONUS: "SENGOKU_REGISTRATION_BONUS",
   AIART_ATTENDANCE: "AIART_ATTENDANCE_REWARD",
 };
