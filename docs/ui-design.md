@@ -84,7 +84,7 @@ pnpmワークスペースパッケージとして追加し、両アプリの `ne
 | 画面 | パス | 使用API |
 |---|---|---|
 | ログイン | `apps/user-wallet` `/login` | `POST /api/v1/auth/{email,line,sso/sengoku}/...` (すべて実装済みAPIに接続) |
-| ウォレットホーム | `/wallet` | `GET /api/v1/accounts/me`, `GET /api/v1/me/wallet`, `GET /api/v1/me/transactions?limit=5`, `GET /api/v1/me/notices` (お知らせは補助情報として別try/catchで取得、失敗してもホーム自体は表示) |
+| ウォレットホーム | `/wallet` | `GET /api/v1/accounts/me`, `GET /api/v1/me/wallet`, `GET /api/v1/me/transactions?limit=5`, `GET /api/v1/me/notices`, `GET /api/v1/me/wallet/holds` (お知らせ・保留内訳は補助情報として別try/catchで取得、失敗してもホーム自体は表示) |
 | 取引履歴一覧 | `/wallet/transactions` | `GET /api/v1/me/transactions?limit=100` (クライアント側で獲得/利用/失効フィルタ) |
 | 取引詳細 | `/wallet/transactions/[transactionId]` | `GET /api/v1/me/transactions/:transactionId` |
 | メニュー | `/wallet/menu` | `GET /api/v1/accounts/me`, `GET /api/v1/me/wallet`, `POST /api/v1/auth/logout` |

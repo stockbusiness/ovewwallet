@@ -43,6 +43,10 @@
   CREDIT/DEBIT合計から**両方とも除外**する。実装中、`RELEASE` だけを合計に含めてしまい
   「保留解除のたびに残高が過大計上される」不整合を作り込んでいたバグを発見し修正した
   (`packages/ledger/src/reconcile.ts` のコメント参照)。
+- `wallets.pending_balance`は現時点でどのコードからも書き込まれておらず、常に0の
+  未使用フィールドである (2026-07-19時点)。ユーザー向けの「保留中残高の内訳」機能
+  (`GET /api/v1/me/wallet/holds`) は、この未使用の`pending_balance`ではなく実際に
+  意味を持つ`WalletHold` (`held_balance`) を対象にした。
 
 ## 取消 (REVERSAL) と残高整合性
 

@@ -125,6 +125,25 @@ export class WalletsService {
     });
     return { ok: true };
   }
+
+  /**
+   * ウォレットホーム画面「保留中残高」の内訳向け。管理者が理由付きで保留した
+   * (`WalletHold`, 指示書13章「保留・保留解除」) 現在進行中の保留のみを返す
+   * (解除済み・取消済みは含めない)。
+   */
+  async listActiveHolds(oveAccountId: string) {
+    const wallet = await this.requireWalletForAccount(oveAccountId);
+    const holds = await this.db.walletHold.findMany({
+      where: { walletId: wallet.id, status: "HELD" },
+      orderBy: { heldAt: "desc" },
+    });
+    return holds.map((h) => ({
+      id: h.id,
+      amount: h.amount.toString(),
+      reason: h.reason,
+      held_at: h.heldAt.toISOString(),
+    }));
+  }
 }
 
 export function serializeTransaction(t: {

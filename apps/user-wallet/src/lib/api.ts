@@ -89,6 +89,13 @@ export interface Notice {
   is_read: boolean;
 }
 
+export interface WalletHoldItem {
+  id: string;
+  amount: string;
+  reason: string;
+  held_at: string;
+}
+
 export interface RewardRulePublic {
   rule_code: string;
   display_name: string;

@@ -21,7 +21,15 @@ import {
   MenuIcon,
   ThemeToggle,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type TransactionSummary, type WalletBalance, type Notice } from "@/lib/api";
+import {
+  apiFetch,
+  ApiError,
+  type OveAccount,
+  type TransactionSummary,
+  type WalletBalance,
+  type Notice,
+  type WalletHoldItem,
+} from "@/lib/api";
 
 export default function WalletTopPage() {
   const router = useRouter();
@@ -29,6 +37,7 @@ export default function WalletTopPage() {
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [holds, setHolds] = useState<WalletHoldItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,13 +59,18 @@ export default function WalletTopPage() {
         setError("読み込みに失敗しました");
         return;
       }
-      // お知らせは補助的な情報のため、取得に失敗してもホーム画面自体は表示する
+      // お知らせ・保留内訳は補助的な情報のため、取得に失敗してもホーム画面自体は表示する
       // (デプロイのタイミング差でこのエンドポイントだけ未反映という事態が過去に
       // 実際に発生したため、致命的な扱いにしない)。
       try {
         setNotices(await apiFetch<Notice[]>("/api/v1/me/notices"));
       } catch {
         setNotices([]);
+      }
+      try {
+        setHolds(await apiFetch<WalletHoldItem[]>("/api/v1/me/wallet/holds"));
+      } catch {
+        setHolds([]);
       }
     })();
   }, [router]);
@@ -93,6 +107,27 @@ export default function WalletTopPage() {
             { label: "回収予定残高", value: `${Number(balance.pending_balance).toLocaleString("ja-JP")} OVE` },
           ]}
         />
+
+        {holds.length > 0 && (
+          <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
+            <h2 className="text-sm font-bold text-sengoku-text">保留中残高の内訳</h2>
+            <ul className="mt-2 flex flex-col gap-2">
+              {holds.map((h) => (
+                <li key={h.id} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="min-w-0 flex-1 text-sengoku-muted">
+                    {h.reason}
+                    <span className="mt-0.5 block text-xs text-sengoku-faint">
+                      {new Date(h.held_at).toLocaleDateString("ja-JP")}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-bold text-sengoku-gold">
+                    {Number(h.amount).toLocaleString("ja-JP")} OVE
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <ActionGrid
           items={[

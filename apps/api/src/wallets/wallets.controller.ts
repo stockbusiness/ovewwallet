@@ -54,6 +54,12 @@ export class MeController {
   async markNoticeRead(@Req() req: AuthenticatedUserRequest, @Param("noticeId") noticeId: string) {
     return this.wallets.markNoticeRead(req.account.id, noticeId);
   }
+
+  @Get("wallet/holds")
+  @UseGuards(SessionAuthGuard)
+  async walletHolds(@Req() req: AuthenticatedUserRequest) {
+    return this.wallets.listActiveHolds(req.account.id);
+  }
 }
 
 /**
