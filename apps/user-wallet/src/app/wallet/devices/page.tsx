@@ -11,6 +11,8 @@ export default function LoginDevicesPage() {
   const [devices, setDevices] = useState<LoginDevice[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -40,6 +42,22 @@ export default function LoginDevicesPage() {
     }
   }
 
+  async function revokeOthers() {
+    setRevokingOthers(true);
+    setMessage(null);
+    try {
+      const result = await apiFetch<{ revoked_count: number }>("/api/v1/accounts/me/sessions/revoke-others", {
+        method: "POST",
+      });
+      setMessage(`${result.revoked_count}件の端末からログアウトしました`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "ログアウトに失敗しました");
+    } finally {
+      setRevokingOthers(false);
+    }
+  }
+
   return (
     <main className="flex flex-col gap-4 px-4 pb-24 pt-6">
       <header className="flex items-center gap-3">
@@ -50,7 +68,19 @@ export default function LoginDevicesPage() {
       </header>
 
       {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
+      {message && <p className="text-sm text-sengoku-gold">{message}</p>}
       {!error && devices === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
+
+      {devices !== null && devices.length > 1 && (
+        <button
+          type="button"
+          onClick={revokeOthers}
+          disabled={revokingOthers}
+          className="self-start rounded-full border border-sengoku-red/40 px-4 py-2 text-xs font-bold text-sengoku-red disabled:opacity-50"
+        >
+          {revokingOthers ? "ログアウト中..." : "この端末以外からすべてログアウト"}
+        </button>
+      )}
 
       <ul className="flex flex-col gap-2">
         {devices?.map((d) => (

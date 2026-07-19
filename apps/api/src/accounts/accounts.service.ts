@@ -242,6 +242,19 @@ export class AccountsService {
   }
 
   /**
+   * 本人による「この端末以外からすべてログアウト」(docs/login-devices.md参照)。
+   * 個別ログアウトと同様、現在のセッション自身は対象外にする (このAPIを呼んだ
+   * 本人がその場でログアウトされてしまう混乱を避けるため)。
+   */
+  async revokeOtherSessions(oveAccountId: string, currentSessionId: string): Promise<{ revoked_count: number }> {
+    const result = await this.db.userSession.updateMany({
+      where: { oveAccountId, revokedAt: null, id: { not: currentSessionId } },
+      data: { revokedAt: new Date(), revokeReason: "USER_REVOKED_ALL_OTHER_DEVICES" },
+    });
+    return { revoked_count: result.count };
+  }
+
+  /**
    * ユーザー本人による退会 (docs/account-closure.md参照)。残高(available/held)が
    * 0でなければ拒否する (使い切ってから退会してもらう、失効ではなく利用を促す方針)。
    * 成功時はアカウントをCLOSEDにし、有効なセッションを全て失効させる。

@@ -22,6 +22,17 @@ export class AccountsController {
     return this.accounts.listSessions(req.account.id, req.sessionId);
   }
 
+  /**
+   * この端末以外からすべてログアウト (docs/login-devices.md参照)。動的セグメント
+   * `:sessionId`より前に登録している (`revoke-others`という文字列がsessionIdとして
+   * 解決されるのを防ぐため、docs/transaction-export.md「ルーティング上の注意」と同じ理由)。
+   */
+  @Post("me/sessions/revoke-others")
+  @UseGuards(SessionAuthGuard)
+  async revokeOtherSessions(@Req() req: AuthenticatedUserRequest) {
+    return this.accounts.revokeOtherSessions(req.account.id, req.sessionId);
+  }
+
   @Post("me/sessions/:sessionId/revoke")
   @UseGuards(SessionAuthGuard)
   async revokeSession(@Req() req: AuthenticatedUserRequest, @Param("sessionId") sessionId: string) {

@@ -88,4 +88,28 @@ describe("ログインデバイス一覧", () => {
 
     await request(server).post(`/api/v1/accounts/me/sessions/${bSessionId}/revoke`).set("Cookie", cookieA).expect(404);
   });
+
+  it("この端末以外からすべてログアウトすると、現在のセッションだけ残る", async () => {
+    const server = app.getHttpServer();
+    const idToken = `mock.${generateId()}`;
+
+    const loginA = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const cookieA = loginA.headers["set-cookie"] as unknown as string[];
+    const loginB = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const cookieB = loginB.headers["set-cookie"] as unknown as string[];
+    const loginC = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const cookieC = loginC.headers["set-cookie"] as unknown as string[];
+
+    const res = await request(server).post("/api/v1/accounts/me/sessions/revoke-others").set("Cookie", cookieA).expect(201);
+    expect(res.body.revoked_count).toBe(2);
+
+    // B・Cは無効化されたため以後認証できない。Aは無事のまま。
+    await request(server).get("/api/v1/me/wallet").set("Cookie", cookieB).expect(401);
+    await request(server).get("/api/v1/me/wallet").set("Cookie", cookieC).expect(401);
+    await request(server).get("/api/v1/me/wallet").set("Cookie", cookieA).expect(200);
+
+    const listFromA = await request(server).get("/api/v1/accounts/me/sessions").set("Cookie", cookieA).expect(200);
+    expect(listFromA.body).toHaveLength(1);
+    expect(listFromA.body[0].is_current).toBe(true);
+  });
 });
