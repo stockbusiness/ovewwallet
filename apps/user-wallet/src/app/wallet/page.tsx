@@ -20,6 +20,7 @@ import {
   LinkIcon,
   MenuIcon,
   ThemeToggle,
+  RankBadge,
 } from "@ove/shared-ui";
 import {
   apiFetch,
@@ -107,6 +108,8 @@ export default function WalletTopPage() {
             { label: "回収予定残高", value: `${Number(balance.pending_balance).toLocaleString("ja-JP")} OVE` },
           ]}
         />
+
+        <RankBadge lifetimeCredited={Number(balance.lifetime_credited)} />
 
         {holds.length > 0 && (
           <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">

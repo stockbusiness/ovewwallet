@@ -1,5 +1,6 @@
 export * from "./tokens";
 export * from "./transaction-status";
+export * from "./rank";
 export * from "./icons";
 export * from "./components/PrimaryButton";
 export * from "./components/SecondaryButton";
@@ -14,4 +15,5 @@ export * from "./components/ActionGrid";
 export * from "./components/InfoCard";
 export * from "./components/AuthButton";
 export * from "./components/ThemeToggle";
+export * from "./components/RankBadge";
 export * from "./theme";
