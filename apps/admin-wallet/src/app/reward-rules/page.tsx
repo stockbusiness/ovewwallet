@@ -30,6 +30,8 @@ export default function RewardRulesPage() {
   const [expiryDays, setExpiryDays] = useState("");
   const [expiryResult, setExpiryResult] = useState<string | null>(null);
   const [expiryRunning, setExpiryRunning] = useState(false);
+  const [expiryPreview, setExpiryPreview] = useState<string | null>(null);
+  const [expiryPreviewLoading, setExpiryPreviewLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +76,24 @@ export default function RewardRulesPage() {
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "作成に失敗しました");
+    }
+  }
+
+  async function previewExpiryBatch() {
+    setExpiryPreviewLoading(true);
+    setExpiryPreview(null);
+    setError(null);
+    try {
+      const result = await apiFetch<{ wallets_affected: number; total_amount: string }>(
+        "/api/v1/admin/expire-credits/preview",
+      );
+      setExpiryPreview(
+        `今すぐ実行すると、${result.wallets_affected}件のウォレットで合計${Number(result.total_amount).toLocaleString("ja-JP")} OVEが失効します`,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "予告レポートの取得に失敗しました");
+    } finally {
+      setExpiryPreviewLoading(false);
     }
   }
 
@@ -213,13 +233,23 @@ export default function RewardRulesPage() {
             有効期限が到来した獲得OVEを失効させます。cron等の外部スケジューラは未接続のため、
             当面はここから手動実行してください (docs/credit-expiry.md参照)。
           </p>
-          <button
-            onClick={runExpiryBatch}
-            disabled={expiryRunning}
-            className="rounded-md bg-brand-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
-          >
-            {expiryRunning ? "実行中..." : "失効バッチを今すぐ実行"}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={previewExpiryBatch}
+              disabled={expiryPreviewLoading}
+              className="rounded-md border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 disabled:opacity-50"
+            >
+              {expiryPreviewLoading ? "確認中..." : "失効予告レポートを確認"}
+            </button>
+            <button
+              onClick={runExpiryBatch}
+              disabled={expiryRunning}
+              className="rounded-md bg-brand-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+            >
+              {expiryRunning ? "実行中..." : "失効バッチを今すぐ実行"}
+            </button>
+          </div>
+          {expiryPreview && <p className="mt-2 text-sm text-neutral-700">{expiryPreview}</p>}
           {expiryResult && <p className="mt-2 text-sm text-emerald-600">{expiryResult}</p>}
         </section>
       </main>

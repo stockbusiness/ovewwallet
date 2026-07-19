@@ -125,6 +125,9 @@ SUPER_ADMIN/OVE_OPERATOR/EVENT_OPERATOR/AUDITORに許可している。
 即座に反映される。E2Eテスト (`apps/api/src/e2e/reward-rules-admin.test.ts`) と
 実ブラウザでの作成・状態切替を確認済み。
 
+同画面には有効期限日数の設定・失効バッチの手動実行・失効予告レポート
+(`docs/credit-expiry.md`参照) もある。
+
 ## APIアクセスログ (指示書11章・13章)
 
 外部サービスAPI (`/api/v1/rewards/grant`, `/api/v1/transactions/debit`,

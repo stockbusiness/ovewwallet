@@ -520,6 +520,14 @@ export class AdminController {
     return this.rewardRules.runExpiryBatch();
   }
 
+  /** OVE有効期限バッチの失効予告レポート (docs/credit-expiry.md参照、書き込みなし)。 */
+  @Get("expire-credits/preview")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR")
+  async previewExpiryBatch() {
+    return this.rewardRules.previewExpiryBatch();
+  }
+
   /**
    * 代理店連携状態一覧 (開発ガイドライン15章)。sengoku-ai.com代理店システムとの
    * account_links (PENDING=同期のみ受信/未紐付け、ACTIVE=SSOログイン済み) を確認する。

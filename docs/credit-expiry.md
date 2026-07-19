@@ -66,3 +66,25 @@
 場合に30日以内の分のみ合計され最短の失効日が返ること、失効予定が無い場合は
 `total_amount: "0"`・`nearest_expires_at: null`を返すことを検証済み。実ブラウザでの
 確認は未実施 (今後の課題)。
+
+## 失効予告レポート (管理画面、2026-07-19追加)
+
+`GET /api/v1/admin/expire-credits/preview`: `packages/ledger/src/expiry.ts`の
+`previewExpiringCreditLots()`が、`expireDueCreditLots()`と全く同じ判定条件
+(`expiresAt <= now`・未失効・未消費) と残高キャップ (`available_balance`を超えない)
+で対象を集計するが、**書き込みは一切行わない**。管理画面の「付与ルール管理」
+(`/reward-rules`) に「失効予告レポートを確認」ボタンを追加し、「今すぐ実行すると
+{n}件のウォレットで合計{amount} OVEが失効します」と表示する。「失効バッチを今すぐ
+実行」ボタンを押す前に影響範囲を確認できるようにする狙い。
+
+`apps/api/src/e2e/credit-expiry-preview.test.ts` (1件): 期限切れロットが実際には
+失効・変更されないまま (`expiredAt`が`null`のまま) プレビュー結果が返ることを
+検証済み。
+
+**注意**: このテストは意図的に期限切れ (`expires_at <= now`) のロットをテストDBに
+作成する。`expireDueCreditLots`/`previewExpiringCreditLots`はどちらもウォレットID等で
+絞らずテーブル全体を走査するため、テスト後に後始末 (`voidedAt`設定) をしないと
+`packages/ledger`側の`expiry.test.ts`など、同じテストDBを共有する他のテストスイートの
+前提 (「期限切れロットは自スイートが作成した分だけ」) を壊してしまう。実際に一度
+この後始末漏れで`packages/ledger/src/expiry.test.ts`のアサーションが失敗する事象を
+確認したため、テスト内で明示的に後始末している。

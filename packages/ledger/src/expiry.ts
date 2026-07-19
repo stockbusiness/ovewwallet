@@ -113,3 +113,40 @@ export async function expireDueCreditLots(
 
   return { walletsProcessed, totalExpiredAmount };
 }
+
+/**
+ * `expireDueCreditLots`を実行した場合に何が起こるかを、書き込みを行わずに事前確認する
+ * (docs/credit-expiry.md「失効予告レポート」参照)。管理画面の失効バッチ実行ボタンの
+ * 直前に影響範囲を確認できるようにする狙い。判定条件・利用可能残高によるキャップは
+ * `expireDueCreditLots`と同一にしている (実行結果とプレビューがずれないようにするため)。
+ */
+export async function previewExpiringCreditLots(
+  db: Db = defaultPrisma,
+  now: Date = new Date(),
+): Promise<ExpireDueCreditLotsResult> {
+  const dueWallets = await db.oveCreditLot.findMany({
+    where: { expiresAt: { lte: now }, expiredAt: null, voidedAt: null, remainingAmount: { gt: 0n } },
+    select: { walletId: true },
+    distinct: ["walletId"],
+  });
+
+  let walletsProcessed = 0;
+  let totalExpiredAmount = 0n;
+
+  for (const { walletId } of dueWallets) {
+    const wallet = await db.wallet.findUnique({ where: { id: walletId } });
+    if (!wallet) continue;
+
+    const lots = await db.oveCreditLot.findMany({
+      where: { walletId, expiresAt: { lte: now }, expiredAt: null, voidedAt: null, remainingAmount: { gt: 0n } },
+    });
+    const due = lots.reduce((sum, lot) => sum + lot.remainingAmount, 0n);
+    const expireAmount = due < wallet.availableBalance ? due : wallet.availableBalance;
+    if (expireAmount <= 0n) continue;
+
+    walletsProcessed += 1;
+    totalExpiredAmount += expireAmount;
+  }
+
+  return { walletsProcessed, totalExpiredAmount };
+}

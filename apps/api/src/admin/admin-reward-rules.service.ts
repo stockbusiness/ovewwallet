@@ -1,6 +1,6 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
-import { expireDueCreditLots } from "@ove/ledger";
+import { expireDueCreditLots, previewExpiringCreditLots } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 
 export interface CreateRewardRuleParams {
@@ -116,6 +116,18 @@ export class AdminRewardRulesService {
     return {
       wallets_processed: result.walletsProcessed,
       total_expired_amount: result.totalExpiredAmount.toString(),
+    };
+  }
+
+  /**
+   * 失効バッチを実行した場合の影響範囲を、書き込みを行わずに事前確認する
+   * (docs/credit-expiry.md「失効予告レポート」参照)。
+   */
+  async previewExpiryBatch() {
+    const result = await previewExpiringCreditLots(this.db);
+    return {
+      wallets_affected: result.walletsProcessed,
+      total_amount: result.totalExpiredAmount.toString(),
     };
   }
 }
