@@ -219,6 +219,52 @@ Explore agentによるコードベース横断調査で、実運用に足りな�
 `exchangeSengokuSsoCode`/`verifyAgencySso`) を追加し、検証失敗を`UnauthorizedException`
 として401で返すよう修正。ユーザー確認済み (「ログインできました」)。
 
+## フェーズ10: 追加機能10件の実装 (2026-07-19)
+
+ユーザーからの機能ブレインストーム依頼に対して提案した10個のアイデアを、優先度順に
+1件ずつ実装・テスト・コミットした。実装順に:
+
+1. **OVE有効期限・自動失効バッチ** (`docs/credit-expiry.md`): `reward_rules.expiry_days`
+   でルール単位に有効期限を設定可能にし、`ove_credit_lots`テーブルでロット単位の
+   残額をFIFO消費 (有効期限が近い順)。管理画面から失効バッチを手動実行できる
+   `POST /api/v1/admin/expire-credits`を追加。
+2. **お知らせのLINE配信連携** (`docs/notices-line-broadcast.md`): お知らせ公開時に
+   LINE Messaging APIのbroadcastで同じ内容を配信する`LineBroadcastService`を追加。
+   `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`未設定時はno-op。
+3. **お知らせの既読管理・重要度フラグ** (`docs/notices-read-tracking.md`):
+   `Notice.importance` (NORMAL/IMPORTANT) と`NoticeRead`テーブル (アカウント単位の
+   既読状態) を追加。
+4. **保留中残高の内訳表示** (`docs/ledger-rules.md`, 新規ドキュメント無し):
+   `wallets.pending_balance`が未使用フィールドだったことを確認したため、実際に
+   意味を持つ`WalletHold`を対象に`GET /api/v1/me/wallet/holds`を新設。
+5. **紹介登録特典状況の確認** (`docs/referral-status.md`): このシステムの「紹介」が
+   代理店発行の紹介URL経由の新規登録であり、ユーザー間の紹介ではないことを踏まえ、
+   `GET /api/v1/me/referral-status`で自分の登録特典状況のみを確認できるようにした。
+6. **累計獲得OVEに応じたランク/称号表示** (`docs/wallet-rank.md`): 既存の
+   `lifetime_credited`を戦国ブランドの階級名 (足軽→侍→武将→大名→天下人) に変換する
+   純粋な表示機能。新しいAPI・DBテーブルは追加していない。
+7. **継続ログイン/デイリーボーナス** (`docs/daily-login-bonus.md`):
+   `DailyBonusClaim`テーブルで1アカウント・1暦日1回の請求を管理し、7日サイクルの
+   固定スケジュールでOVEを付与する。
+8. **ユーザー向けログインデバイス一覧** (`docs/login-devices.md`):
+   `user_sessions.ip_address`/`user_agent`が未使用フィールドだったため、ログイン時に
+   実際に記録するようにし、`GET/POST /api/v1/accounts/me/sessions`で本人が自分の
+   ログイン中端末を確認・個別ログアウトできるようにした。
+9. **ユーザー向け退会/アカウント削除フロー** (`docs/account-closure.md`):
+   `OveAccount.status`の`CLOSED`と`closedAt`も未使用フィールドだったため、
+   `POST /api/v1/accounts/me/close`で実際に使うようにした。残高0が条件、退会後は
+   同一identityでの再ログインも拒否する。
+10. **自分の取引履歴CSVエクスポート** (`docs/transaction-export.md`):
+    `GET /api/v1/me/transactions/export`でUTF-8 BOM付きCSVをダウンロードできる
+    ようにした。
+
+10機能すべてにe2eテストを追加し (計23件)、既存の125件 (ledger 21 + auth 37 + API旧91)
+と合わせて計174件が引き続き全てグリーンであることを確認済み。「未使用フィールドの
+発見→実際に使う機能を実装する」というパターンが3回 (pending_balance→held_balance
+ベースの保留内訳、user_sessions.ip_address/user_agent→ログインデバイス一覧、
+OveAccount.status=CLOSED→退会機能) 続けて発生しており、実装済みのスキーマと
+実際に配線されている機能の間にギャップがあったことが今回の作業で明らかになった。
+
 ## 未着手・今後の課題
 
 `docs/project-status.md` 6章「未実装・今後の課題」および各機能ドキュメントの
