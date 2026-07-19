@@ -22,6 +22,15 @@ function formatDetail(r: ApprovalRequestItem): string {
   return `${Number(r.payload.amount).toLocaleString("ja-JP")} OVE`;
 }
 
+/** 承認待ちがこの時間を超えて放置されている場合、強調表示する (SLA可視化)。 */
+const SLA_HOURS = 24;
+
+function elapsedSinceRequested(requestedAt: string): { label: string; overSla: boolean } {
+  const hours = (Date.now() - new Date(requestedAt).getTime()) / (60 * 60 * 1000);
+  const label = hours < 1 ? "1時間未満" : hours < 24 ? `${Math.floor(hours)}時間` : `${Math.floor(hours / 24)}日`;
+  return { label, overSla: hours >= SLA_HOURS };
+}
+
 export default function ApprovalRequestsPage() {
   const router = useRouter();
   const [requests, setRequests] = useState<ApprovalRequestItem[]>([]);
@@ -126,32 +135,42 @@ export default function ApprovalRequestsPage() {
               <th className="p-3">理由</th>
               <th className="p-3">申請者</th>
               <th className="p-3">申請日時</th>
+              <th className="p-3">経過時間</th>
               <th className="p-3"></th>
             </tr>
           </thead>
           <tbody>
-            {pending.map((r) => (
-              <tr key={r.id} className="border-t border-neutral-100">
-                <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
-                <td className="p-3">{formatDetail(r)}</td>
-                <td className="p-3">{r.payload.reason}</td>
-                <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
-                <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <button onClick={() => approve(r.id, r.requestType)} className="text-xs text-brand-600 underline">
-                      承認
-                    </button>
-                    <button onClick={() => reject(r.id)} className="text-xs text-red-600 underline">
-                      却下
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {pending.map((r) => {
+              const elapsed = elapsedSinceRequested(r.requestedAt);
+              return (
+                <tr key={r.id} className={`border-t border-neutral-100 ${elapsed.overSla ? "bg-red-50" : ""}`}>
+                  <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
+                  <td className="p-3">{formatDetail(r)}</td>
+                  <td className="p-3">{r.payload.reason}</td>
+                  <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
+                  <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">
+                    <span className={elapsed.overSla ? "font-bold text-red-600" : "text-neutral-600"}>
+                      {elapsed.label}
+                      {elapsed.overSla && " (放置)"}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <div className="flex gap-2">
+                      <button onClick={() => approve(r.id, r.requestType)} className="text-xs text-brand-600 underline">
+                        承認
+                      </button>
+                      <button onClick={() => reject(r.id)} className="text-xs text-red-600 underline">
+                        却下
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {pending.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-3 text-xs text-neutral-400">
+                <td colSpan={7} className="p-3 text-xs text-neutral-400">
                   承認待ちの申請はありません
                 </td>
               </tr>
