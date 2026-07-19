@@ -12,8 +12,10 @@ import {
   type ReconciliationResult,
   type WalletListItem,
   type TransactionItem as TransactionItemType,
+  type RankDistributionItem,
 } from "@/lib/api";
 import { TrendChart } from "./TrendChart";
+import { RankDistribution } from "./RankDistribution";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,23 +24,26 @@ export default function DashboardPage() {
   const [wallets, setWallets] = useState<WalletListItem[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentTransactions, setRecentTransactions] = useState<TransactionItemType[]>([]);
+  const [rankDistribution, setRankDistribution] = useState<RankDistributionItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [meRes, recRes, walletsRes, statsRes, txnsRes] = await Promise.all([
+        const [meRes, recRes, walletsRes, statsRes, txnsRes, rankRes] = await Promise.all([
           apiFetch<AdminMe>("/api/v1/admin/me"),
           apiFetch<ReconciliationResult>("/api/v1/admin/reconciliation"),
           apiFetch<WalletListItem[]>("/api/v1/admin/wallets?limit=200"),
           apiFetch<DashboardStats>("/api/v1/admin/dashboard-stats"),
           apiFetch<TransactionItemType[]>("/api/v1/admin/transactions?limit=8"),
+          apiFetch<RankDistributionItem[]>("/api/v1/admin/dashboard-stats/rank-distribution"),
         ]);
         setMe(meRes);
         setReconciliation(recRes);
         setWallets(walletsRes);
         setStats(statsRes);
         setRecentTransactions(txnsRes);
+        setRankDistribution(rankRes);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           router.push("/login");
@@ -119,6 +124,11 @@ export default function DashboardPage() {
               )}
             </section>
           </div>
+
+          <section className="mb-6 rounded-xl border border-sengoku-border bg-sengoku-navy p-5">
+            <h2 className="mb-4 text-sm font-bold text-sengoku-text">会員ランク分布</h2>
+            <RankDistribution data={rankDistribution} />
+          </section>
 
           <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5">
             <div className="mb-3 flex items-center justify-between">

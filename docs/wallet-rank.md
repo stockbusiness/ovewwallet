@@ -38,3 +38,19 @@
 累計獲得量が古いまま更新されない不具合**を発見した (`docs/daily-login-bonus.md`
 参照)。`wallet/page.tsx`の`claimDailyBonus()`が`available_balance`のみを
 楽観的に更新し`lifetime_credited`を更新していなかったことが原因で、修正済み。
+
+## 管理画面: 会員ランク分布 (2026-07-19追加)
+
+`GET /api/v1/admin/dashboard-stats/rank-distribution`: 全ウォレットの
+`lifetime_credited`を階級ごとに集計し、階級名と人数の配列を返す。管理ダッシュボード
+(`/dashboard`) に横棒グラフで表示する (`apps/admin-wallet/src/app/dashboard/RankDistribution.tsx`)。
+
+しきい値テーブル (`WALLET_RANK_THRESHOLDS`, `apps/api/src/admin/admin.service.ts`) は
+`packages/shared-ui/src/rank.ts`の`WALLET_RANKS`と同じ値を持つ独立した定義。バックエンドを
+Reactコンポーネント込みのUIパッケージに依存させたくないための意図的な重複であり、
+階級を追加・変更する場合は両方を更新する必要がある (今後の課題: 共通パッケージへの
+切り出し)。
+
+`apps/api/src/e2e/rank-distribution.test.ts` (1件): 6,000 OVE付与後のウォレットが
+「侍」に計上されること、全階級の人数合計が総ウォレット数と一致することを検証済み。
+実ブラウザでの確認は未実施 (今後の課題)。

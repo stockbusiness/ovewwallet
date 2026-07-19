@@ -41,6 +41,11 @@ export interface DashboardStats {
   dailyTrend: Array<{ date: string; credited: string; debited: string }>;
 }
 
+export interface RankDistributionItem {
+  name: string;
+  count: number;
+}
+
 export interface WalletListItem {
   id: string;
   walletCode: string;

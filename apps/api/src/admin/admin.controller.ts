@@ -217,6 +217,13 @@ export class AdminController {
     return this.admin.getDashboardStats();
   }
 
+  /** ダッシュボード向け、会員ランク (docs/wallet-rank.md) の人数分布。 */
+  @Get("dashboard-stats/rank-distribution")
+  @UseGuards(AdminAuthGuard)
+  async rankDistribution() {
+    return this.admin.getRankDistribution();
+  }
+
   @Get("accounts")
   @UseGuards(AdminAuthGuard)
   async listAccounts(@Query("status") status?: string, @Query("limit") limit?: string) {

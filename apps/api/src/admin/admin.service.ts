@@ -12,6 +12,19 @@ import { PRISMA } from "../common/prisma.module";
 import { serializeTransaction } from "../wallets/wallets.service";
 import { AdminApprovalService, HIGH_VALUE_THRESHOLD } from "./admin-approval.service";
 
+/**
+ * `packages/shared-ui/src/rank.ts`のWALLET_RANKSと同じ定義 (docs/wallet-rank.md参照)。
+ * バックエンドをUIパッケージ (Reactコンポーネント込み) に依存させたくないため、
+ * しきい値のみ独立して保持する。階級を追加・変更する場合は両方を更新すること。
+ */
+const WALLET_RANK_THRESHOLDS = [
+  { name: "足軽", min: 0 },
+  { name: "侍", min: 5000 },
+  { name: "武将", min: 20000 },
+  { name: "大名", min: 50000 },
+  { name: "天下人", min: 100000 },
+];
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -75,6 +88,23 @@ export class AdminService {
         debited: v.debited.toString(),
       })),
     };
+  }
+
+  /** ダッシュボード向け、会員ランク (docs/wallet-rank.md) の人数分布。 */
+  async getRankDistribution(): Promise<Array<{ name: string; count: number }>> {
+    const wallets = await this.db.wallet.findMany({ select: { lifetimeCredited: true } });
+    const counts = WALLET_RANK_THRESHOLDS.map((r) => ({ name: r.name, count: 0 }));
+
+    for (const wallet of wallets) {
+      const credited = Number(wallet.lifetimeCredited);
+      let rankIndex = 0;
+      for (let i = 0; i < WALLET_RANK_THRESHOLDS.length; i++) {
+        if (credited >= WALLET_RANK_THRESHOLDS[i]!.min) rankIndex = i;
+      }
+      counts[rankIndex]!.count += 1;
+    }
+
+    return counts;
   }
 
   async listAccounts(params: { status?: string; limit?: number }) {
