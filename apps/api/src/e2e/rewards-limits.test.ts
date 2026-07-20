@@ -67,7 +67,8 @@ describe("reward rule limits (monthly / global / period)", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/has not started yet/);
+    // /api/v1/rewards/grant は外部連携APIのため {ok:false, error:{code,message}} 形式
+    expect(res.body.error.message).toMatch(/has not started yet/);
   });
 
   it("rejects a grant after the rule's ends_at", async () => {
@@ -89,7 +90,7 @@ describe("reward rule limits (monthly / global / period)", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(res.body.message).toMatch(/already ended/);
+    expect(res.body.error.message).toMatch(/already ended/);
   });
 
   it("enforces monthly_amount_limit relative to the current baseline", async () => {
@@ -129,7 +130,7 @@ describe("reward rule limits (monthly / global / period)", () => {
       idempotency_key: `key-${generateId()}`,
     });
     expect(failRes.status).toBe(400);
-    expect(failRes.body.message).toMatch(/monthly_amount_limit/);
+    expect(failRes.body.error.message).toMatch(/monthly_amount_limit/);
   });
 
   it("enforces global_amount_limit relative to the current baseline", async () => {
@@ -169,6 +170,6 @@ describe("reward rule limits (monthly / global / period)", () => {
       idempotency_key: `key-${generateId()}`,
     });
     expect(failRes.status).toBe(400);
-    expect(failRes.body.message).toMatch(/global_amount_limit/);
+    expect(failRes.body.error.message).toMatch(/global_amount_limit/);
   });
 });

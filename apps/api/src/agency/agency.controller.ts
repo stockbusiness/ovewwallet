@@ -1,4 +1,13 @@
-import { BadRequestException, Body, Controller, Post, Req, ServiceUnavailableException, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  Req,
+  ServiceUnavailableException,
+  UseFilters,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import {
   AGENCY_HUB_EVENT_TYPES,
@@ -9,6 +18,7 @@ import { AgencyService } from "./agency.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AgencyApiKeyGuard, type AuthenticatedPartnerRequest } from "../common/agency-api-key.guard";
 import { isFeatureEnabled } from "../common/feature-flags";
+import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 
 const HUB_EVENT_TYPES = new Set<string>(AGENCY_HUB_EVENT_TYPES);
 
@@ -21,6 +31,7 @@ const HUB_EVENT_TYPES = new Set<string>(AGENCY_HUB_EVENT_TYPES);
  */
 @ApiTags("agency-integration")
 @Controller("api/integrations/agencies")
+@UseFilters(ExternalApiExceptionFilter)
 export class AgencyController {
   constructor(private readonly agency: AgencyService) {}
 

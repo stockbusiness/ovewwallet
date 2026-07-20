@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UseFilters, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { RewardGrantRequestSchema, type RewardGrantRequest } from "@ove/shared-types";
 import { RewardsService } from "./rewards.service";
@@ -6,6 +6,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
+import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 
 @ApiTags("rewards")
 @Controller("api/v1/rewards")
@@ -16,6 +17,7 @@ export class RewardsController {
   @Post("grant")
   @UseGuards(ExternalApiAuthGuard)
   @UseInterceptors(ApiAccessLogInterceptor)
+  @UseFilters(ExternalApiExceptionFilter)
   async grant(
     @Body(new ZodValidationPipe(RewardGrantRequestSchema)) body: RewardGrantRequest,
     @Req() req: AuthenticatedServiceRequest,

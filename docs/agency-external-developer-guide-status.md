@@ -205,7 +205,17 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 ## 5. エラーフォーマットの不一致
 
-### 差分
+> **対応済み**: sengoku-ai.com等の外部システムが直接叩くAPI
+> (`POST /api/integrations/agencies`、`POST /api/v1/rewards/grant`、
+> `POST /api/v1/transactions/debit`、`POST /api/v1/transactions/{id}/reverse`)
+> のみ、ガイド形式 `{ok:false, error:{code,message}}` を返す
+> `ExternalApiExceptionFilter`(`apps/api/src/common/external-api-exception.filter.ts`)
+> を個別適用した。ウォレット自身のフロントエンド(apps/user-wallet, apps/admin-wallet)
+> が使うセッション認証APIは`lib/api.ts`が`body.message`を直接読む実装のため、
+> 影響範囲をこの4エンドポイントに限定し、グローバルの`LedgerExceptionFilter`
+> (内部向け・全体適用)は変更していない。以下の差分記述は着手前の調査結果を保持する。
+
+### 差分（対応前の調査結果）
 
 - ガイド§13の標準エラー形式は `{ok: false, error: {code, message}}`
   （`code`は`INVALID_API_KEY`/`VALIDATION_ERROR`等の安定した文字列）。
@@ -227,10 +237,19 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
      受け取るエラーレスポンスの`{ok, error.code}`形式を正しくパースする
      クライアントコードの実装が必要（現行にはそのようなパーサーは存在しない）。
 
-### 必要API
+### 必要API・実装内容（対応済み）
 
-無し。既存のレスポンス形式を変更するか、sengoku-ai.com向け専用のアダプタ層を
-設けるかの設計判断が必要（既存の他の外部サービス連携との一貫性も考慮が必要）。
+- `apps/api/src/common/ledger-error-classification.ts`: 台帳コアの例外クラス→
+  HTTPステータス区分の対応表を`LedgerExceptionFilter`と共有する形で切り出し。
+- `apps/api/src/common/external-api-exception.filter.ts`: 新規の
+  `ExternalApiExceptionFilter`。`BadRequestException`→`VALIDATION_ERROR`、
+  `UnauthorizedException`→`API_KEY_REQUIRED`/`INVALID_API_KEY`(メッセージに
+  "missing"を含むかで判定)、`ServiceUnavailableException`→`FEATURE_DISABLED`、
+  台帳ドメイン例外→例外クラス名、その他→`INTERNAL_ERROR`にマッピングする。
+- `AgencyController`(クラス単位)・`TransactionsController`(クラス単位、
+  debit/reverse共に外部向けのため)・`RewardsController.grant`(メソッド単位、
+  同controllerの`GET /rewards/public`はセッション認証の内部APIのため対象外)へ
+  `@UseFilters(ExternalApiExceptionFilter)`を適用。
 
 ### データ移行の有無
 
@@ -245,7 +264,7 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 | 受信Webhook (`/api/integrations/agencies`) | event別分岐・REVOKED遷移・HUBイベント監査ログ化まで対応済み | 小 | `agent_code`キー化のみ残 |
 | SSOログイン | 実装済み・ほぼ整合 | 小 | `return_to`クレーム対応（任意） |
 | 送信系（resolve/system-links/capture/confirm/hierarchy） | **未実装** | 大 | クライアントコード新設、送信用APIキーの発行・保管 |
-| エラーフォーマット | 独自形式（不一致） | 中 | ガイド形式へのアダプタ、または現状維持の判断 |
+| エラーフォーマット | 対象4エンドポイントのみ`{ok,error:{code,message}}`形式に統一済み | 小 | 送信系API新設時にレスポンスパーサー実装が必要 |
 
 ---
 

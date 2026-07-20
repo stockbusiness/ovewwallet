@@ -7,32 +7,14 @@ import {
   Logger,
 } from "@nestjs/common";
 import type { Response } from "express";
-import {
-  AccountAlreadyMergedError,
-  AccountNotFoundError,
-  HoldNotActiveError,
-  HoldNotFoundError,
-  InsufficientBalanceError,
-  InvalidAmountError,
-  InvalidMergeError,
-  TransactionNotFoundError,
-  TransactionNotReversibleError,
-  WalletNotActiveError,
-  WalletNotFoundError,
-} from "@ove/ledger";
 import { ExternalApiAuthError, AgencySsoVerificationError } from "@ove/auth";
+import { LEDGER_ERROR_CLASSIFICATION } from "./ledger-error-classification";
 import type { RequestWithId } from "./request-id.middleware";
 import { captureException } from "./sentry";
 
-const NOT_FOUND_ERRORS = [WalletNotFoundError, TransactionNotFoundError, HoldNotFoundError, AccountNotFoundError];
-const CONFLICT_ERRORS = [
-  WalletNotActiveError,
-  InsufficientBalanceError,
-  TransactionNotReversibleError,
-  HoldNotActiveError,
-  AccountAlreadyMergedError,
-];
-const BAD_REQUEST_ERRORS = [InvalidAmountError, InvalidMergeError];
+const NOT_FOUND_ERRORS = LEDGER_ERROR_CLASSIFICATION.notFound;
+const CONFLICT_ERRORS = LEDGER_ERROR_CLASSIFICATION.conflict;
+const BAD_REQUEST_ERRORS = LEDGER_ERROR_CLASSIFICATION.badRequest;
 
 /**
  * 台帳コア (@ove/ledger) と外部API認証 (@ove/auth) が投げる例外を

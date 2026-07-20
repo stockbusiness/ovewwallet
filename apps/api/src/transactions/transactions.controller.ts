@@ -1,13 +1,15 @@
-import { Body, Controller, Param, Post, Req, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Param, Post, Req, UseFilters, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { DebitRequestSchema, ReverseRequestSchema, type DebitRequest, type ReverseRequest } from "@ove/shared-types";
 import { TransactionsService } from "./transactions.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
+import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 
 @ApiTags("transactions")
 @Controller("api/v1/transactions")
+@UseFilters(ExternalApiExceptionFilter)
 export class TransactionsController {
   constructor(private readonly transactions: TransactionsService) {}
 

@@ -184,7 +184,10 @@ describe("戦国経済圏代理店システム外部連携 (仕様書v3.6.71 / �
         .send({ event: "admin_updated", name: "external_idなしの代理店" })
         .expect(400);
 
-      expect(res.body.message).toMatch(/external_id/);
+      // 外部開発者向け連携ガイド13章のエラー形式 ({ok:false, error:{code,message}})
+      expect(res.body.ok).toBe(false);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(res.body.error.message).toMatch(/external_id/);
     });
 
     it("revokes the account_link on deactivated/deleted events (外部開発者向け連携ガイド11.1章)", async () => {
