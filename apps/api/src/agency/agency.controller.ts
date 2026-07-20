@@ -1,10 +1,16 @@
-import { Body, Controller, Post, Req, ServiceUnavailableException, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Post, Req, ServiceUnavailableException, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { AgencySyncRequestSchema, type AgencySyncRequest } from "@ove/shared-types";
+import {
+  AGENCY_HUB_EVENT_TYPES,
+  AgencySyncRequestSchema,
+  type AgencySyncRequest,
+} from "@ove/shared-types";
 import { AgencyService } from "./agency.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AgencyApiKeyGuard, type AuthenticatedPartnerRequest } from "../common/agency-api-key.guard";
 import { isFeatureEnabled } from "../common/feature-flags";
+
+const HUB_EVENT_TYPES = new Set<string>(AGENCY_HUB_EVENT_TYPES);
 
 /**
  * 戦国経済圏代理店システム外部連携API仕様書 v3.6.71。
@@ -33,7 +39,20 @@ export class AgencyController {
       return { success: true, message: "connection ok" };
     }
 
-    const result = await this.agency.syncAgency(req.serviceIntegration.id, body);
+    // 共通顧客HUBイベント(lead_created/common_user.merged/
+    // common_user.assigned_agent.updated)は代理店レコードの同期ではないため、
+    // account_linksへ誤って代理店データとしてupsertせず、監査ログにのみ記録する
+    // (自動反映は共通ID接続機能の実装後に対応)。
+    if (body.event && HUB_EVENT_TYPES.has(body.event)) {
+      await this.agency.recordHubEvent(req.serviceIntegration.id, body);
+      return { success: true, message: "recorded for manual review" };
+    }
+
+    if (!body.external_id) {
+      throw new BadRequestException("external_id is required to sync an agency record");
+    }
+
+    const result = await this.agency.syncAgency(req.serviceIntegration.id, body.external_id, body);
     return { success: true, data: { external_id: result.externalId, synced: result.synced } };
   }
 }

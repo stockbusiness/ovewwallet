@@ -1,7 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { AgencySyncRequest } from "@ove/shared-types";
+import { AGENCY_DEACTIVATION_EVENT_TYPES, type AgencySyncRequest } from "@ove/shared-types";
 import { generateId, type PrismaClient, type Prisma } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+
+const DEACTIVATION_EVENT_TYPES = new Set<string>(AGENCY_DEACTIVATION_EVENT_TYPES);
 
 export interface AgencySyncResult {
   externalId: string;
@@ -32,8 +34,15 @@ export class AgencyService {
     return integration?.id;
   }
 
-  async syncAgency(serviceIntegrationId: string, body: AgencySyncRequest): Promise<AgencySyncResult> {
+  /**
+   * `deactivated`/`deleted`イベント(ガイド11.1章)を受けてaccount_linkをREVOKEDへ
+   * 遷移させる。従来はstatusを一切更新しなかったため、代理店が停止・削除されても
+   * account_linkがACTIVE/PENDINGのまま残り続けるバグがあった。
+   */
+  async syncAgency(serviceIntegrationId: string, externalId: string, body: AgencySyncRequest): Promise<AgencySyncResult> {
+    const isRevocation = body.event !== undefined && DEACTIVATION_EVENT_TYPES.has(body.event);
     const metadata = {
+      agentCode: body.agent_code ?? null,
       parentExternalId: body.parent_external_id ?? null,
       commonUserId: body.common_user_id ?? null,
       referralToken: body.referral_token ?? null,
@@ -48,7 +57,7 @@ export class AgencyService {
       rawPayload: body,
     } satisfies Record<string, unknown>;
 
-    const key = { serviceIntegrationId, externalUserId: body.external_id };
+    const key = { serviceIntegrationId, externalUserId: externalId };
     const existing = await this.db.accountLink.findUnique({
       where: { serviceIntegrationId_externalUserId: key },
     });
@@ -56,21 +65,49 @@ export class AgencyService {
     if (existing) {
       await this.db.accountLink.update({
         where: { id: existing.id },
-        data: { metadata: metadata as unknown as Prisma.InputJsonValue },
+        data: {
+          metadata: metadata as unknown as Prisma.InputJsonValue,
+          ...(isRevocation ? { status: "REVOKED" as const, revokedAt: new Date() } : {}),
+        },
       });
     } else {
       await this.db.accountLink.create({
         data: {
           id: generateId(),
           ...key,
-          status: "PENDING",
+          status: isRevocation ? "REVOKED" : "PENDING",
           linkMethod: "AGENCY_SYNC",
           metadata: metadata as unknown as Prisma.InputJsonValue,
+          ...(isRevocation ? { revokedAt: new Date() } : {}),
         },
       });
     }
 
-    return { externalId: body.external_id, synced: true };
+    return { externalId, synced: true };
+  }
+
+  /**
+   * 共通顧客HUBイベント(lead_created/common_user.merged/
+   * common_user.assigned_agent.updated、ガイド11.1〜11.2章)を監査ログへ記録する。
+   * これらは代理店レコードの同期ではなく、ウォレット側にcommon_user_idとの
+   * 紐づけがまだ無いため自動反映はできない。手動確認・将来の共通ID接続機能の
+   * 実装まで、生ペイロードを保全することが目的。
+   */
+  async recordHubEvent(serviceIntegrationId: string, body: AgencySyncRequest): Promise<void> {
+    const actionType = `AGENCY_HUB_EVENT_${(body.event ?? "unknown").toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "EXTERNAL_SERVICE",
+        actorId: serviceIntegrationId,
+        actionType,
+        targetType: "agency_common_user_hub_event",
+        targetId: body.common_user_id ?? null,
+        result: "SUCCESS",
+        afterData: body as unknown as Prisma.InputJsonValue,
+        reason: "共通顧客HUBイベントを受信(手動確認待ち、自動反映は未実装)",
+      },
+    });
   }
 
   /**

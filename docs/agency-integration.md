@@ -1,6 +1,7 @@
 # 戦国経済圏代理店システム外部連携 (sengoku-ai.com)
 
-対象仕様: 「戦国経済圏 代理店システム 外部連携API仕様書」v3.6.71
+対象仕様: 「戦国経済圏 代理店システム 外部連携API仕様書」v3.6.71、
+「千ノ国 代理店システム 外部開発者向け連携ガイド」v3.6.78-draft
 開発基準: `docs/development-guardrails.md` (特に4.3章・9.1章・13章)
 
 ## 実装範囲
@@ -15,6 +16,21 @@
 3. **管理画面: 代理店連携状態一覧** (開発ガイドライン15章「必須」項目):
    `/agency-links` で `account_links` (AGENCY_SYSTEM分) を一覧・状態絞り込み・
    詳細確認できる。
+
+## イベント種別による分岐 (外部開発者向け連携ガイド11.1章)
+
+`POST /api/integrations/agencies` は `event` フィールドの値によって処理を
+分ける (`apps/api/src/agency/agency.controller.ts`)。
+
+| `event` | 扱い |
+|---|---|
+| `connection_test` (または `dry_run: true`) | 何も保存せず2xxのみ返す (従来通り) |
+| `admin_created` / `admin_updated` / `role_updated` / `approved` / `promoted` など、`external_id`を伴う代理店レコードのイベント | `AgencyService.syncAgency()` で `account_links` へupsert (従来通り) |
+| `deactivated` / `deleted` | 同じく`syncAgency()`を通るが、**`account_links.status`を`REVOKED`へ強制的に遷移させ`revokedAt`を記録する**。従来はイベント種別を見ずmetadataのみ更新していたため、代理店が停止・削除されてもリンクがACTIVE/PENDINGのまま残り続けるバグがあった |
+| `lead_created` / `common_user.merged` / `common_user.assigned_agent.updated` | 代理店レコードの同期ではなく共通顧客HUBのイベントのため、`account_links`へは書き込まず`AgencyService.recordHubEvent()`で`audit_logs`(`target_type: "agency_common_user_hub_event"`, `action_type: "AGENCY_HUB_EVENT_<EVENT>"`)へ記録するのみ。ウォレット側に`common_user_id`とアカウントの紐づけがまだ無い(共通ID接続機能は別途)ため、自動反映はできない。手動確認は`audit_logs`を参照する |
+
+`external_id`は代理店レコード同期のイベントでは必須(無い場合は400)。HUB系
+イベントは`external_id`を持たないことがあるため任意項目にしてある。
 
 ## 管理画面でできること・できないこと
 

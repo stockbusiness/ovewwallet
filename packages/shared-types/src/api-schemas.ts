@@ -56,18 +56,27 @@ export const TransactionResponseSchema = z.object({
 export type TransactionResponse = z.infer<typeof TransactionResponseSchema>;
 
 /**
- * POST /api/integrations/agencies (戦国経済圏代理店システム外部連携API仕様書
- * v3.6.71 7章)。sengoku-ai.comから代理店情報の同期を受信する。将来の
- * フィールド追加(仕様書付則)に備え、未知のフィールドは無視せず素通りさせる
- * (.passthrough())。connection_test/dry_runの場合はexternal_id以外は
- * 送られないことがあるため、external_id以外は全て任意とする。
+ * POST /api/integrations/agencies (外部開発者向け連携ガイド v3.6.78-draft 8章・11章)。
+ * sengoku-ai.comから2種類のイベントを受信する:
+ * (1) 代理店レコードの同期 (admin_created/admin_updated/role_updated/approved/
+ *     promoted/deactivated/deleted等、`external_id`で識別)
+ * (2) 共通顧客HUBイベント (lead_created/common_user.merged/
+ *     common_user.assigned_agent.updated等、`common_user_id`で識別し、
+ *     代理店レコードとは無関係のペイロード形状を持つ)
+ * を区別できるよう、`external_id`は任意にし、HUBイベント用のフィールド
+ * (`entity`/`common_user`/`identities`/`system_links`/`agency_relations`/
+ * `details`)も型として受け付ける。将来のフィールド追加(ガイド付則)に備え、
+ * 未知のフィールドは無視せず素通りさせる(.passthrough())。
  */
 export const AgencySyncRequestSchema = z
   .object({
     event: z.string().max(50).optional(),
+    entity: z.string().max(50).optional(),
     dry_run: z.boolean().optional(),
     source: z.string().max(100).optional(),
-    external_id: z.string().min(1).max(255),
+    external_id: z.string().max(255).optional(),
+    /** ガイド4章推奨の代理店公開識別子。現状はexternal_idを紐づけキーとして使い続け、metadataに併記する。 */
+    agent_code: z.string().max(255).nullable().optional(),
     parent_external_id: z.string().max(255).nullable().optional(),
     common_user_id: z.string().max(255).nullable().optional(),
     referral_token: z.string().max(255).nullable().optional(),
@@ -79,9 +88,30 @@ export const AgencySyncRequestSchema = z
     role: z.string().max(50).nullable().optional(),
     role_label: z.string().max(100).nullable().optional(),
     status: z.string().max(50).nullable().optional(),
+    /** 共通顧客HUBイベント (ガイド11.2章) 用のペイロード。代理店同期処理では未使用、監査ログへ記録するのみ。 */
+    common_user: z.record(z.unknown()).nullable().optional(),
+    identities: z.array(z.record(z.unknown())).optional(),
+    system_links: z.array(z.record(z.unknown())).optional(),
+    agency_relations: z.array(z.record(z.unknown())).optional(),
+    details: z.record(z.unknown()).optional(),
+    updated_at: z.string().optional(),
   })
   .passthrough();
 export type AgencySyncRequest = z.infer<typeof AgencySyncRequestSchema>;
+
+/**
+ * 外部開発者向け連携ガイド11.1章のイベント一覧のうち、代理店レコードではなく
+ * 「共通顧客HUB」に関するイベント。代理店同期(syncAgency)の対象外とし、
+ * 監査ログへの記録のみ行う(自動反映は共通ID接続機能の実装後に対応)。
+ */
+export const AGENCY_HUB_EVENT_TYPES = [
+  "lead_created",
+  "common_user.merged",
+  "common_user.assigned_agent.updated",
+] as const;
+
+/** 代理店リンクの解除を意味するイベント (ガイド11.1章)。account_linkをREVOKEDへ遷移させる。 */
+export const AGENCY_DEACTIVATION_EVENT_TYPES = ["deactivated", "deleted"] as const;
 
 /** POST /api/v1/auth/sso/agency (仕様書12章)。sengoku-ai.com発行のSSO用JWTでログインする。 */
 export const AgencySsoLoginRequestSchema = z.object({

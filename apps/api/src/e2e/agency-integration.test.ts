@@ -176,6 +176,97 @@ describe("戦国経済圏代理店システム外部連携 (仕様書v3.6.71 / �
         await prisma.accountLink.count({ where: { serviceIntegrationId, externalUserId: externalId } }),
       ).toBe(1);
     });
+
+    it("rejects an agency-record event without external_id", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "admin_updated", name: "external_idなしの代理店" })
+        .expect(400);
+
+      expect(res.body.message).toMatch(/external_id/);
+    });
+
+    it("revokes the account_link on deactivated/deleted events (外部開発者向け連携ガイド11.1章)", async () => {
+      const externalId = `dir_deactivate_${generateId()}`;
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "admin_created", external_id: externalId, name: "停止テスト代理店" })
+        .expect(201);
+      expect((await findLink(externalId))!.status).toBe("PENDING");
+
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "deactivated", external_id: externalId })
+        .expect(201);
+
+      const revoked = await findLink(externalId);
+      expect(revoked!.status).toBe("REVOKED");
+      expect(revoked!.revokedAt).not.toBeNull();
+
+      const deletedExternalId = `dir_delete_${generateId()}`;
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "deleted", external_id: deletedExternalId, name: "初回受信がdeletedのケース" })
+        .expect(201);
+      const deleted = await findLink(deletedExternalId);
+      expect(deleted!.status).toBe("REVOKED");
+      expect(deleted!.revokedAt).not.toBeNull();
+    });
+
+    it("records common_user.merged / lead_created / common_user.assigned_agent.updated as audit logs instead of upserting an account_link", async () => {
+      const commonUserId = `cu_${generateId()}`;
+      const linkCountBefore = await prisma.accountLink.count({ where: { serviceIntegrationId } });
+
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({
+          event: "common_user.merged",
+          entity: "common_user",
+          source: "sengoku-ai",
+          common_user_id: commonUserId,
+          common_user: { common_user_id: commonUserId, status: "active", assigned_agent_id: 20 },
+          identities: [{ identity_type: "email", identity_masked: "u***@example.com", verified: 0 }],
+          system_links: [{ system_key: "shopping-cart", external_user_id: "cart-user-789" }],
+          agency_relations: [{ agent_id: 20, relation_type: "referral" }],
+          details: { source_common_user_id: "cu_source", target_common_user_id: commonUserId, reason: "manual merge" },
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "lead_created", common_user_id: commonUserId, metadata: { lp_url: "https://sengoku-ai.com/a/dir001" } })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/api/integrations/agencies")
+        .set("x-api-key", partnerApiKey)
+        .send({ event: "common_user.assigned_agent.updated", common_user_id: commonUserId })
+        .expect(201);
+
+      // HUBイベントはaccount_linksへ書き込まれない (external_idが無い/代理店データではないため)
+      expect(await prisma.accountLink.count({ where: { serviceIntegrationId } })).toBe(linkCountBefore);
+
+      const logs = await prisma.auditLog.findMany({
+        where: { targetType: "agency_common_user_hub_event", targetId: commonUserId },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(logs.map((l) => l.actionType)).toEqual([
+        "AGENCY_HUB_EVENT_COMMON_USER_MERGED",
+        "AGENCY_HUB_EVENT_LEAD_CREATED",
+        "AGENCY_HUB_EVENT_COMMON_USER_ASSIGNED_AGENT_UPDATED",
+      ]);
+      expect(logs.every((l) => l.actorType === "EXTERNAL_SERVICE" && l.result === "SUCCESS")).toBe(true);
+      expect((logs[0]!.afterData as Record<string, unknown>).common_user).toMatchObject({
+        common_user_id: commonUserId,
+        assigned_agent_id: 20,
+      });
+    });
   });
 
   describe("POST /api/v1/auth/sso/agency (SSOログイン, 12章)", () => {

@@ -3,7 +3,13 @@
 対象文書: `EXTERNAL_DEVELOPER_GUIDE.md`（sengoku-ai.com代理店システムの外部連携API仕様、
 v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-5systems.md`）で
 「代理店システム内共通顧客HUB」として抽象的に記述されていたものの**具体的なAPI契約**に
-相当する。本ドキュメントはコード改修を行わず、現行実装との整合状況のみを報告する。
+相当する。
+
+> **更新 (実装済み)**: 本レポートの「2. 受信側: 代理店同期Webhook」で指摘していた
+> 「`event`値による分岐処理が存在しない」問題は対応済み。詳細は
+> `docs/agency-integration.md`「イベント種別による分岐」節を参照。以下の2〜4章の
+> 記述は対応前の調査結果を保持しつつ、実施済み事項には注記を付けている。
+> `agent_code`キー化・送信系API・エラーフォーマット統一は引き続き未着手。
 
 ---
 
@@ -13,7 +19,7 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 | 方向 | 実装状況 |
 |---|---|
-| **受信**: sengoku-ai.com → ウォレット（代理店同期Webhook） | 実装済みだが、イベント種別を区別しない汎用実装 |
+| **受信**: sengoku-ai.com → ウォレット（代理店同期Webhook） | 実装済み。イベント種別分岐は対応済み(下記2章参照)。`agent_code`キー化は未対応 |
 | **受信**: sengoku-ai.com → ウォレット（SSOログイン） | 実装済み、ガイドとほぼ整合 |
 | **送信**: ウォレット → sengoku-ai.com（共通顧客ID解決・紹介capture/confirm・階層取得） | **未実装（コード上一切存在しない）** |
 
@@ -26,7 +32,13 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 ## 2. 受信側: 代理店同期Webhook `POST /api/integrations/agencies`
 
-### 差分
+> **対応済み**: `event`値による分岐処理・`deactivated`/`deleted`時のREVOKED遷移・
+> `common_user.merged`等のHUBイベントを`account_links`へ誤ってupsertしない対応は
+> 実装済み(`apps/api/src/agency/agency.controller.ts`, `agency.service.ts`,
+> `packages/shared-types/src/api-schemas.ts`)。以下の差分記述は着手前の調査時点の
+> ものを保持する(何が問題だったかの記録として)。`agent_code`キー化のみ未対応のまま。
+
+### 差分（対応前の調査結果）
 
 - 現行実装のリクエストスキーマ `AgencySyncRequestSchema`
   (`packages/shared-types/src/api-schemas.ts:65-83`, Zod, `.passthrough()`) が受け取るのは
@@ -63,10 +75,14 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 ### 必要API・スキーマ変更（案）
 
+- ~~`event`値によるハンドラ分岐（特に`common_user.merged`/
+  `common_user.assigned_agent.updated`の専用処理）の新設。~~ **対応済み**
+  (`AGENCY_HUB_EVENT_TYPES`/`AGENCY_DEACTIVATION_EVENT_TYPES`,
+  `AgencyService.recordHubEvent()`)。
 - `AgencySyncRequestSchema`に`agent_code`フィールドを追加し、アカウント紐づけの主キーを
-  `external_id`から`agent_code`へ移行するかどうかの判断が必要。
-- `event`値によるハンドラ分岐（特に`common_user.merged`/
-  `common_user.assigned_agent.updated`の専用処理）の新設。
+  `external_id`から`agent_code`へ移行するかどうかの判断は**未対応のまま**
+  (今回は`agent_code`を任意フィールドとしてmetadataに保存するのみ追加し、
+  紐づけキーは互換性維持のため`external_id`を継続使用)。
 
 ### データ移行の有無
 
@@ -226,7 +242,7 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 | 領域 | 実装状況 | 差分の大きさ | 必要な対応 |
 |---|---|---|---|
-| 受信Webhook (`/api/integrations/agencies`) | 実装済み・汎用処理のみ | 中 | event別分岐、`common_user.merged`等の意味的処理、`agent_code`キー化 |
+| 受信Webhook (`/api/integrations/agencies`) | event別分岐・REVOKED遷移・HUBイベント監査ログ化まで対応済み | 小 | `agent_code`キー化のみ残 |
 | SSOログイン | 実装済み・ほぼ整合 | 小 | `return_to`クレーム対応（任意） |
 | 送信系（resolve/system-links/capture/confirm/hierarchy） | **未実装** | 大 | クライアントコード新設、送信用APIキーの発行・保管 |
 | エラーフォーマット | 独自形式（不一致） | 中 | ガイド形式へのアダプタ、または現状維持の判断 |

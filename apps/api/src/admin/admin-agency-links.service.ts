@@ -8,6 +8,9 @@ import { PRISMA } from "../common/prisma.module";
  * (docs/agency-integration.md参照)。PENDING/FAILED/CONFLICTの絞り込みのうち、
  * 現在の実装ではPENDING/ACTIVE/REVOKEDのみが実際に発生しうる状態であり、
  * 自動再送・FAILED状態は今後の課題 (ENABLE_AGENCY_SYNC_RETRY) として未実装。
+ * REVOKEDは、sengoku-ai.comから`deactivated`/`deleted`イベント
+ * (外部開発者向け連携ガイド11.1章) を受信した場合に AgencyService.syncAgency()
+ * が自動的に遷移させる。
  */
 @Injectable()
 export class AdminAgencyLinksService {
