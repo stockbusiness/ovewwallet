@@ -5,11 +5,14 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 「代理店システム内共通顧客HUB」として抽象的に記述されていたものの**具体的なAPI契約**に
 相当する。
 
-> **更新 (実装済み)**: 本レポートの「2. 受信側: 代理店同期Webhook」で指摘していた
-> 「`event`値による分岐処理が存在しない」問題は対応済み。詳細は
-> `docs/agency-integration.md`「イベント種別による分岐」節を参照。以下の2〜4章の
-> 記述は対応前の調査結果を保持しつつ、実施済み事項には注記を付けている。
-> `agent_code`キー化・送信系API・エラーフォーマット統一は引き続き未着手。
+> **更新 (実装済み)**: 以下が対応済み。以下の2〜5章の記述は対応前の調査結果を
+> 保持しつつ、実施済み事項には注記を付けている。
+> - 「2. 受信側: 代理店同期Webhook」の`event`値による分岐処理
+> - 「4. 送信側」のうち`POST /api/common-users/resolve`(新規登録時)
+> - 「5. エラーフォーマット」の外部連携4エンドポイント分
+>
+> `agent_code`キー化、`system-links`の実際の呼び出し、`referrals/capture`・
+> `confirm`・`hierarchy.php`は引き続き未着手。
 
 ---
 
@@ -133,7 +136,18 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 
 ## 4. 送信側: ウォレット → sengoku-ai.com（共通顧客ID・紹介capture/confirm・階層取得）
 
-### 差分
+> **部分対応済み**: `POST /api/common-users/resolve`のみ実装した
+> (`apps/api/src/common-user-hub/common-user-hub.client.ts`)。新規アカウント登録時
+> (メール/LINE/戦国パスポートSSO/代理店SSOの4経路、既存ユーザーの一括移行は対象外)に
+> ベストエフォートで呼び出し、`OveAccount.commonUserId`へ保存する。
+> `ENABLE_PLATFORM_USER_ID`(既定false)と送信用APIキー(`SENGOKU_AI_OUTBOUND_API_KEY`、
+> 未設定時はno-op)の両方が揃わないと動作しない。`POST /api/common-users/{id}/system-links`
+> はクライアントメソッドとしては実装済みだが、まだどこからも呼び出していない
+> (resolve単体で新規登録時のリンクは完結するため。既知のcommon_user_idへ後から
+> 追加リンクするユースケース向けに残してある)。`referrals/capture`・`confirm`・
+> `hierarchy.php`は引き続き未実装。以下の差分記述は着手前の調査結果を保持する。
+
+### 差分（対応前の調査結果）
 
 **該当するコードが一切存在しない**。具体的に確認した内容:
 
@@ -263,7 +277,7 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 |---|---|---|---|
 | 受信Webhook (`/api/integrations/agencies`) | event別分岐・REVOKED遷移・HUBイベント監査ログ化まで対応済み | 小 | `agent_code`キー化のみ残 |
 | SSOログイン | 実装済み・ほぼ整合 | 小 | `return_to`クレーム対応（任意） |
-| 送信系（resolve/system-links/capture/confirm/hierarchy） | **未実装** | 大 | クライアントコード新設、送信用APIキーの発行・保管 |
+| 送信系（resolve/system-links/capture/confirm/hierarchy） | resolveのみ新規登録時に実装済み。system-linksはクライアント実装のみで未呼出。capture/confirm/hierarchyは未実装 | 中 | 送信用APIキーの実際の発行依頼、capture/confirm/hierarchyの実装判断 |
 | エラーフォーマット | 対象4エンドポイントのみ`{ok,error:{code,message}}`形式に統一済み | 小 | 送信系API新設時にレスポンスパーサー実装が必要 |
 
 ---

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import {
@@ -17,6 +18,7 @@ import {
   type PrismaClient,
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { CommonUserHubClient } from "../common-user-hub/common-user-hub.client";
 
 /** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
 export const CURRENT_TERMS_VERSION = "1.0";
@@ -36,11 +38,25 @@ export interface FindOrCreateIdentityParams {
    * 「作成した場合だけ」実行するためのフック (既存ユーザーのログインでは呼ばれない)。
    */
   onNewAccountCreated?: (tx: Prisma.TransactionClient, account: OveAccount) => Promise<void>;
+  /**
+   * 既存ユーザーの一括移行 (`AdminMigrationService`) 等、大量のレコードを
+   * ループ処理する呼び出し元向け。trueの場合、共通顧客HUBへのcommon_user_id
+   * 解決 (`CommonUserHubClient.resolve`) を呼ばない。移行データの解決は
+   * 別途「HUB突合バッチ」(既存データ移行、未実装) で一括処理する想定であり、
+   * 個々の行ごとに外部APIへ同期呼び出しするとバルク移行の速度・相手サービスへの
+   * 負荷に影響するため。既定はfalse (通常のログイン/新規登録では解決する)。
+   */
+  skipCommonUserHubLink?: boolean;
 }
 
 @Injectable()
 export class AccountsService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  private readonly logger = new Logger(AccountsService.name);
+
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly commonUserHub: CommonUserHubClient,
+  ) {}
 
   async getById(oveAccountId: string): Promise<OveAccount | null> {
     return this.db.oveAccount.findUnique({ where: { id: oveAccountId } });
@@ -75,7 +91,7 @@ export class AccountsService {
       throw new BadRequestException("terms of service agreement is required to create a new account");
     }
 
-    return this.db.$transaction(async (tx) => {
+    const createdAccount = await this.db.$transaction(async (tx) => {
       const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
       const account = await tx.oveAccount.create({
         data: {
@@ -136,6 +152,39 @@ export class AccountsService {
 
       return account;
     });
+
+    // 外部HTTP呼び出しをDBトランザクション内に含めない (接続保持・タイムアウトを
+    // 避けるため)。ベストエフォートのため失敗しても登録自体は成功済みのまま返す。
+    if (!params.skipCommonUserHubLink) {
+      await this.tryLinkCommonUser(createdAccount);
+    }
+    return createdAccount;
+  }
+
+  /**
+   * 代理店システム内共通顧客HUBへcommon_user_idを解決・保存する
+   * (外部開発者向け連携ガイド9.1章)。`ENABLE_PLATFORM_USER_ID`無効時や
+   * 送信APIキー未設定時はCommonUserHubClient側で自動的にno-opになる。
+   */
+  private async tryLinkCommonUser(account: OveAccount): Promise<void> {
+    try {
+      const result = await this.commonUserHub.resolve({
+        externalUserId: account.id,
+        email: account.primaryEmail,
+        phone: account.primaryPhone,
+        displayName: account.displayName,
+      });
+      if (!result) return;
+
+      await this.db.oveAccount.update({
+        where: { id: account.id },
+        data: { commonUserId: result.commonUserId, commonUserLinkedAt: new Date() },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `failed to link common_user_id for account ${account.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

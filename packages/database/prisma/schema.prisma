@@ -245,6 +245,11 @@ model OveAccount {
   termsAgreedAt       DateTime?     @map("terms_agreed_at")
   /// 同意した利用規約のバージョン (例: "1.0")。
   termsVersion        String?       @map("terms_version")
+  /// 代理店システム内共通顧客HUBが発行するcommon_user_id (外部開発者向け連携
+  /// ガイド9章)。ENABLE_PLATFORM_USER_ID有効時、新規アカウント作成後にベスト
+  /// エフォートで解決・保存する。解決前の既存アカウント・呼び出し失敗時はnull。
+  commonUserId        String?       @map("common_user_id")
+  commonUserLinkedAt  DateTime?     @map("common_user_linked_at")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   closedAt            DateTime?     @map("closed_at")
@@ -260,6 +265,7 @@ model OveAccount {
   noticeReads       NoticeRead[]
   dailyBonusClaims  DailyBonusClaim[]
 
+  @@index([commonUserId])
   @@map("ove_accounts")
 }
 

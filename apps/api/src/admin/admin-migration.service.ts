@@ -103,6 +103,9 @@ export class AdminMigrationService {
           // 管理者による一括移行であり、対話的な同意画面を経由しないため対象外とする
           // (指示書: 利用規約同意の永続化はユーザー自身のログイン/新規登録フロー向け)。
           termsAccepted: true,
+          // 大量行を逐次処理するため、行ごとに共通顧客HUBへ同期呼び出ししない
+          // (将来の「HUB突合バッチ」でまとめて解決する想定)。
+          skipCommonUserHubLink: true,
         });
 
         if (!row.oldBalanceRaw) {
