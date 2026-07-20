@@ -1,5 +1,9 @@
 # 外部サービスAPI (指示書11章)
 
+> 外部サービスの開発担当者向けの正式な連携ガイドは `docs/EXTERNAL_DEVELOPER_GUIDE.md`
+> を参照。本ファイルは実装の詳細・内部向けの補足 (発見されたバグ・テストで確認済みの
+> 内容等) を記録する開発者向けメモ。
+
 Base URL: `${API_URL}` (デフォルト `http://localhost:4000`)。Swagger: `/api/docs`。
 
 ## エンドポイント
