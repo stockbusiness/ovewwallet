@@ -1,5 +1,13 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { decryptSecret } from "@ove/auth";
+import type { PrismaClient } from "@ove/database";
+import { PRISMA } from "../common/prisma.module";
 import { isFeatureEnabled } from "../common/feature-flags";
+
+const CONFIG_ID = "default";
+const DEFAULT_BASE_URL = "https://sengoku-ai.com";
+const DEFAULT_SYSTEM_KEY = "ove-wallet";
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
 
 export interface ResolveCommonUserParams {
   externalUserId: string;
@@ -36,8 +44,11 @@ interface ResolveResponseBody {
  * (9.1章) と `POST /api/common-users/{common_user_id}/system-links` (9.3章) を
  * 呼び出す。
  *
- * `ENABLE_PLATFORM_USER_ID` 無効時、または送信用APIキー
- * (`SENGOKU_AI_OUTBOUND_API_KEY`) 未設定時は何もせずnull/falseを返す。
+ * 送信先URL・system_key・APIキーは管理画面(`/common-user-hub-config`、
+ * `AdminCommonUserHubService`)で設定する `common_user_hub_config` テーブル
+ * (シングルトン行) から読む。`ENABLE_PLATFORM_USER_ID` 無効時、または
+ * APIキー未設定時は何もせずnull/falseを返す。
+ *
  * 呼び出しが失敗しても例外を投げず、呼び出し元(アカウント登録処理等)を
  * ブロックしない (ガイド29.4章「タイムアウト時: 登録自体を失わず、連携待ちとして
  * 保存する」に倣ったベストエフォート設計)。解決できなかった場合の
@@ -47,31 +58,31 @@ interface ResolveResponseBody {
 export class CommonUserHubClient {
   private readonly logger = new Logger(CommonUserHubClient.name);
 
-  private get baseUrl(): string {
-    return process.env.SENGOKU_AI_COMMON_USER_HUB_URL || "https://sengoku-ai.com";
-  }
+  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 
-  private get apiKey(): string {
-    return process.env.SENGOKU_AI_OUTBOUND_API_KEY || "";
-  }
+  private async loadConfig(): Promise<{ baseUrl: string; systemKey: string; apiKey: string } | null> {
+    if (!isFeatureEnabled("ENABLE_PLATFORM_USER_ID")) return null;
 
-  private get systemKey(): string {
-    return process.env.SENGOKU_AI_SYSTEM_KEY || "ove-wallet";
-  }
+    const config = await this.db.commonUserHubConfig.findUnique({ where: { id: CONFIG_ID } });
+    if (!config?.apiKeyEncrypted) return null;
 
-  private get enabled(): boolean {
-    return isFeatureEnabled("ENABLE_PLATFORM_USER_ID") && this.apiKey !== "";
+    return {
+      baseUrl: config.baseUrl || DEFAULT_BASE_URL,
+      systemKey: config.systemKey || DEFAULT_SYSTEM_KEY,
+      apiKey: decryptSecret(config.apiKeyEncrypted, ENCRYPTION_KEY),
+    };
   }
 
   async resolve(params: ResolveCommonUserParams): Promise<ResolveCommonUserResult | null> {
-    if (!this.enabled) return null;
+    const config = await this.loadConfig();
+    if (!config) return null;
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/common-users/resolve`, {
+      const res = await fetch(`${config.baseUrl}/api/common-users/resolve`, {
         method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": this.apiKey },
+        headers: { "content-type": "application/json", "x-api-key": config.apiKey },
         body: JSON.stringify({
-          system_key: this.systemKey,
+          system_key: config.systemKey,
           external_user_id: params.externalUserId,
           email: params.email ?? undefined,
           phone: params.phone ?? undefined,
@@ -104,14 +115,15 @@ export class CommonUserHubClient {
   }
 
   async linkSystemAccount(params: LinkSystemAccountParams): Promise<boolean> {
-    if (!this.enabled) return false;
+    const config = await this.loadConfig();
+    if (!config) return false;
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/common-users/${params.commonUserId}/system-links`, {
+      const res = await fetch(`${config.baseUrl}/api/common-users/${params.commonUserId}/system-links`, {
         method: "POST",
-        headers: { "content-type": "application/json", "x-api-key": this.apiKey },
+        headers: { "content-type": "application/json", "x-api-key": config.apiKey },
         body: JSON.stringify({
-          system_key: this.systemKey,
+          system_key: config.systemKey,
           external_user_id: params.externalUserId,
           email: params.email ?? undefined,
           display_name: params.displayName ?? undefined,

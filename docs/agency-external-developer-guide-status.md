@@ -140,9 +140,13 @@ v3.6.78-draft）。既存の4/5システム方針書（`docs/policy-diff-report-
 > (`apps/api/src/common-user-hub/common-user-hub.client.ts`)。新規アカウント登録時
 > (メール/LINE/戦国パスポートSSO/代理店SSOの4経路、既存ユーザーの一括移行は対象外)に
 > ベストエフォートで呼び出し、`OveAccount.commonUserId`へ保存する。
-> `ENABLE_PLATFORM_USER_ID`(既定false)と送信用APIキー(`SENGOKU_AI_OUTBOUND_API_KEY`、
-> 未設定時はno-op)の両方が揃わないと動作しない。`POST /api/common-users/{id}/system-links`
-> はクライアントメソッドとしては実装済みだが、まだどこからも呼び出していない
+> `ENABLE_PLATFORM_USER_ID`(既定false、Feature Flagのため環境変数のみ)と、
+> 送信先URL・system_key・APIキーの両方が揃わないと動作しない。後者3つは環境変数
+> ではなく、管理画面(`/common-user-hub-config`、`AdminCommonUserHubService`)から
+> `common_user_hub_config`テーブル(シングルトン行、APIキーはAES-256-GCM暗号化)へ
+> 設定する — 当初は環境変数のみだったが、管理画面からAPIキーをローテーションできる
+> 必要があったため追加対応した。`POST /api/common-users/{id}/system-links`は
+> クライアントメソッドとしては実装済みだが、まだどこからも呼び出していない
 > (resolve単体で新規登録時のリンクは完結するため。既知のcommon_user_idへ後から
 > 追加リンクするユースケース向けに残してある)。`referrals/capture`・`confirm`・
 > `hierarchy.php`は引き続き未実装。以下の差分記述は着手前の調査結果を保持する。

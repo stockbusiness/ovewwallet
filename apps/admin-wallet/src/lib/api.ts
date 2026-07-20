@@ -192,6 +192,15 @@ export interface ServiceIntegrationItem {
   createdAt: string;
 }
 
+export interface CommonUserHubConfig {
+  baseUrl: string;
+  systemKey: string;
+  apiKeySet: boolean;
+  apiKeyPreview: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 export interface ApprovalRequestItem {
   id: string;
   requestType: string;

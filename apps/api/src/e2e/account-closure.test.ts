@@ -99,7 +99,7 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
     // 通常はUIから到達不能 (退会に成功すると自分のセッションも即座に失効するため、
     // HTTP経由で「退会済みアカウントに対する退会リクエスト」は再現できない)。
     // サーバー側の冪等性ガード自体はサービス層で直接検証する。
-    const accounts = new AccountsService(prisma, new CommonUserHubClient());
+    const accounts = new AccountsService(prisma, new CommonUserHubClient(prisma));
     await accounts.requestClosure(oveAccountId);
     await expect(accounts.requestClosure(oveAccountId)).rejects.toThrow(/already closed/);
   });

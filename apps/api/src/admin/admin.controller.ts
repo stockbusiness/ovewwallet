@@ -14,6 +14,7 @@ import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
 import { AdminNoticesService } from "./admin-notices.service";
+import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -49,6 +50,12 @@ const BulkGrantExecuteSchema = z.object({
   batchId: z.string().optional(),
 });
 const ServiceIntegrationActionSchema = z.object({ reason: z.string().min(1) });
+const CommonUserHubConfigUpdateSchema = z.object({
+  baseUrl: z.string().url().optional(),
+  systemKey: z.string().min(1).max(100).optional(),
+  apiKey: z.string().min(1).max(500).optional(),
+  reason: z.string().min(1),
+});
 const MigrationRequestSchema = z.object({
   fileName: z.string().min(1),
   csvContent: z.string().min(1),
@@ -119,6 +126,7 @@ export class AdminController {
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly walletReferrals: AdminWalletReferralsService,
     private readonly notices: AdminNoticesService,
+    private readonly commonUserHub: AdminCommonUserHubService,
   ) {}
 
   /**
@@ -455,6 +463,32 @@ export class AdminController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.serviceIntegrations.reactivate(id, req.admin.id, body.reason);
+  }
+
+  /**
+   * 代理店システム内共通顧客HUBへの送信設定 (外部開発者向け連携ガイド9章)。
+   * APIキーの生値は返さない (末尾4文字のみのマスク表示)。
+   */
+  @Get("common-user-hub-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async getCommonUserHubConfig() {
+    return this.commonUserHub.get();
+  }
+
+  /** baseUrl/systemKey/apiKeyのうち指定されたものだけを更新する (省略した項目は現状維持)。 */
+  @Post("common-user-hub-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async updateCommonUserHubConfig(
+    @Body(new ZodValidationPipe(CommonUserHubConfigUpdateSchema)) body: z.infer<typeof CommonUserHubConfigUpdateSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.commonUserHub.update(
+      { baseUrl: body.baseUrl, systemKey: body.systemKey, apiKey: body.apiKey },
+      req.admin.id,
+      body.reason,
+    );
   }
 
   /**
