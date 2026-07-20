@@ -63,9 +63,13 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 
 ## 付与ルール (reward_rules) の上限enforcement
 
-`transaction_type: REGISTRATION_BONUS / AIART_ATTENDANCE` については、対応する
-`reward_rules` 行 (`SENGOKU_REGISTRATION_BONUS` / `AIART_ATTENDANCE_REWARD`) の
-以下の制約をすべて検証する (`apps/api/src/rewards/rewards.service.ts`):
+`transaction_type: REGISTRATION_BONUS / AIART_ATTENDANCE / SENGOKU_EC_PURCHASE`
+については、対応する `reward_rules` 行 (`SENGOKU_REGISTRATION_BONUS` /
+`AIART_ATTENDANCE_REWARD` / `SENGOKU_EC_PURCHASE_REWARD`、
+`RULE_CODE_BY_TRANSACTION_TYPE`で対応) の以下の制約をすべて検証する
+(`apps/api/src/rewards/rewards.service.ts`)。`SENGOKU_EC_PURCHASE_REWARD`の
+実際の`reward_rules`行はまだ運用担当者が登録していないため、登録前は
+以下の制約は一切効かない (ServiceIntegrationの1リクエスト/1日上限のみ有効)。
 
 - `starts_at`/`ends_at`: ルールの有効期間外なら拒否
 - `per_user_limit`: そのウォレットに対する当該取引種別のCOMPLETED件数が上限以上なら拒否

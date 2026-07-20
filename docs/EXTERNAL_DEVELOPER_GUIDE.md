@@ -275,6 +275,25 @@ Base URL: `${API_URL}` (既定 `http://localhost:4000`)。Swagger: `/api/docs`�
 付与ルールの内容は管理画面「付与ルール管理」で確認・設定する。事前にどの
 `transaction_type`がどのルールに紐づくか、運用担当者に確認してください。
 
+現在`transaction_type`↔`reward_rules.rule_code`が対応づけられているのは以下のみ
+(`apps/api/src/rewards/rewards.service.ts`の`RULE_CODE_BY_TRANSACTION_TYPE`)。
+このマッピングに無い`transaction_type`(例: 汎用の`PURCHASE_REWARD`)で付与した場合、
+`reward_rules`の上限は一切適用されず、後述の11章のサービス単位の上限のみが
+チェックされる (OVE有効期限も付与されない)。
+
+| `transaction_type` | `reward_rules.rule_code` | 対象サービス |
+|---|---|---|
+| `REGISTRATION_BONUS` | `SENGOKU_REGISTRATION_BONUS` | `SENGOKU_PASSPORT` |
+| `AIART_ATTENDANCE` | `AIART_ATTENDANCE_REWARD` | `AIART` |
+| `SENGOKU_EC_PURCHASE` | `SENGOKU_EC_PURCHASE_REWARD` | `SENGOKU_EC` |
+
+`SENGOKU_EC`(戦国EC/戦国楽市楽座)向けの購入特典ポイント付与には
+**`transaction_type: "SENGOKU_EC_PURCHASE"`** を使用すること。マッピング自体は
+実装済みだが、実際の上限額・付与額・有効期限日数を持つ`reward_rules`行
+(`rule_code: "SENGOKU_EC_PURCHASE_REWARD"`)は、運用担当者が管理画面
+「付与ルール管理」で個別に登録するまで存在しない。登録前は`per_user_limit`等の
+制限なしで付与できてしまう点に注意 (11章のサービス単位上限のみ有効)。
+
 ## 11. レート制限・上限額
 
 - `service_integrations.per_request_amount_limit`: 1リクエストあたりの上限額。

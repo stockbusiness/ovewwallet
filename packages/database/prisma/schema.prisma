@@ -113,6 +113,10 @@ enum TransactionStatus {
 enum TransactionType {
   REGISTRATION_BONUS
   AIART_ATTENDANCE
+  /// 戦国EC(戦国楽市楽座、ServiceCode.SENGOKU_EC)の購入特典ポイント付与。
+  /// reward_rules.rule_code = "SENGOKU_EC_PURCHASE_REWARD" と対応させる
+  /// (apps/api/src/rewards/rewards.service.ts の RULE_CODE_BY_TRANSACTION_TYPE)。
+  SENGOKU_EC_PURCHASE
   EVENT_REWARD
   CAMPAIGN_REWARD
   REFERRAL_REWARD

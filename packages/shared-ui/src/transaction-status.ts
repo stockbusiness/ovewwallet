@@ -36,8 +36,10 @@ export function transactionStatusTone(status: string, direction: TransactionDire
 export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   SENGOKU_REGISTRATION_BONUS: "千ノ国パスポート登録特典",
   AIART_ATTENDANCE_REWARD: "AIアート教室参加特典",
+  SENGOKU_EC_PURCHASE_REWARD: "戦国EC購入特典",
   REGISTRATION_BONUS: "登録特典",
   AIART_ATTENDANCE: "AIアート教室参加特典",
+  SENGOKU_EC_PURCHASE: "戦国EC購入特典",
   ADMIN_GRANT: "管理者付与",
   ADMIN_DEDUCTION: "管理者減算",
   ITEM_EXCHANGE: "アイテム交換",

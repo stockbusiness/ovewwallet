@@ -15,6 +15,7 @@ import { serializeTransaction } from "../wallets/wallets.service";
 export const RULE_CODE_BY_TRANSACTION_TYPE: Record<string, string> = {
   REGISTRATION_BONUS: "SENGOKU_REGISTRATION_BONUS",
   AIART_ATTENDANCE: "AIART_ATTENDANCE_REWARD",
+  SENGOKU_EC_PURCHASE: "SENGOKU_EC_PURCHASE_REWARD",
 };
 
 @Injectable()
