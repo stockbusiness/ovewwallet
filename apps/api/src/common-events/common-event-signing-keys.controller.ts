@@ -10,6 +10,8 @@ const CreateKeySchema = z.object({
   keyId: z.string().min(1).max(100),
   sourceSystemKey: z.string().min(1).max(100),
   secret: z.string().min(16).max(500),
+  /** 明示的に許可するevent_type一覧 (末尾".*"でprefix一致)。未指定/空配列は何も許可しない。 */
+  allowedEventTypes: z.array(z.string().min(1).max(100)).default([]),
 });
 
 /**

@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Catch,
   type ExceptionFilter,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Logger,
@@ -64,6 +65,9 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
       }
       if (exception instanceof NotFoundException) {
         return { status, code: "NOT_FOUND", message };
+      }
+      if (exception instanceof ForbiddenException) {
+        return { status, code: "FORBIDDEN", message };
       }
       return { status, code: exception.constructor.name, message };
     }

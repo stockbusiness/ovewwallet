@@ -11,15 +11,12 @@ import { creditWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { OutboxService } from "../outbox/outbox.service";
 import { isFeatureEnabled } from "../common/feature-flags";
+import { getEncryptionKey } from "../common/encryption-key";
 import { AgencyReferralClient } from "./agency-referral-client";
 
 const REFERRAL_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{1,255}$/;
 const REFERRAL_SESSION_TTL_HOURS = Number(process.env.REFERRAL_SESSION_TTL_HOURS || "24");
 export const REFERRAL_SIGNUP_BONUS_AMOUNT = BigInt(process.env.REFERRAL_SIGNUP_BONUS_AMOUNT || "3000");
-
-function getEncryptionKey(): string {
-  return process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
-}
 
 /**
  * 代理店紹介トークンの受け入れ (実装指示書 v1.0)。/invite/{token} での受付から、
@@ -202,9 +199,14 @@ export class ReferralsService {
       referral = await this.db.walletReferral.findFirst({ where: { referralSessionKey: params.referralSessionKey } });
     }
     if (!referral && params.commonUserId) {
-      const account = await this.db.oveAccount.findFirst({ where: { commonUserId: params.commonUserId } });
-      if (account) {
-        referral = await this.db.walletReferral.findUnique({ where: { walletUserId: account.id } });
+      // common_user_idはUNIQUE制約が無いため、2件以上ヒットした場合はどちらのアカウントの
+      // 紹介関係か一意に決められない。自動処理せず対象外として扱う
+      // (次期改修指示書P0-5、確定は要レビュー — referralSessionKeyでの再送に委ねる)。
+      const accounts = await this.db.oveAccount.findMany({ where: { commonUserId: params.commonUserId } });
+      if (accounts.length === 1) {
+        referral = await this.db.walletReferral.findUnique({ where: { walletUserId: accounts[0]!.id } });
+      } else if (accounts.length > 1) {
+        return { action: "common_user_id_conflict" };
       }
     }
     if (!referral) return { action: "no_local_referral" };

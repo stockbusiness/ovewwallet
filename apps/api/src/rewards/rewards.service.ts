@@ -5,6 +5,7 @@ import type { RewardGrantRequest } from "@ove/shared-types";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { serializeTransaction } from "../wallets/wallets.service";
+import { enforceRewardRuleLimits } from "./reward-rule-limits";
 
 /**
  * transaction_type -> reward_rules.rule_code の対応 (指示書9章の初期2ルール分)。
@@ -99,7 +100,13 @@ export class RewardsService {
     const ruleCode = RULE_CODE_BY_TRANSACTION_TYPE[request.transaction_type];
     let expiryDays: number | null = null;
     if (ruleCode) {
-      const rule = await this.enforceRuleLimits(ruleCode, wallet.id, transactionType, request.event_id, amount);
+      const rule = await enforceRewardRuleLimits(this.db, {
+        ruleCode,
+        walletId: wallet.id,
+        transactionType,
+        eventId: request.event_id,
+        amount,
+      });
       expiryDays = rule?.expiryDays ?? null;
     }
 
@@ -122,84 +129,5 @@ export class RewardsService {
     );
 
     return { ove_account_id: account.id, ...serializeTransaction(transaction) };
-  }
-
-  private async enforceRuleLimits(
-    ruleCode: string,
-    walletId: string,
-    transactionType: TransactionType,
-    eventId: string,
-    amount: bigint,
-  ) {
-    const rule = await this.db.rewardRule.findUnique({ where: { ruleCode } });
-    if (!rule || rule.status !== "ACTIVE") return rule;
-
-    const now = new Date();
-    if (rule.startsAt && now < rule.startsAt) {
-      throw new BadRequestException(`reward rule ${ruleCode} has not started yet`);
-    }
-    if (rule.endsAt && now > rule.endsAt) {
-      throw new BadRequestException(`reward rule ${ruleCode} has already ended`);
-    }
-
-    if (rule.perUserLimit) {
-      const count = await this.db.oveTransaction.count({
-        where: { walletId, transactionType, status: "COMPLETED" },
-      });
-      if (count >= rule.perUserLimit) {
-        throw new BadRequestException(`per_user_limit (${rule.perUserLimit}) already reached for ${ruleCode}`);
-      }
-    }
-
-    if (rule.perEventLimit) {
-      const count = await this.db.oveTransaction.count({
-        where: {
-          walletId,
-          transactionType,
-          sourceReferenceId: eventId,
-          status: "COMPLETED",
-        },
-      });
-      if (count >= rule.perEventLimit) {
-        throw new BadRequestException(`per_event_limit (${rule.perEventLimit}) already reached for ${ruleCode}`);
-      }
-    }
-
-    // monthly_count_limit / monthly_amount_limit はルール単位 (キャンペーン全体) の
-    // 月間上限であり、per_user_limit (ユーザー単位) とは異なりウォレットを絞らず全体で集計する。
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    if (rule.monthlyCountLimit) {
-      const count = await this.db.oveTransaction.count({
-        where: { transactionType, status: "COMPLETED", occurredAt: { gte: monthStart } },
-      });
-      if (count >= rule.monthlyCountLimit) {
-        throw new BadRequestException(`monthly_count_limit (${rule.monthlyCountLimit}) already reached for ${ruleCode}`);
-      }
-    }
-
-    if (rule.monthlyAmountLimit) {
-      const sum = await this.db.oveTransaction.aggregate({
-        where: { transactionType, status: "COMPLETED", occurredAt: { gte: monthStart } },
-        _sum: { amount: true },
-      });
-      const grantedThisMonth = sum._sum.amount ?? 0n;
-      if (grantedThisMonth + amount > rule.monthlyAmountLimit) {
-        throw new BadRequestException(`monthly_amount_limit (${rule.monthlyAmountLimit.toString()}) exceeded for ${ruleCode}`);
-      }
-    }
-
-    if (rule.globalAmountLimit) {
-      const sum = await this.db.oveTransaction.aggregate({
-        where: { transactionType, status: "COMPLETED" },
-        _sum: { amount: true },
-      });
-      const grantedGlobally = sum._sum.amount ?? 0n;
-      if (grantedGlobally + amount > rule.globalAmountLimit) {
-        throw new BadRequestException(`global_amount_limit (${rule.globalAmountLimit.toString()}) exceeded for ${ruleCode}`);
-      }
-    }
-
-    return rule;
   }
 }

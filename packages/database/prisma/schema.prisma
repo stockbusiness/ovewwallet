@@ -982,6 +982,10 @@ model CommonEventSigningKey {
   /// HMAC検証には平文シークレットの復元が必要なため、ServiceIntegrationと同様に
   /// 一方向ハッシュではなくAES-256-GCM可逆暗号化で保存する。
   secretEncrypted String                       @map("secret_encrypted")
+  /// この鍵で送信を許可するevent_type (例: "common_user.resolved"、末尾".*"でprefix一致、
+  /// 例: "order.*")。既定は空配列=何も許可しない(secure-by-default、次期改修指示書P0-3)。
+  /// 鍵発行時に明示的に許可対象を指定する必要がある。
+  allowedEventTypes String[]                  @default([]) @map("allowed_event_types")
   status          CommonEventSigningKeyStatus  @default(ACTIVE)
   createdAt       DateTime                     @default(now()) @map("created_at")
   updatedAt       DateTime                     @updatedAt @map("updated_at")

@@ -102,7 +102,9 @@ export class InboundEventsService {
     }
 
     try {
-      const result = await this.handlers.dispatch(body.event_type, body);
+      // 次期改修指示書P0-1: ハンドラへは認証済みの送信元 (row.sourceSystemKey、guard/
+      // controllerで検証済み) を渡し、本文の自己申告値を再度信用しない。
+      const result = await this.handlers.dispatch(body.event_type, body, row.sourceSystemKey);
       const updated = await this.db.inboundEvent.update({
         where: { id: row.id },
         data: {

@@ -7,12 +7,16 @@ import { CommonEventSigningKeysService } from "./common-event-signing-keys.servi
 
 export interface AuthenticatedCommonEventRequest extends Request {
   commonEventSourceSystemKey: string;
+  /** この鍵が送信を許可されているevent_typeパターン (次期改修指示書P0-3)。 */
+  commonEventAllowedEventTypes: string[];
 }
 
 /**
  * 千ノ国 全体統合 共通実装契約 6.1章の`X-SenNoKuni-*`ヘッダー検証。既存の
- * `ExternalApiAuthGuard` (X-OVE-*、method+path込みの署名) や `AgencyApiKeyGuard`
- * (単純なAPIキー照合のみ) とは異なる、契約が新たに定めた認証方式のため専用ガードにする。
+ * `ExternalApiAuthGuard` (X-OVE-*) や `AgencyApiKeyGuard` (単純なAPIキー照合のみ) とは
+ * 異なる、契約が新たに定めた認証方式のため専用ガードにする。署名対象文字列の詳細は
+ * `CommonEventAuthenticator`のコメント参照 (次期改修指示書P0-2でnonce/key_id/method/path
+ * を署名対象へ追加済み)。
  *
  * 署名対象の「生ボディ」は、既存の`ExternalApiAuthGuard`と同様の理由
  * (グローバルなraw body captureミドルウェアを追加しない) により
@@ -46,11 +50,22 @@ export class CommonEventAuthGuard implements CanActivate {
     const rawBody = JSON.stringify(req.body ?? {});
     const authenticator = new CommonEventAuthenticator(this.kv);
     await authenticator.verify(
-      { keyId, timestamp, nonce, signature, rawBody, sourceSystemKey: credentials.sourceSystemKey },
+      {
+        keyId,
+        timestamp,
+        nonce,
+        signature,
+        rawBody,
+        method: req.method,
+        path: req.originalUrl,
+        sourceSystemKey: credentials.sourceSystemKey,
+      },
       { keyId, secret: credentials.secret },
     );
 
-    (req as unknown as AuthenticatedCommonEventRequest).commonEventSourceSystemKey = credentials.sourceSystemKey;
+    const authenticatedReq = req as unknown as AuthenticatedCommonEventRequest;
+    authenticatedReq.commonEventSourceSystemKey = credentials.sourceSystemKey;
+    authenticatedReq.commonEventAllowedEventTypes = credentials.allowedEventTypes;
     return true;
   }
 }

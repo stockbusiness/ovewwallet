@@ -2,11 +2,11 @@ import { Inject, Injectable } from "@nestjs/common";
 import { generateId, Prisma, type PrismaClient, type CommonUserHubConfig } from "@ove/database";
 import { encryptSecret } from "@ove/auth";
 import { PRISMA } from "../common/prisma.module";
+import { getEncryptionKey } from "../common/encryption-key";
 
 const CONFIG_ID = "default";
 const DEFAULT_BASE_URL = "https://sengoku-ai.com";
 const DEFAULT_SYSTEM_KEY = "ove-wallet";
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
 
 export interface CommonUserHubConfigView {
   baseUrl: string;
@@ -59,7 +59,7 @@ export class AdminCommonUserHubService {
 
     const baseUrl = params.baseUrl ?? existing?.baseUrl ?? DEFAULT_BASE_URL;
     const systemKey = params.systemKey ?? existing?.systemKey ?? DEFAULT_SYSTEM_KEY;
-    const apiKeyEncrypted = params.apiKey ? encryptSecret(params.apiKey, ENCRYPTION_KEY) : (existing?.apiKeyEncrypted ?? null);
+    const apiKeyEncrypted = params.apiKey ? encryptSecret(params.apiKey, getEncryptionKey()) : (existing?.apiKeyEncrypted ?? null);
     const apiKeyPreview = params.apiKey ? maskApiKey(params.apiKey) : (existing?.apiKeyPreview ?? null);
 
     const updated = await this.db.commonUserHubConfig.upsert({

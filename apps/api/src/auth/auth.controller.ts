@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, NotFoundException, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
@@ -87,11 +87,18 @@ export class AuthController {
     }
   }
 
-  /** 開発用: 戦国パスポート側が発行するSSOコードのモック発行エンドポイント。 */
+  /**
+   * 開発用: 戦国パスポート側が発行するSSOコードのモック発行エンドポイント。
+   * 次期改修指示書P0-7: 正式SSO (RS256/JWKS) が完成するまでは本番で無効化する
+   * (任意の`sengokuMemberId`でログインコードを発行できてしまうため)。
+   */
   @Post("sso/sengoku/dev-issue")
   async devIssueSsoCode(
     @Body(new ZodValidationPipe(SsoIssueMockSchema)) body: z.infer<typeof SsoIssueMockSchema>,
   ) {
+    if (process.env.NODE_ENV === "production") {
+      throw new NotFoundException();
+    }
     const code = await this.auth.issueMockSengokuSsoCode(body.sengokuMemberId);
     return { code };
   }

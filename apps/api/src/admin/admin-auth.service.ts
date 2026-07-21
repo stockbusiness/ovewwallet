@@ -14,16 +14,13 @@ import { generateId, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { KV_STORE } from "../common/kv-store.module";
 import { ADMIN_SESSION_TTL_SECONDS, adminSessionKey } from "../common/admin-auth.guard";
+import { getEncryptionKey } from "../common/encryption-key";
 
 const MFA_PENDING_TTL_SECONDS = 5 * 60; // MFAコード入力の猶予は5分
 const MFA_ISSUER = "戦国ウォレット管理画面";
 
 function mfaPendingKey(mfaToken: string): string {
   return `admin-mfa-pending:${sha256Hex(mfaToken)}`;
-}
-
-function getEncryptionKey(): string {
-  return process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
 }
 
 export type AdminLoginResult =

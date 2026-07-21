@@ -307,8 +307,9 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
       const res = await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(201);
 
       expect(res.body.result.action).toBe("approval_requested");
-      const approvalRequestId = res.body.result.approval_request_id as string;
-      const approval = await prisma.approvalRequest.findUniqueOrThrow({ where: { id: approvalRequestId } });
+      const approvalRequestIds = res.body.result.approval_request_ids as string[];
+      expect(approvalRequestIds).toHaveLength(1);
+      const approval = await prisma.approvalRequest.findUniqueOrThrow({ where: { id: approvalRequestIds[0] } });
       expect(approval.requestType).toBe("ACCOUNT_MERGE");
       expect(approval.status).toBe("PENDING");
       expect(approval.requestedBy).toContain("system:common_user.merged");

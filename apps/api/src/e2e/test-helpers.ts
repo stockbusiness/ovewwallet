@@ -67,8 +67,12 @@ export interface TestCommonEventSigningKey {
   secret: string;
 }
 
-/** 千ノ国 全体統合 共通実装契約 6.1章のcommon_event_signing_keysテスト用鍵を発行する。 */
-export async function createTestCommonEventSigningKey(sourceSystemKey = "agency-system"): Promise<TestCommonEventSigningKey> {
+/** 千ノ国 全体統合 共通実装契約 6.1章のcommon_event_signing_keysテスト用鍵を発行する。
+ * allowedEventTypes省略時は"*"(全event_type許可)にする (P0-3導入前のテストの既定挙動を維持)。 */
+export async function createTestCommonEventSigningKey(
+  sourceSystemKey = "agency-system",
+  allowedEventTypes: string[] = ["*"],
+): Promise<TestCommonEventSigningKey> {
   const keyId = `test-key-${generateId()}`;
   const secret = `common-event-secret-${generateId()}`;
 
@@ -78,6 +82,7 @@ export async function createTestCommonEventSigningKey(sourceSystemKey = "agency-
       keyId,
       sourceSystemKey,
       secretEncrypted: encryptSecret(secret, ENCRYPTION_KEY),
+      allowedEventTypes,
       status: "ACTIVE",
     },
   });
@@ -85,12 +90,17 @@ export async function createTestCommonEventSigningKey(sourceSystemKey = "agency-
   return { keyId, secret };
 }
 
-/** 共通実装契約6.1章のX-SenNoKuni-*ヘッダーを組み立てる。 */
-export function commonEventSignedHeaders(key: TestCommonEventSigningKey, body: unknown): Record<string, string> {
+/** 共通実装契約6.1章のX-SenNoKuni-*ヘッダーを組み立てる (次期改修指示書P0-2の署名対象に対応)。 */
+export function commonEventSignedHeaders(
+  key: TestCommonEventSigningKey,
+  body: unknown,
+  method = "POST",
+  path = "/api/integrations/events",
+): Record<string, string> {
   const bodyJson = JSON.stringify(body);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const nonce = generateId();
-  const signature = hmacSign(key.secret, `${timestamp}.${bodyJson}`);
+  const signature = hmacSign(key.secret, `${timestamp}.${nonce}.${key.keyId}.${method}:${path}:${bodyJson}`);
 
   return {
     "X-SenNoKuni-Key-Id": key.keyId,

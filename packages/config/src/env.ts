@@ -52,6 +52,8 @@ const envSchema = z.object({
   ENABLE_WALLET_REGISTRATION_BONUS: z.enum(["true", "false"]).default("false"),
   ENABLE_EXTERNAL_REWARD_TYPES: z.enum(["true", "false"]).default("false"),
   ENABLE_ONCHAIN_MIGRATION: z.enum(["true", "false"]).default("false"),
+  // 千ノ国 全体統合 共通実装契約 (2026-07-21) の POST /api/integrations/events。
+  ENABLE_COMMON_EVENT_INBOX: z.enum(["true", "false"]).default("false"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

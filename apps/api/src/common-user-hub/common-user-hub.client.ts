@@ -3,11 +3,11 @@ import { decryptSecret } from "@ove/auth";
 import type { PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { isFeatureEnabled } from "../common/feature-flags";
+import { getEncryptionKey } from "../common/encryption-key";
 
 const CONFIG_ID = "default";
 const DEFAULT_BASE_URL = "https://sengoku-ai.com";
 const DEFAULT_SYSTEM_KEY = "ove-wallet";
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
 
 export interface ResolveCommonUserParams {
   externalUserId: string;
@@ -69,7 +69,7 @@ export class CommonUserHubClient {
     return {
       baseUrl: config.baseUrl || DEFAULT_BASE_URL,
       systemKey: config.systemKey || DEFAULT_SYSTEM_KEY,
-      apiKey: decryptSecret(config.apiKeyEncrypted, ENCRYPTION_KEY),
+      apiKey: decryptSecret(config.apiKeyEncrypted, getEncryptionKey()),
     };
   }
 

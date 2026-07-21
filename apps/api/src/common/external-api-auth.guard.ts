@@ -13,6 +13,7 @@ import { KV_STORE } from "./kv-store.module";
 import type { KeyValueStore } from "@ove/auth";
 import { logApiAccess } from "./api-access-log";
 import type { RequestWithId } from "./request-id.middleware";
+import { getEncryptionKey } from "./encryption-key";
 
 export interface AuthenticatedServiceRequest extends Request {
   serviceIntegration: ServiceIntegration;
@@ -51,8 +52,7 @@ export class ExternalApiAuthGuard implements CanActivate {
         throw new UnauthorizedException("invalid API key");
       }
 
-      const encryptionKey = process.env.ENCRYPTION_KEY || "dev-only-insecure-encryption-key";
-      const signingSecret = decryptSecret(integration.signingSecretEncrypted, encryptionKey);
+      const signingSecret = decryptSecret(integration.signingSecretEncrypted, getEncryptionKey());
       const canonicalPayload = `${req.method}:${req.originalUrl}:${JSON.stringify(req.body ?? {})}`;
       const authenticator = new ExternalApiAuthenticator(this.kv);
 

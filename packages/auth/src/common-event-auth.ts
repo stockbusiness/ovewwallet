@@ -17,8 +17,12 @@ export interface CommonEventRequestContext {
   timestamp: string;
   nonce: string;
   signature: string;
-  /** 生のリクエストボディ文字列。署名対象はこの値そのもの (契約6.1章)。 */
+  /** 生のリクエストボディ文字列。署名対象に含まれる (契約6.1章)。 */
   rawBody: string;
+  /** HTTPメソッド (署名対象に含める、次期改修指示書P0-2)。 */
+  method: string;
+  /** リクエストパス (署名対象に含める、次期改修指示書P0-2)。 */
+  path: string;
   sourceSystemKey: string;
 }
 
@@ -29,9 +33,14 @@ export interface CommonEventSigningCredentials {
 
 /**
  * 千ノ国 全体統合 共通実装契約 6.1章の`X-SenNoKuni-*`ヘッダー検証。
- * 署名対象文字列は`timestamp + "." + raw_body`のみ (既存の`ExternalApiAuthenticator`
- * (`X-OVE-*`) がmethod/path/nonceまで連結するのとは異なり、契約が明示的にこの
- * 単純な形式を定めているため新しい認証方式として別クラスにする)。
+ *
+ * 署名対象文字列は`timestamp + "." + nonce + "." + key_id + "." + method + ":" + path
+ * + ":" + raw_body`。契約書原文は`timestamp + "." + raw_body`のみだったが、この形式では
+ * `X-SenNoKuni-Nonce`が署名対象に含まれず、同じ署名のままnonceだけ差し替えたリクエストを
+ * リプレイできてしまう脆弱性があった (次期改修指示書P0-2)。この共通イベント受信機能は
+ * まだどの外部システムとも本番接続していない未公開機能のため、後方互換より安全性を
+ * 優先しここで署名フォーマットを確定する。送信側システムの実装もこのフォーマットに
+ * 合わせて同時に更新する必要がある。
  */
 export class CommonEventAuthenticator {
   constructor(private readonly nonceStore: KeyValueStore) {}
@@ -46,7 +55,7 @@ export class CommonEventAuthenticator {
       throw new CommonEventAuthError("request timestamp is outside the allowed skew");
     }
 
-    const signaturePayload = `${ctx.timestamp}.${ctx.rawBody}`;
+    const signaturePayload = `${ctx.timestamp}.${ctx.nonce}.${ctx.keyId}.${ctx.method}:${ctx.path}:${ctx.rawBody}`;
     if (!hmacVerify(credentials.secret, signaturePayload, ctx.signature)) {
       throw new CommonEventAuthError("invalid HMAC signature");
     }
