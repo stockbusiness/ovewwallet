@@ -253,18 +253,18 @@ export class ReferralsService {
   }
 
   /**
-   * `AccountsService.tryLinkCommonUser`から、common_user_id解決に成功した直後に
-   * ベストエフォートで呼ばれる (指示書5.2章「本人ログイン・common user resolve後に
-   * confirmする」)。PENDINGの紹介関係かつcapture済み (referralSessionKey/
-   * canonicalReferralToken保持) の場合のみ`AgencyReferralClient.confirm`を呼び、
-   * 即時に確定応答が得られればその場で特典を確定する。応答が得られない場合は
-   * PENDINGのまま残り、後続の`referral.confirmed`イベント受信 (共通イベントInbox)
-   * で確定される。
+   * `confirmAfterCommonUserResolve` (即時・ベストエフォート) と `AgencyReferralOutboxHandler`
+   * (Outbox再送) の両方から呼ばれる共通ロジック。呼び出し元によって「呼び出し失敗」を
+   * 再送対象として扱うか無視するかが異なるため、結果種別を返すだけで例外は投げない
+   * (例外を投げるかどうかは呼び出し元が`outcome`を見て決める)。
    */
-  async confirmAfterCommonUserResolve(oveAccountId: string, commonUserId: string): Promise<void> {
+  private async attemptConfirm(
+    oveAccountId: string,
+    commonUserId: string,
+  ): Promise<"confirmed" | "rejected" | "not_applicable" | "no_canonical_token" | "call_failed"> {
     const referral = await this.db.walletReferral.findUnique({ where: { walletUserId: oveAccountId } });
-    if (!referral || referral.status !== "PENDING") return;
-    if (!referral.referralSessionKey || !referral.canonicalReferralTokenEncrypted) return;
+    if (!referral || referral.status !== "PENDING") return "not_applicable";
+    if (!referral.referralSessionKey || !referral.canonicalReferralTokenEncrypted) return "no_canonical_token";
 
     const canonicalToken = decryptSecret(referral.canonicalReferralTokenEncrypted, getEncryptionKey());
     const confirmResult = await this.agencyClient.confirm({
@@ -273,17 +273,49 @@ export class ReferralsService {
       commonUserId,
       walletUserId: oveAccountId,
     });
-    if (!confirmResult) return; // ENABLE_AGENCY_REFERRAL_SYNC無効、または呼び出し失敗 (後続イベントに委ねる)
+    if (!confirmResult) return "call_failed"; // ENABLE_AGENCY_REFERRAL_SYNC無効、または呼び出し失敗
 
     if (confirmResult.status === "confirmed") {
       // walletUserIdが既に判明しているため、referralSessionKeyの一意性に依存しない
       // (呼び出し元がアカウントを既に特定できている点でイベント受信経路と異なる)。
       await this.confirmBenefitFromEvent({ walletUserId: oveAccountId, commonUserId, eventId: `sync:${referral.id}` });
-    } else if (confirmResult.status === "rejected") {
+      return "confirmed";
+    }
+    if (confirmResult.status === "rejected") {
       await this.db.walletReferral.update({
         where: { id: referral.id },
         data: { status: "REJECTED", rejectedAt: new Date(), lastErrorCode: "AGENCY_REJECTED" },
       });
+      return "rejected";
+    }
+    return "call_failed"; // 未知のstatus。成功と誤認せず再送対象として扱う。
+  }
+
+  /**
+   * `AccountsService.tryLinkCommonUser`から、common_user_id解決に成功した直後に
+   * ベストエフォートで呼ばれる (指示書5.2章「本人ログイン・common user resolve後に
+   * confirmする」)。呼び出し失敗時は例外を投げず、そのままPENDINGを維持する
+   * (本人のログイン応答は絶対にブロックしない)。取りこぼしは
+   * `AgencyReferralOutboxHandler` (Outbox再送、`wallet.referral.registered`イベント)
+   * が後から回収する。
+   */
+  async confirmAfterCommonUserResolve(oveAccountId: string, commonUserId: string): Promise<void> {
+    await this.attemptConfirm(oveAccountId, commonUserId);
+  }
+
+  /**
+   * `AgencyReferralOutboxHandler.send`から呼ばれる。呼び出し失敗 (`call_failed`) を
+   * 明示的な例外として投げ、`OutboxService`の指数バックオフ再送・DLQに乗せる
+   * (契約6.4章「外部API timeout時は成功・失敗を推測せず、同じevent_idで再送する」)。
+   * それ以外の結果 (確定・否認・対象外・capture未完了) はこれ以上再送する意味が無いため
+   * 正常終了として扱う。
+   */
+  async retryConfirmViaOutbox(oveAccountId: string, commonUserId: string): Promise<void> {
+    const outcome = await this.attemptConfirm(oveAccountId, commonUserId);
+    if (outcome === "call_failed") {
+      throw new Error(
+        `agency referral confirm call failed for account ${oveAccountId} (feature disabled or transient error); will retry`,
+      );
     }
   }
 
