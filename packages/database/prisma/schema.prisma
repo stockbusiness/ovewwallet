@@ -117,6 +117,11 @@ enum TransactionType {
   /// reward_rules.rule_code = "SENGOKU_EC_PURCHASE_REWARD" と対応させる
   /// (apps/api/src/rewards/rewards.service.ts の RULE_CODE_BY_TRANSACTION_TYPE)。
   SENGOKU_EC_PURCHASE
+  /// 千ノ国 全体統合 共通実装契約 6.2章の`reward.granted`イベント経由のOVE付与
+  /// (共通イベントInbox、`apps/api/src/common-events/`)。既存の
+  /// `POST /api/v1/rewards/grant` (X-OVE-*認証・ServiceIntegration経由) とは
+  /// 受信経路が異なるため区別する。
+  COMMON_EVENT_REWARD
   EVENT_REWARD
   CAMPAIGN_REWARD
   REFERRAL_REWARD
@@ -254,6 +259,13 @@ model OveAccount {
   /// エフォートで解決・保存する。解決前の既存アカウント・呼び出し失敗時はnull。
   commonUserId        String?       @map("common_user_id")
   commonUserLinkedAt  DateTime?     @map("common_user_linked_at")
+  /// 千ノ国 全体統合 共通実装契約 4.2章。初回登録を発生させた紹介代理店の
+  /// agents.agent_code。原則ロックし、一度設定したら上書きしない
+  /// (アプリケーション層で保護、`CommonEventHandlersService`参照)。
+  registrationReferrerAgencyId String? @map("registration_referrer_agency_id")
+  /// 同4.2章。現在の顧客担当代理店のagent_code。`customer.assignment.changed`
+  /// イベント受信のたびに更新される (運用上変更可能、変更履歴はAuditLogに残す)。
+  assignedAgencyId             String? @map("assigned_agency_id")
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
   closedAt            DateTime?     @map("closed_at")
@@ -790,6 +802,17 @@ model WalletReferral {
   /// (開発ガイドライン5.1章・18章「代理店ランクのウォレット内管理」は対象外)。
   agencyId String? @map("agency_id")
 
+  /// 千ノ国 全体統合 共通実装契約 5章。代理店システムの`POST /api/referrals/capture`
+  /// からの応答で得られる正式トークン (`rt_...`)。Phase 1のinvite tokenそのままではなく
+  /// canonical化された値。Outbox送信同様、平文が必要な再送に備え可逆暗号化で保存する。
+  canonicalReferralTokenEncrypted String? @map("canonical_referral_token_encrypted")
+  /// 同5章。`capture`応答の`referral_session_key` (`rs_...`)。`confirm`呼び出し時に必要。
+  referralSessionKey              String? @map("referral_session_key")
+  /// 代理店システムへのcapture/confirm呼び出し失敗によるリトライ回数
+  /// (契約7章`sync_attempt_count`相当)。失敗理由自体は既存の
+  /// lastErrorCode/lastErrorMessageに保存する。
+  agencySyncAttemptCount          Int     @default(0) @map("agency_sync_attempt_count")
+
   status WalletReferralStatus @default(CAPTURED)
   /// `invite_url` (通常フロー) / `admin` (管理者による後付け) / `migration`。
   source String @default("invite_url")
@@ -894,4 +917,76 @@ model NoticeRead {
   @@unique([noticeId, oveAccountId])
   @@index([oveAccountId])
   @@map("notice_reads")
+}
+
+// =====================================================================
+// 14. 千ノ国 全体統合 共通イベント受信 (共通実装契約 v1.0 6章): Inbox
+//
+// 代理店システム・ショッピング等、他システムから送信される共通イベント
+// (common_user.resolved / common_user.merged / referral.confirmed /
+// customer.assignment.changed / reward.granted / reward.reversed 等) の受信を
+// 冪等に処理するためのInbox。9章のOutbox (IntegrationOutbox、送信専用) とは
+// 逆方向。event_idごとに一意の行を持ち、同一event_id+同一本文ハッシュは
+// 再処理せず前回の結果を返し (200)、本文ハッシュが異なれば処理せず409を返す
+// (契約6.4章)。
+// =====================================================================
+
+enum InboundEventStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  DEAD
+}
+
+model InboundEvent {
+  id               String             @id
+  /// 送信元で一意に固定される値 (契約6.3章の`event_id`)。このテーブルの冪等キー。
+  eventId          String             @unique @map("event_id")
+  eventType        String             @map("event_type")
+  eventVersion     String             @map("event_version")
+  sourceSystemKey  String             @map("source_system_key")
+  /// 受信した本文全体 (契約6.3章の共通本文)。処理ハンドラはここから読む。
+  payload          Json
+  /// 本文の一方向ハッシュ (SHA-256)。同一event_idの再送で本文が変わっていないか照合する。
+  payloadHash      String             @map("payload_hash")
+  correlationId    String?            @map("correlation_id")
+  status           InboundEventStatus @default(PENDING)
+  attemptCount     Int                @default(0) @map("attempt_count")
+  nextRetryAt      DateTime?          @map("next_retry_at")
+  lastErrorCode    String?            @map("last_error_code")
+  lastErrorMessage String?            @map("last_error_message")
+  /// 処理成功時に返したレスポンス本文。同一event_id+同一ハッシュの再送時にそのまま返す。
+  resultPayload    Json?              @map("result_payload")
+  processedAt      DateTime?          @map("processed_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  @@index([status, nextRetryAt])
+  @@index([sourceSystemKey, eventType])
+  @@map("inbound_events")
+}
+
+enum CommonEventSigningKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+/// 共通イベント契約6.1章の`X-SenNoKuni-Key-Id`に対応する送信元別HMAC署名鍵。
+/// 送信元システム (代理店システム等) ごと・鍵ID単位で複数保持し、ローテーション時は
+/// 新しい行を追加してから旧行をREVOKEDにする (即時失効させない移行を可能にする)。
+model CommonEventSigningKey {
+  id              String                      @id
+  keyId           String                      @unique @map("key_id")
+  sourceSystemKey String                       @map("source_system_key")
+  /// HMAC検証には平文シークレットの復元が必要なため、ServiceIntegrationと同様に
+  /// 一方向ハッシュではなくAES-256-GCM可逆暗号化で保存する。
+  secretEncrypted String                       @map("secret_encrypted")
+  status          CommonEventSigningKeyStatus  @default(ACTIVE)
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  updatedAt       DateTime                     @updatedAt @map("updated_at")
+  revokedAt       DateTime?                    @map("revoked_at")
+
+  @@index([sourceSystemKey, status])
+  @@map("common_event_signing_keys")
 }

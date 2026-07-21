@@ -40,6 +40,7 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   REGISTRATION_BONUS: "登録特典",
   AIART_ATTENDANCE: "AIアート教室参加特典",
   SENGOKU_EC_PURCHASE: "戦国EC購入特典",
+  COMMON_EVENT_REWARD: "共通イベント連携特典",
   ADMIN_GRANT: "管理者付与",
   ADMIN_DEDUCTION: "管理者減算",
   ITEM_EXCHANGE: "アイテム交換",

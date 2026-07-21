@@ -120,6 +120,50 @@ export const AgencySsoLoginRequestSchema = z.object({
 });
 export type AgencySsoLoginRequest = z.infer<typeof AgencySsoLoginRequestSchema>;
 
+/**
+ * POST /api/integrations/events (千ノ国 全体統合 共通実装契約 v1.0 6.3章)。
+ * 代理店システム等から送られる共通イベント本文。契約が定義する共通フィールドを
+ * すべて任意項目として受け付け (イベント種別ごとに使うフィールドが異なるため)、
+ * 未知のフィールドも素通りさせる (`.passthrough()`、付則での項目追加に備える)。
+ */
+export const CommonEventBodySchema = z
+  .object({
+    event_id: z.string().min(1).max(255),
+    event_type: z.string().min(1).max(100),
+    event_version: z.string().min(1).max(20),
+    occurred_at: z.string().min(1),
+    source_system_key: z.string().min(1).max(100),
+    common_user_id: z.string().max(255).nullable().optional(),
+    source_user_id: z.string().max(255).nullable().optional(),
+    agency_id: z.string().max(255).nullable().optional(),
+    registration_referrer_agency_id: z.string().max(255).nullable().optional(),
+    assigned_agency_id: z.string().max(255).nullable().optional(),
+    sales_agent_id: z.string().max(255).nullable().optional(),
+    closing_agent_id: z.string().max(255).nullable().optional(),
+    referral_session_key: z.string().max(255).nullable().optional(),
+    order_id: z.string().max(255).nullable().optional(),
+    order_item_id: z.string().max(255).nullable().optional(),
+    product_code: z.string().max(255).nullable().optional(),
+    entitlement_id: z.string().max(255).nullable().optional(),
+    quantity: z.number().nullable().optional(),
+    valid_from: z.string().nullable().optional(),
+    valid_until: z.string().nullable().optional(),
+    correlation_id: z.string().max(255).nullable().optional(),
+    metadata: z.record(z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+export type CommonEventBody = z.infer<typeof CommonEventBodySchema>;
+
+/** 契約6.2章の必須イベントのうち、ウォレットが実際に反応するもの (5つの実装対象領域に対応)。 */
+export const COMMON_EVENT_HANDLED_TYPES = [
+  "common_user.resolved",
+  "common_user.merged",
+  "customer.assignment.changed",
+  "referral.confirmed",
+  "reward.granted",
+  "reward.reversed",
+] as const;
+
 export const BalanceResponseSchema = z.object({
   ove_account_id: z.string(),
   wallet_id: z.string(),

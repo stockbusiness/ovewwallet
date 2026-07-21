@@ -1,8 +1,7 @@
 /**
  * Feature Flag (開発ガイドライン13章)。外部連携は初期状態OFFで段階的に有効化する。
  * すべて既定でfalse (未設定を含む) — OFFのままでも既存のログイン・残高表示・
- * 取引履歴・管理画面が壊れないことが前提であり、現時点ではどのコードもこれらの
- * フラグを参照していない (今後の連携実装がこのフラグを見て分岐する)。
+ * 取引履歴・管理画面が壊れないことが前提。
  */
 export const FEATURE_FLAG_KEYS = [
   "ENABLE_PLATFORM_USER_ID",
@@ -12,6 +11,8 @@ export const FEATURE_FLAG_KEYS = [
   "ENABLE_WALLET_REGISTRATION_BONUS",
   "ENABLE_EXTERNAL_REWARD_TYPES",
   "ENABLE_ONCHAIN_MIGRATION",
+  /** 千ノ国 全体統合 共通実装契約 (2026-07-21) の POST /api/integrations/events を有効化する。 */
+  "ENABLE_COMMON_EVENT_INBOX",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

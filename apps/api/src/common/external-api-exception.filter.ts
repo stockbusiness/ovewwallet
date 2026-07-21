@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { ExternalApiAuthError, AgencySsoVerificationError } from "@ove/auth";
+import { ExternalApiAuthError, AgencySsoVerificationError, CommonEventAuthError } from "@ove/auth";
 import { LEDGER_ERROR_CLASSIFICATION } from "./ledger-error-classification";
 import type { RequestWithId } from "./request-id.middleware";
 import { captureException } from "./sentry";
@@ -70,6 +70,9 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof ExternalApiAuthError || exception instanceof AgencySsoVerificationError) {
       return { status: HttpStatus.UNAUTHORIZED, code: "INVALID_API_KEY", message: exception.message };
+    }
+    if (exception instanceof CommonEventAuthError) {
+      return { status: HttpStatus.UNAUTHORIZED, code: "INVALID_SIGNATURE", message: exception.message };
     }
 
     for (const ErrorClass of LEDGER_ERROR_CLASSIFICATION.notFound) {

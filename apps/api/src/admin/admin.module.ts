@@ -33,5 +33,8 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminCommonUserHubService,
     LineBroadcastService,
   ],
+  // AdminApprovalServiceは共通イベントハンドラ (common_user.merged) からも
+  // システム起点のアカウント統合申請を作成するために参照する (二段階承認を再利用)。
+  exports: [AdminApprovalService],
 })
 export class AdminModule {}

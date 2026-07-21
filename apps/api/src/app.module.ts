@@ -15,6 +15,7 @@ import { OutboxModule } from "./outbox/outbox.module";
 import { AgencyModule } from "./agency/agency.module";
 import { ReferralsModule } from "./referrals/referrals.module";
 import { DailyBonusModule } from "./daily-bonus/daily-bonus.module";
+import { CommonEventsModule } from "./common-events/common-events.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -32,6 +33,7 @@ import { HealthController } from "./health.controller";
     AgencyModule,
     ReferralsModule,
     DailyBonusModule,
+    CommonEventsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

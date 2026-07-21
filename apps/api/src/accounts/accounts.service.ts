@@ -19,6 +19,7 @@ import {
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CommonUserHubClient } from "../common-user-hub/common-user-hub.client";
+import { ReferralsService } from "../referrals/referrals.service";
 
 /** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
 export const CURRENT_TERMS_VERSION = "1.0";
@@ -56,6 +57,7 @@ export class AccountsService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly commonUserHub: CommonUserHubClient,
+    private readonly referrals: ReferralsService,
   ) {}
 
   async getById(oveAccountId: string): Promise<OveAccount | null> {
@@ -180,6 +182,10 @@ export class AccountsService {
         where: { id: account.id },
         data: { commonUserId: result.commonUserId, commonUserLinkedAt: new Date() },
       });
+
+      // 紹介Phase 2 (共通実装契約5章): 「本人ログイン・common user resolve後にconfirmする」。
+      // ベストエフォート (失敗しても登録・ログイン自体はブロックしない)。
+      await this.referrals.confirmAfterCommonUserResolve(account.id, result.commonUserId);
     } catch (error) {
       this.logger.warn(
         `failed to link common_user_id for account ${account.id}: ${error instanceof Error ? error.message : String(error)}`,

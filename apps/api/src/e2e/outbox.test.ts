@@ -226,6 +226,7 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_WALLET_REGISTRATION_BONUS: false,
       ENABLE_EXTERNAL_REWARD_TYPES: false,
       ENABLE_ONCHAIN_MIGRATION: false,
+      ENABLE_COMMON_EVENT_INBOX: false,
     });
   });
 
