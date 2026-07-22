@@ -164,6 +164,9 @@ export const COMMON_EVENT_HANDLED_TYPES = [
   "reward.reversed",
 ] as const;
 
+/** 共通契約v1.1 DRAFT 8章。サポート外`event_version`は422 unsupported_event_versionで拒否する。 */
+export const COMMON_EVENT_SUPPORTED_VERSIONS = ["1.0"] as const;
+
 export const BalanceResponseSchema = z.object({
   ove_account_id: z.string(),
   wallet_id: z.string(),

@@ -329,6 +329,57 @@ describe("POST /api/integrations/events (次期改修指示書P0-1/P0-3/P0-4/P0-
     });
   });
 
+  describe("共通契約v1.1 DRAFT: Idempotency-Key/event_id一致・event_version検証", () => {
+    it("rejects a request missing the Idempotency-Key header", async () => {
+      const key = await createTestCommonEventSigningKey("agency-system");
+      const body = baseBody({ common_user_id: `cu_${generateId()}` });
+      const headers = commonEventSignedHeaders(key, body);
+      delete (headers as Record<string, string>)["Idempotency-Key"];
+
+      await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(400);
+    });
+
+    it("rejects when the Idempotency-Key header does not match body.event_id", async () => {
+      const key = await createTestCommonEventSigningKey("agency-system");
+      const body = baseBody({ common_user_id: `cu_${generateId()}` });
+      const headers = commonEventSignedHeaders(key, body);
+      (headers as Record<string, string>)["Idempotency-Key"] = `evt_${generateId()}`; // bodyのevent_idと不一致
+
+      await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(400);
+    });
+
+    it("rejects when X-Event-Version header does not match body.event_version", async () => {
+      const key = await createTestCommonEventSigningKey("agency-system");
+      const body = baseBody({ common_user_id: `cu_${generateId()}`, event_version: "1.0" });
+      const headers = commonEventSignedHeaders(key, body);
+      (headers as Record<string, string>)["X-Event-Version"] = "2.0";
+
+      await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(422);
+    });
+
+    it("rejects an unsupported event_version", async () => {
+      const key = await createTestCommonEventSigningKey("agency-system");
+      const body = baseBody({ common_user_id: `cu_${generateId()}`, event_version: "2.0" });
+      const headers = commonEventSignedHeaders(key, body);
+      (headers as Record<string, string>)["X-Event-Version"] = "2.0"; // headerとbodyは一致させ、サポート外version自体を検証する
+
+      await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(422);
+    });
+
+    it("accepts a supported event_version with a matching X-Event-Version header", async () => {
+      const key = await createTestCommonEventSigningKey("agency-system");
+      const { accountId } = await createAccountWithWallet();
+      const body = baseBody({
+        common_user_id: `cu_${generateId()}`,
+        source_user_id: accountId,
+        event_version: "1.0",
+      });
+      const headers = commonEventSignedHeaders(key, body);
+
+      await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(201);
+    });
+  });
+
   describe("P0-5: common_user_id重複時にfindFirstで任意の1件を扱わない", () => {
     it("refuses reward.granted when common_user_id resolves to multiple accounts", async () => {
       const key = await createTestCommonEventSigningKey("shopping-system", ["reward.granted"]);

@@ -10,6 +10,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import type { Response } from "express";
 import { ExternalApiAuthError, AgencySsoVerificationError, CommonEventAuthError } from "@ove/auth";
@@ -68,6 +69,9 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
       }
       if (exception instanceof ForbiddenException) {
         return { status, code: "FORBIDDEN", message };
+      }
+      if (exception instanceof UnprocessableEntityException) {
+        return { status, code: "UNSUPPORTED_EVENT_VERSION", message };
       }
       return { status, code: exception.constructor.name, message };
     }
