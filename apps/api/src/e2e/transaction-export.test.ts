@@ -74,7 +74,6 @@ describe("GET /api/v1/me/transactions/export", () => {
 
     const idTokenA = `mock.${generateId()}`;
     const loginA = await request(server).post("/api/v1/auth/line/login").send({ idToken: idTokenA, termsAccepted: true }).expect(201);
-    const cookieA = loginA.headers["set-cookie"] as unknown as string[];
     const walletA = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId: loginA.body.ove_account_id } });
 
     const idTokenB = `mock.${generateId()}`;

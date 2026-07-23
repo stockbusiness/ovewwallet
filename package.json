@@ -16,13 +16,23 @@
     "test:e2e": "pnpm --filter @ove/e2e test",
     "test:load": "node tests/load/run.mjs",
     "lint": "pnpm -r lint",
+    "lint:eslint": "eslint .",
+    "depcruise": "depcruise apps/*/src packages/*/src --config .dependency-cruiser.cjs",
+    "depcruise:madge": "madge --circular --extensions ts apps/api/src packages/*/src apps/user-wallet/src apps/admin-wallet/src",
     "db:generate": "pnpm --filter @ove/database generate",
     "db:migrate": "pnpm --filter @ove/database migrate",
     "db:migrate:test": "pnpm --filter @ove/database migrate:test",
     "db:seed": "pnpm --filter @ove/database seed"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^20.16.11",
-    "typescript": "^5.6.3"
+    "dependency-cruiser": "^18.1.0",
+    "eslint": "^9.39.5",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "madge": "^8.0.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.65.0"
   }
 }
