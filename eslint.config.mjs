@@ -42,6 +42,7 @@ export default tseslint.config(
           // (typescript-eslintの制約でワイルドカードは1階層のみ対応)。
           allowDefaultProject: [
             "apps/api/src/common/*.test.ts",
+            "apps/api/src/common-events/*.test.ts",
             "apps/api/src/e2e/*.test.ts",
             "apps/api/src/notices/*.test.ts",
             "apps/api/src/referrals/*.test.ts",
