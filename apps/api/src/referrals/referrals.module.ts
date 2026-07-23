@@ -11,9 +11,10 @@ import { AgencyReferralClient } from "./agency-referral-client";
 import { AgencyReferralOutboxHandler } from "./agency-referral-outbox-handler";
 import { OutboxModule } from "../outbox/outbox.module";
 import { OutboxService } from "../outbox/outbox.service";
+import { IntegrationsModule } from "../integrations/integrations.module";
 
 @Module({
-  imports: [OutboxModule],
+  imports: [OutboxModule, IntegrationsModule],
   controllers: [ReferralsController],
   providers: [
     ReferralsService,
