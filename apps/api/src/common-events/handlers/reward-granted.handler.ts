@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { type PrismaClient } from "@ove/database";
 import { creditWallet } from "@ove/ledger";
-import { CommonEventBodySchema, type CommonEventBody } from "@ove/shared-types";
+import { RewardGrantedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { PRISMA } from "../../common/prisma.module";
 import { isFeatureEnabled } from "../../common/feature-flags";
 import { serializeTransaction } from "../../wallets/wallets.service";
@@ -11,16 +11,17 @@ import { buildAgencyMetadata } from "../common-event-handler-support";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
- * reward.granted。契約の共通本文にamountフィールドが無いため、metadata.amountで
- * 受け取る。次期改修指示書P0-4: 小数・0・負数を明確に拒否し (`Math.trunc`による暗黙の
- * 丸めは行わない)、`reward_rules`の各種上限 (1回上限相当のper_event_limit、日次相当の
- * per_user_limit、月次件数/金額、累計金額) を商品コード単位のルールで検証する。
+ * reward.granted。リファクタリング指示書 Phase 5により正式フィールド`amount`
+ * (トップレベル) を優先し、未指定の送信元向けに`metadata.amount`を後方互換fallback
+ * として受け取る。次期改修指示書P0-4: 小数・0・負数を明確に拒否し (`Math.trunc`による
+ * 暗黙の丸めは行わない)、`reward_rules`の各種上限 (1回上限相当のper_event_limit、
+ * 日次相当のper_user_limit、月次件数/金額、累計金額) を商品コード単位のルールで検証する。
  * `ENABLE_EXTERNAL_REWARD_TYPES`が無効な間はOVEを動かさず記録のみ行う。
  */
 @Injectable()
 export class RewardGrantedHandler implements CommonEventHandler {
   readonly eventType = "reward.granted";
-  readonly schema = CommonEventBodySchema;
+  readonly schema = RewardGrantedEventSchema;
 
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
@@ -50,11 +51,12 @@ export class RewardGrantedHandler implements CommonEventHandler {
     const account = resolved.account;
     const wallet = await this.db.wallet.findUniqueOrThrow({ where: { oveAccountId: account.id } });
 
+    // 正式フィールドを優先し、未指定の送信元向けにmetadataを後方互換fallbackとして扱う。
     const metadata = (body.metadata as Record<string, unknown> | null | undefined) ?? {};
-    const rawAmount = metadata["amount"];
+    const rawAmount = body.amount ?? metadata["amount"];
     const numericAmount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
     if (!Number.isInteger(numericAmount) || numericAmount <= 0 || !Number.isSafeInteger(numericAmount)) {
-      throw new BadRequestException("metadata.amount must be a positive integer (decimals/zero/negative are rejected)");
+      throw new BadRequestException("amount must be a positive integer (decimals/zero/negative are rejected)");
     }
     const amount = BigInt(numericAmount);
 

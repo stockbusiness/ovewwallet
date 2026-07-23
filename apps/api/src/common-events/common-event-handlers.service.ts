@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleInit } from "@nestjs/common";
+import { BadRequestException, Injectable, type OnModuleInit } from "@nestjs/common";
 import type { CommonEventBody } from "@ove/shared-types";
 import { CommonEventHandlerRegistry } from "./common-event-handler-registry";
 import { CommonUserResolvedHandler } from "./handlers/common-user-resolved.handler";
@@ -44,6 +44,16 @@ export class CommonEventHandlersService implements OnModuleInit {
     if (!handler) {
       return { note: `no handler registered for event_type "${eventType}"; recorded only` };
     }
-    return handler.handle({ eventId: body.event_id, eventType, authenticatedSourceSystemKey }, body);
+
+    // リファクタリング指示書 Phase 5: Phase 4で導入したevent_type別`schema`を実際の
+    // 検証に使う。コントローラの`CommonEventBodySchema`(全event_type共通・全項目任意) を
+    // 通過した後の、ハンドラごとのより厳密な型チェックとして機能する。
+    const parseResult = handler.schema.safeParse(body);
+    if (!parseResult.success) {
+      const issues = parseResult.error.errors.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+      throw new BadRequestException(`event_type "${eventType}" payload failed schema validation: ${issues}`);
+    }
+
+    return handler.handle({ eventId: body.event_id, eventType, authenticatedSourceSystemKey }, parseResult.data);
   }
 }

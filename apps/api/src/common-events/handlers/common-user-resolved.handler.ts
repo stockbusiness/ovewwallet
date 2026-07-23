@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
-import { CommonEventBodySchema, type CommonEventBody } from "@ove/shared-types";
+import { CommonUserResolvedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { PRISMA } from "../../common/prisma.module";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
@@ -14,7 +14,7 @@ import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult }
 @Injectable()
 export class CommonUserResolvedHandler implements CommonEventHandler {
   readonly eventType = "common_user.resolved";
-  readonly schema = CommonEventBodySchema;
+  readonly schema = CommonUserResolvedEventSchema;
 
   constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 

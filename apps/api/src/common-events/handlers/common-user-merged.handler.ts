@@ -1,14 +1,16 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { type PrismaClient } from "@ove/database";
-import { CommonEventBodySchema, type CommonEventBody } from "@ove/shared-types";
+import { CommonUserMergedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { PRISMA } from "../../common/prisma.module";
 import { AdminApprovalService } from "../../admin/admin-approval.service";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
  * common_user.merged。統合先(新common_user_id)・統合元(旧common_user_id、
- * metadata.previous_common_user_idで受け取る) の両方に既存Wallet accountが存在する
- * 場合、指示書5.3章「両方にWallet accountが存在する場合は自動統合しない」に従い
+ * リファクタリング指示書 Phase 5により正式フィールド`previous_common_user_id`を優先し、
+ * 未指定の送信元向けに`metadata.previous_common_user_id`を後方互換fallbackとして
+ * 参照する) の両方に既存Wallet accountが存在する場合、指示書5.3章
+ * 「両方にWallet accountが存在する場合は自動統合しない」に従い
  * 自動マージせず、既存の二段階承認フロー (`AdminApprovalService.requestAccountMerge`)
  * へ申請するだけにとどめる。申請者はシステムsentinel値とし、実際の統合実行は
  * 人間の管理者が承認して初めて行われる (`approval_requests.requested_by`は
@@ -18,7 +20,7 @@ import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult }
 @Injectable()
 export class CommonUserMergedHandler implements CommonEventHandler {
   readonly eventType = "common_user.merged";
-  readonly schema = CommonEventBodySchema;
+  readonly schema = CommonUserMergedEventSchema;
 
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
@@ -27,11 +29,12 @@ export class CommonUserMergedHandler implements CommonEventHandler {
 
   async handle(_context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
     if (!body.common_user_id) throw new BadRequestException("common_user_id is required");
-    const previousCommonUserId = (body.metadata as Record<string, unknown> | null | undefined)?.[
-      "previous_common_user_id"
-    ];
+    // 正式フィールドを優先し、未指定の送信元向けにmetadataを後方互換fallbackとして扱う。
+    const previousCommonUserId =
+      body.previous_common_user_id ??
+      (body.metadata as Record<string, unknown> | null | undefined)?.["previous_common_user_id"];
     if (typeof previousCommonUserId !== "string" || !previousCommonUserId) {
-      return { action: "skipped", reason: "metadata.previous_common_user_id not provided" };
+      return { action: "skipped", reason: "previous_common_user_id not provided" };
     }
 
     const accounts = await this.db.oveAccount.findMany({

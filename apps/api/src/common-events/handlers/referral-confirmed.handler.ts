@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { CommonEventBodySchema, type CommonEventBody } from "@ove/shared-types";
+import { ReferralConfirmedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { ReferralsService } from "../../referrals/referrals.service";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
@@ -7,7 +7,7 @@ import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult }
 @Injectable()
 export class ReferralConfirmedHandler implements CommonEventHandler {
   readonly eventType = "referral.confirmed";
-  readonly schema = CommonEventBodySchema;
+  readonly schema = ReferralConfirmedEventSchema;
 
   constructor(private readonly referrals: ReferralsService) {}
 
