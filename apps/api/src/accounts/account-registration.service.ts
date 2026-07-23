@@ -11,6 +11,7 @@ import {
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CommonUserLinkingService } from "./common-user-linking.service";
+import { AccountRepository } from "./account.repository";
 
 /** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
 export const CURRENT_TERMS_VERSION = "1.0";
@@ -51,6 +52,7 @@ export class AccountRegistrationService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly commonUserLinking: CommonUserLinkingService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   /**
@@ -84,17 +86,15 @@ export class AccountRegistrationService {
 
     const createdAccount = await this.db.$transaction(async (tx) => {
       const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
-      const account = await tx.oveAccount.create({
-        data: {
-          id: generateId(),
-          accountCode,
-          status: "ACTIVE",
-          displayName: params.displayName,
-          primaryEmail: params.email,
-          primaryPhone: params.phone,
-          termsAgreedAt: new Date(),
-          termsVersion: CURRENT_TERMS_VERSION,
-        },
+      const account = await this.accountRepository.create(tx, {
+        id: generateId(),
+        accountCode,
+        status: "ACTIVE",
+        displayName: params.displayName,
+        primaryEmail: params.email,
+        primaryPhone: params.phone,
+        termsAgreedAt: new Date(),
+        termsVersion: CURRENT_TERMS_VERSION,
       });
 
       await tx.accountIdentity.create({

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { AccountRepository } from "./account.repository";
 
 /**
  * リファクタリング指示書 Phase 2: `AccountsService`から分離した退会責務
@@ -8,7 +9,10 @@ import { PRISMA } from "../common/prisma.module";
  */
 @Injectable()
 export class AccountClosureService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   /**
    * ユーザー本人による退会 (docs/account-closure.md参照)。残高(available/held)が
@@ -16,7 +20,7 @@ export class AccountClosureService {
    * 成功時はアカウントをCLOSEDにし、有効なセッションを全て失効させる。
    */
   async requestClosure(oveAccountId: string): Promise<{ closed: true }> {
-    const account = await this.db.oveAccount.findUnique({ where: { id: oveAccountId } });
+    const account = await this.accountRepository.findById(oveAccountId);
     if (!account) throw new NotFoundException("account not found");
     if (account.status === "CLOSED") throw new ConflictException("account is already closed");
 
@@ -26,10 +30,7 @@ export class AccountClosureService {
     }
 
     await this.db.$transaction(async (tx) => {
-      await tx.oveAccount.update({
-        where: { id: oveAccountId },
-        data: { status: "CLOSED", closedAt: new Date() },
-      });
+      await this.accountRepository.closeAccount(tx, oveAccountId);
 
       await tx.userSession.updateMany({
         where: { oveAccountId, revokedAt: null },

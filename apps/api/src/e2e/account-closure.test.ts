@@ -8,6 +8,7 @@ import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { AccountClosureService } from "../accounts/account-closure.service";
+import { AccountRepository } from "../accounts/account.repository";
 
 /** ユーザー本人による退会 (docs/account-closure.md参照)。 */
 describe("退会 (POST /api/v1/accounts/me/close)", () => {
@@ -98,7 +99,7 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
     // 通常はUIから到達不能 (退会に成功すると自分のセッションも即座に失効するため、
     // HTTP経由で「退会済みアカウントに対する退会リクエスト」は再現できない)。
     // サーバー側の冪等性ガード自体はサービス層で直接検証する。
-    const closure = new AccountClosureService(prisma);
+    const closure = new AccountClosureService(prisma, new AccountRepository(prisma));
     await closure.requestClosure(oveAccountId);
     await expect(closure.requestClosure(oveAccountId)).rejects.toThrow(/already closed/);
   });

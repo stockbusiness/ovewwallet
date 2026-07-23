@@ -8,6 +8,7 @@ import {
   type PrismaClient,
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { AccountRepository } from "./account.repository";
 
 /**
  * リファクタリング指示書 Phase 2: `AccountsService`から分離した外部サービス
@@ -15,7 +16,10 @@ import { PRISMA } from "../common/prisma.module";
  */
 @Injectable()
 export class ExternalAccountProvisioningService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   /**
    * サービス連携 (account_links) からOVEアカウントを解決する。未連携なら
@@ -38,9 +42,7 @@ export class ExternalAccountProvisioningService {
 
     return this.db.$transaction(async (tx) => {
       const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
-      const account = await tx.oveAccount.create({
-        data: { id: generateId(), accountCode, status: "ACTIVE" },
-      });
+      const account = await this.accountRepository.create(tx, { id: generateId(), accountCode, status: "ACTIVE" });
 
       const walletCode = await nextDisplayCode(tx, WALLET_CODE_COUNTER, "OVE-WLT");
       await tx.wallet.create({

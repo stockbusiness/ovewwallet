@@ -3,6 +3,7 @@ import { generateId, type Prisma, type PrismaClient } from "@ove/database";
 import { CustomerAssignmentChangedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { PRISMA } from "../../common/prisma.module";
 import { CommonEventAccountResolver } from "../common-event-account-resolver";
+import { AgencyAssignmentRepository, type UpdateAgencyAssignmentParams } from "../agency-assignment.repository";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
@@ -19,6 +20,7 @@ export class CustomerAssignmentChangedHandler implements CommonEventHandler {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accountResolver: CommonEventAccountResolver,
+    private readonly agencyAssignments: AgencyAssignmentRepository,
   ) {}
 
   async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
@@ -35,7 +37,7 @@ export class CustomerAssignmentChangedHandler implements CommonEventHandler {
     }
     const account = resolved.account;
 
-    const data: Prisma.OveAccountUpdateInput = {};
+    const data: UpdateAgencyAssignmentParams = {};
     if (body.assigned_agency_id && body.assigned_agency_id !== account.assignedAgencyId) {
       data.assignedAgencyId = body.assigned_agency_id;
     }
@@ -47,7 +49,7 @@ export class CustomerAssignmentChangedHandler implements CommonEventHandler {
       return { action: "no_change", ove_account_id: account.id };
     }
 
-    await this.db.oveAccount.update({ where: { id: account.id }, data });
+    await this.agencyAssignments.updateAssignment(account.id, data);
     await this.db.auditLog.create({
       data: {
         id: generateId(),

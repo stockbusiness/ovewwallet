@@ -3,8 +3,10 @@ import type { PrismaClient, ServiceIntegration, TransactionType } from "@ove/dat
 import type { RewardGrantRequest } from "@ove/shared-types";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
+import { AccountRepository } from "../accounts/account.repository";
 import { serializeTransaction } from "../wallets/wallets.service";
 import { GrantRewardUseCase } from "./grant-reward.use-case";
+import { RewardRuleRepository } from "./reward-rule.repository";
 
 /**
  * transaction_type -> reward_rules.rule_code の対応 (指示書9章の初期2ルール分)。
@@ -23,7 +25,9 @@ export class RewardsService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
+    private readonly accountRepository: AccountRepository,
     private readonly grantReward: GrantRewardUseCase,
+    private readonly rewardRules: RewardRuleRepository,
   ) {}
 
   /**
@@ -31,15 +35,7 @@ export class RewardsService {
    * フィールドのみで返す (上限値・内部管理用コードなどは含めない)。
    */
   async listPublicRules() {
-    const now = new Date();
-    const rules = await this.db.rewardRule.findMany({
-      where: {
-        status: "ACTIVE",
-        OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-        AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const rules = await this.rewardRules.listActive(new Date());
     return rules.map((r) => ({
       rule_code: r.ruleCode,
       display_name: r.displayName,
@@ -57,9 +53,7 @@ export class RewardsService {
       where: { idempotencyKey: request.idempotency_key },
     });
     if (existing) {
-      const account = await this.db.oveAccount.findFirstOrThrow({
-        where: { wallet: { id: existing.walletId } },
-      });
+      const account = await this.accountRepository.findFirstByWalletIdOrThrow(existing.walletId);
       return { ove_account_id: account.id, ...serializeTransaction(existing) };
     }
 

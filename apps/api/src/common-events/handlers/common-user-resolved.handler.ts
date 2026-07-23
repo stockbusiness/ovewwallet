@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
 import { CommonUserResolvedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { PRISMA } from "../../common/prisma.module";
+import { AccountRepository } from "../../accounts/account.repository";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
@@ -16,14 +17,17 @@ export class CommonUserResolvedHandler implements CommonEventHandler {
   readonly eventType = "common_user.resolved";
   readonly schema = CommonUserResolvedEventSchema;
 
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
     if (!body.common_user_id) throw new BadRequestException("common_user_id is required");
     const sourceUserId = body.source_user_id;
     if (!sourceUserId) return { action: "skipped", reason: "source_user_id not provided" };
 
-    const account = await this.db.oveAccount.findUnique({ where: { id: sourceUserId } });
+    const account = await this.accountRepository.findById(sourceUserId);
     if (!account) return { action: "account_not_found", ove_account_id: sourceUserId };
 
     if (account.commonUserId === body.common_user_id) {
@@ -48,10 +52,7 @@ export class CommonUserResolvedHandler implements CommonEventHandler {
       return { action: "conflict_ignored", ove_account_id: account.id };
     }
 
-    await this.db.oveAccount.update({
-      where: { id: account.id },
-      data: { commonUserId: body.common_user_id, commonUserLinkedAt: new Date() },
-    });
+    await this.accountRepository.linkCommonUser(account.id, body.common_user_id);
     return { action: "linked", ove_account_id: account.id, common_user_id: body.common_user_id };
   }
 }

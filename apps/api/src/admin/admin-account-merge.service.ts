@@ -1,6 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
-import type { PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
+import { Injectable } from "@nestjs/common";
+import { AccountRepository } from "../accounts/account.repository";
 import { AdminApprovalService } from "./admin-approval.service";
 
 /**
@@ -12,7 +11,7 @@ import { AdminApprovalService } from "./admin-approval.service";
 @Injectable()
 export class AdminAccountMergeService {
   constructor(
-    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
     private readonly approvals: AdminApprovalService,
   ) {}
 
@@ -23,8 +22,8 @@ export class AdminAccountMergeService {
     adminId: string;
   }) {
     const [source, target] = await Promise.all([
-      this.db.oveAccount.findUniqueOrThrow({ where: { accountCode: params.sourceAccountCode } }),
-      this.db.oveAccount.findUniqueOrThrow({ where: { accountCode: params.targetAccountCode } }),
+      this.accountRepository.findByAccountCodeOrThrow(params.sourceAccountCode),
+      this.accountRepository.findByAccountCodeOrThrow(params.targetAccountCode),
     ]);
 
     const request = await this.approvals.requestAccountMerge({

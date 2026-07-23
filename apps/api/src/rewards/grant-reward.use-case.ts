@@ -9,6 +9,7 @@ import {
 import { creditWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { enforceRewardRuleLimits } from "./reward-rule-limits";
+import { RewardRuleRepository } from "./reward-rule.repository";
 
 export interface GrantRewardParams {
   oveAccountId: string;
@@ -48,7 +49,10 @@ export interface GrantRewardResult {
  */
 @Injectable()
 export class GrantRewardUseCase {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly rewardRules: RewardRuleRepository,
+  ) {}
 
   async execute(params: GrantRewardParams): Promise<GrantRewardResult> {
     // 冪等キーが既に処理済みなら、上限チェックより前に既存取引をそのまま返す
@@ -64,7 +68,7 @@ export class GrantRewardUseCase {
 
     let expiryDays: number | null = null;
     if (params.ruleCode) {
-      const rule = await enforceRewardRuleLimits(this.db, {
+      const rule = await enforceRewardRuleLimits(this.db, this.rewardRules, {
         ruleCode: params.ruleCode,
         walletId: wallet.id,
         transactionType: params.transactionType,

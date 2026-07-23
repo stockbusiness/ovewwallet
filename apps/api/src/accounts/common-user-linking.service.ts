@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
-import { type OveAccount, type PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
+import { Injectable, Logger } from "@nestjs/common";
+import { type OveAccount } from "@ove/database";
 import { CommonUserHubClient } from "../common-user-hub/common-user-hub.client";
 import { ReferralsService } from "../referrals/referrals.service";
+import { AccountRepository } from "./account.repository";
 
 /**
  * リファクタリング指示書 Phase 2: `AccountsService`から分離した
@@ -13,9 +13,9 @@ export class CommonUserLinkingService {
   private readonly logger = new Logger(CommonUserLinkingService.name);
 
   constructor(
-    @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly commonUserHub: CommonUserHubClient,
     private readonly referrals: ReferralsService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   /**
@@ -35,10 +35,7 @@ export class CommonUserLinkingService {
       });
       if (!result) return;
 
-      await this.db.oveAccount.update({
-        where: { id: account.id },
-        data: { commonUserId: result.commonUserId, commonUserLinkedAt: new Date() },
-      });
+      await this.accountRepository.linkCommonUser(account.id, result.commonUserId);
 
       // 紹介Phase 2 (共通実装契約5章): 「本人ログイン・common user resolve後にconfirmする」。
       // ベストエフォート (失敗しても登録・ログイン自体はブロックしない)。

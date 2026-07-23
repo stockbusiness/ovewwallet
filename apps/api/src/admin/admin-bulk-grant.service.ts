@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import { generateId, type PrismaClient } from "@ove/database";
 import { creditWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
+import { AccountRepository } from "../accounts/account.repository";
 
 interface CsvRow {
   externalUserId: string; // OVE account_code (例: OVE-ACC-00000001) を想定
@@ -49,7 +50,10 @@ export interface BulkGrantSummary {
  */
 @Injectable()
 export class AdminBulkGrantService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   private parseCsv(content: string): CsvRow[] {
     const lines = content
@@ -96,7 +100,7 @@ export class AdminBulkGrantService {
       return { status: "DUPLICATE" };
     }
 
-    const account = await this.db.oveAccount.findUnique({ where: { accountCode: row.externalUserId } });
+    const account = await this.accountRepository.findByAccountCode(row.externalUserId);
     if (!account) {
       return { status: "UNKNOWN_USER" };
     }

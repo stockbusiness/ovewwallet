@@ -6,6 +6,7 @@ import { PRISMA } from "../common/prisma.module";
 import { getEncryptionKey } from "../common/encryption-key";
 import { AgencyReferralClient } from "./agency-referral-client";
 import { ReferralRepository } from "./referral.repository";
+import { AccountRepository } from "../accounts/account.repository";
 import { RejectReferralUseCase } from "./reject-referral.use-case";
 import { assertValidReferralTransition } from "./referral-state-machine";
 
@@ -30,6 +31,7 @@ export class ConfirmReferralUseCase {
     private readonly referrals: ReferralRepository,
     private readonly agencyClient: AgencyReferralClient,
     private readonly rejectReferral: RejectReferralUseCase,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   /**
@@ -59,7 +61,7 @@ export class ConfirmReferralUseCase {
       // common_user_idはUNIQUE制約が無いため、2件以上ヒットした場合はどちらのアカウントの
       // 紹介関係か一意に決められない。自動処理せず対象外として扱う
       // (次期改修指示書P0-5、確定は要レビュー — referralSessionKeyでの再送に委ねる)。
-      const accounts = await this.db.oveAccount.findMany({ where: { commonUserId: params.commonUserId } });
+      const accounts = await this.accountRepository.findManyByCommonUserId(params.commonUserId);
       if (accounts.length === 1) {
         referral = await this.referrals.findByWalletUserId(accounts[0]!.id);
       } else if (accounts.length > 1) {

@@ -14,6 +14,7 @@ import { AgencyReferralClient } from "../referrals/agency-referral-client";
 import { AgencyReferralAdapter } from "../integrations/agency-referral.adapter";
 import { IntegrationHttpClient } from "../integrations/integration-http-client";
 import { IntegrationConfigProvider } from "../integrations/integration-config-provider";
+import { AccountRepository } from "../accounts/account.repository";
 
 /**
  * リファクタリング指示書 Phase 3 (§9 原子性): 紹介特典確定 (CREDIT・
@@ -74,6 +75,7 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
       referrals,
       new AgencyReferralClient(new AgencyReferralAdapter(new IntegrationHttpClient(), new IntegrationConfigProvider(prisma))),
       new RejectReferralUseCase(referrals),
+      new AccountRepository(prisma),
     );
 
     const [resultA, resultB] = await Promise.all([

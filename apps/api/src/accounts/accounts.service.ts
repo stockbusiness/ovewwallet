@@ -1,6 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { type OveAccount, type PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
+import { Injectable } from "@nestjs/common";
+import { type OveAccount } from "@ove/database";
+import { AccountRepository } from "./account.repository";
 import {
   AccountRegistrationService,
   CURRENT_TERMS_VERSION,
@@ -23,7 +23,7 @@ export { CURRENT_TERMS_VERSION, type FindOrCreateIdentityParams };
 @Injectable()
 export class AccountsService {
   constructor(
-    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
     private readonly registration: AccountRegistrationService,
     private readonly externalProvisioning: ExternalAccountProvisioningService,
     private readonly sessions: SessionManagementService,
@@ -31,7 +31,7 @@ export class AccountsService {
   ) {}
 
   async getById(oveAccountId: string): Promise<OveAccount | null> {
-    return this.db.oveAccount.findUnique({ where: { id: oveAccountId } });
+    return this.accountRepository.findById(oveAccountId);
   }
 
   async findOrCreateByIdentity(params: FindOrCreateIdentityParams): Promise<OveAccount> {

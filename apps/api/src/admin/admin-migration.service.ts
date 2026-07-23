@@ -4,6 +4,7 @@ import { generateId, type PrismaClient } from "@ove/database";
 import { creditWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
+import { AccountRepository } from "../accounts/account.repository";
 
 interface MigrationRow {
   oldUserId: string;
@@ -38,6 +39,7 @@ export class AdminMigrationService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   private parseCsv(content: string): MigrationRow[] {
@@ -115,7 +117,7 @@ export class AdminMigrationService {
           // 「REVIEWING状態だが実行者の記録が無い」「監査ログはあるがREVIEWINGでない」
           // という不整合が生じ、resolve-reviewでの職務分離チェックが崩れうる。
           await this.db.$transaction(async (tx) => {
-            await tx.oveAccount.update({ where: { id: account.id }, data: { status: "REVIEWING" } });
+            await this.accountRepository.updateStatus(account.id, "REVIEWING", tx);
             await tx.auditLog.create({
               data: {
                 id: generateId(),

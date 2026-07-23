@@ -4,9 +4,11 @@ import { CommonEventSigningKeysController } from "./common-event-signing-keys.co
 import { CommonEventAuthGuard } from "./common-event-auth.guard";
 import { CommonEventSigningKeysService } from "./common-event-signing-keys.service";
 import { InboundEventsService } from "./inbound-events.service";
+import { InboundEventRepository } from "./inbound-event.repository";
 import { CommonEventHandlersService } from "./common-event-handlers.service";
 import { CommonEventHandlerRegistry } from "./common-event-handler-registry";
 import { CommonEventAccountResolver } from "./common-event-account-resolver";
+import { AgencyAssignmentRepository } from "./agency-assignment.repository";
 import { CommonUserResolvedHandler } from "./handlers/common-user-resolved.handler";
 import { CommonUserMergedHandler } from "./handlers/common-user-merged.handler";
 import { CustomerAssignmentChangedHandler } from "./handlers/customer-assignment-changed.handler";
@@ -28,9 +30,11 @@ import { RewardsModule } from "../rewards/rewards.module";
     CommonEventAuthGuard,
     CommonEventSigningKeysService,
     InboundEventsService,
+    InboundEventRepository,
     CommonEventHandlersService,
     CommonEventHandlerRegistry,
     CommonEventAccountResolver,
+    AgencyAssignmentRepository,
     CommonUserResolvedHandler,
     CommonUserMergedHandler,
     CustomerAssignmentChangedHandler,

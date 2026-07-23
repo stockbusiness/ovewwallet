@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import type { Prisma, PrismaClient, RewardRule, TransactionType } from "@ove/database";
+import type { RewardRuleRepository } from "./reward-rule.repository";
 
 export interface EnforceRewardRuleLimitsParams {
   ruleCode: string;
@@ -26,10 +27,11 @@ export interface EnforceRewardRuleLimitsParams {
  */
 export async function enforceRewardRuleLimits(
   db: PrismaClient,
+  rewardRules: RewardRuleRepository,
   params: EnforceRewardRuleLimitsParams,
 ): Promise<RewardRule | null> {
   const { ruleCode, walletId, transactionType, eventId, amount, extraWhere } = params;
-  const rule = await db.rewardRule.findUnique({ where: { ruleCode } });
+  const rule = await rewardRules.findByRuleCode(ruleCode, db);
   if (!rule || rule.status !== "ACTIVE") return rule;
 
   const now = new Date();

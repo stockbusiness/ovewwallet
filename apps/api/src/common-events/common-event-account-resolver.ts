@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { generateId, type OveAccount, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { AccountRepository } from "../accounts/account.repository";
 
 export type AccountLookupResult =
   | { status: "not_found" }
@@ -18,14 +19,17 @@ export type AccountLookupResult =
  */
 @Injectable()
 export class CommonEventAccountResolver {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   async resolveByCommonUserId(
     commonUserId: string,
     actionType: string,
     authenticatedSourceSystemKey: string,
   ): Promise<AccountLookupResult> {
-    const accounts = await this.db.oveAccount.findMany({ where: { commonUserId } });
+    const accounts = await this.accountRepository.findManyByCommonUserId(commonUserId);
     if (accounts.length === 0) return { status: "not_found" };
     if (accounts.length === 1) return { status: "ok", account: accounts[0]! };
 

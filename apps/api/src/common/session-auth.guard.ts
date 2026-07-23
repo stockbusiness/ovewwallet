@@ -3,6 +3,7 @@ import type { Request } from "express";
 import { hashSessionToken, SESSION_COOKIE_NAME } from "@ove/auth";
 import type { PrismaClient, OveAccount } from "@ove/database";
 import { PRISMA } from "./prisma.module";
+import { AccountRepository } from "../accounts/account.repository";
 
 export interface AuthenticatedUserRequest extends Request {
   account: OveAccount;
@@ -13,7 +14,10 @@ export interface AuthenticatedUserRequest extends Request {
 /** OVE独自セッションCookieを検証し、req.account にログイン中のアカウントを積む。 */
 @Injectable()
 export class SessionAuthGuard implements CanActivate {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountRepository: AccountRepository,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
@@ -28,7 +32,7 @@ export class SessionAuthGuard implements CanActivate {
       throw new UnauthorizedException("session expired or revoked");
     }
 
-    const account = await this.db.oveAccount.findUnique({ where: { id: session.oveAccountId } });
+    const account = await this.accountRepository.findById(session.oveAccountId);
     if (!account) throw new UnauthorizedException("account not found");
     // 退会済みアカウント向けにセッションが残っていた場合の保険 (通常は退会処理自体で
     // 全セッションを失効させるため通らないはずだが、多層防御として置く)。

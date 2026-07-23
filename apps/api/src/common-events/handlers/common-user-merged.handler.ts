@@ -1,8 +1,7 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import { type PrismaClient } from "@ove/database";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { CommonUserMergedEventSchema, type CommonEventBody } from "@ove/shared-types";
-import { PRISMA } from "../../common/prisma.module";
 import { AdminApprovalService } from "../../admin/admin-approval.service";
+import { AccountRepository } from "../../accounts/account.repository";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
@@ -23,8 +22,8 @@ export class CommonUserMergedHandler implements CommonEventHandler {
   readonly schema = CommonUserMergedEventSchema;
 
   constructor(
-    @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly approvals: AdminApprovalService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   async handle(_context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
@@ -37,9 +36,7 @@ export class CommonUserMergedHandler implements CommonEventHandler {
       return { action: "skipped", reason: "previous_common_user_id not provided" };
     }
 
-    const accounts = await this.db.oveAccount.findMany({
-      where: { commonUserId: { in: [body.common_user_id, previousCommonUserId] } },
-    });
+    const accounts = await this.accountRepository.findManyByCommonUserIds([body.common_user_id, previousCommonUserId]);
 
     if (accounts.length === 0) {
       return { action: "no_local_accounts" };
@@ -48,10 +45,7 @@ export class CommonUserMergedHandler implements CommonEventHandler {
     if (accounts.length === 1) {
       const account = accounts[0]!;
       if (account.commonUserId !== body.common_user_id) {
-        await this.db.oveAccount.update({
-          where: { id: account.id },
-          data: { commonUserId: body.common_user_id, commonUserLinkedAt: new Date() },
-        });
+        await this.accountRepository.linkCommonUser(account.id, body.common_user_id);
       }
       return { action: "relinked", ove_account_id: account.id };
     }
