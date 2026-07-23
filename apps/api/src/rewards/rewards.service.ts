@@ -1,11 +1,10 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import type { PrismaClient, ServiceIntegration, TransactionType } from "@ove/database";
-import { creditWallet } from "@ove/ledger";
 import type { RewardGrantRequest } from "@ove/shared-types";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { serializeTransaction } from "../wallets/wallets.service";
-import { enforceRewardRuleLimits } from "./reward-rule-limits";
+import { GrantRewardUseCase } from "./grant-reward.use-case";
 
 /**
  * transaction_type -> reward_rules.rule_code の対応 (指示書9章の初期2ルール分)。
@@ -24,6 +23,7 @@ export class RewardsService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
+    private readonly grantReward: GrantRewardUseCase,
   ) {}
 
   /**
@@ -94,39 +94,23 @@ export class RewardsService {
       serviceIntegrationId: serviceIntegration.id,
       externalUserId: request.external_user_id,
     });
-    const wallet = await this.db.wallet.findUniqueOrThrow({ where: { oveAccountId: account.id } });
     const transactionType = request.transaction_type as TransactionType;
-
     const ruleCode = RULE_CODE_BY_TRANSACTION_TYPE[request.transaction_type];
-    let expiryDays: number | null = null;
-    if (ruleCode) {
-      const rule = await enforceRewardRuleLimits(this.db, {
-        ruleCode,
-        walletId: wallet.id,
-        transactionType,
-        eventId: request.event_id,
-        amount,
-      });
-      expiryDays = rule?.expiryDays ?? null;
-    }
 
-    const transaction = await creditWallet(
-      {
-        walletId: wallet.id,
-        amount,
-        transactionType,
-        idempotencyKey: request.idempotency_key,
-        displayName: request.display_name,
-        description: request.description,
-        sourceService: request.service_code,
-        sourceReferenceId: request.event_id,
-        createdByType: "EXTERNAL_SERVICE",
-        createdById: serviceIntegration.id,
-        metadata: { eventType: request.event_type, eventId: request.event_id },
-        expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
-      },
-      this.db,
-    );
+    const { transaction } = await this.grantReward.execute({
+      oveAccountId: account.id,
+      amount,
+      transactionType,
+      idempotencyKey: request.idempotency_key,
+      displayName: request.display_name,
+      description: request.description,
+      sourceService: request.service_code,
+      sourceReferenceId: request.event_id,
+      createdByType: "EXTERNAL_SERVICE",
+      createdById: serviceIntegration.id,
+      metadata: { eventType: request.event_type, eventId: request.event_id },
+      ruleCode,
+    });
 
     return { ove_account_id: account.id, ...serializeTransaction(transaction) };
   }

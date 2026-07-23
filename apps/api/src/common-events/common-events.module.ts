@@ -15,13 +15,14 @@ import { RewardGrantedHandler } from "./handlers/reward-granted.handler";
 import { RewardReversedHandler } from "./handlers/reward-reversed.handler";
 import { AdminModule } from "../admin/admin.module";
 import { ReferralsModule } from "../referrals/referrals.module";
+import { RewardsModule } from "../rewards/rewards.module";
 
 /**
  * 千ノ国 全体統合 共通実装契約 v1.0 6章「共通イベント契約」の受信側実装。
  * 送信専用のOutboxModuleとは独立した、受信専用(Inbox)モジュール。
  */
 @Module({
-  imports: [AdminModule, ReferralsModule],
+  imports: [AdminModule, ReferralsModule, RewardsModule],
   controllers: [CommonEventsController, CommonEventSigningKeysController],
   providers: [
     CommonEventAuthGuard,
