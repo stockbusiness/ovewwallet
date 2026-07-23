@@ -44,6 +44,7 @@ export default tseslint.config(
             "apps/api/src/common/*.test.ts",
             "apps/api/src/e2e/*.test.ts",
             "apps/api/src/notices/*.test.ts",
+            "apps/api/src/referrals/*.test.ts",
             "apps/api/vitest.config.ts",
             "packages/auth/src/*.test.ts",
             "packages/auth/vitest.config.ts",

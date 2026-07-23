@@ -1,6 +1,12 @@
 import { Module, type OnModuleInit } from "@nestjs/common";
 import { ReferralsController } from "./referrals.controller";
 import { ReferralsService } from "./referrals.service";
+import { ReferralRepository } from "./referral.repository";
+import { ReferralCaptureUseCase } from "./referral-capture.use-case";
+import { AttachReferralToAccountUseCase } from "./attach-referral-to-account.use-case";
+import { ConfirmReferralUseCase } from "./confirm-referral.use-case";
+import { RejectReferralUseCase } from "./reject-referral.use-case";
+import { ReferralQueryService } from "./referral-query.service";
 import { AgencyReferralClient } from "./agency-referral-client";
 import { AgencyReferralOutboxHandler } from "./agency-referral-outbox-handler";
 import { OutboxModule } from "../outbox/outbox.module";
@@ -9,7 +15,17 @@ import { OutboxService } from "../outbox/outbox.service";
 @Module({
   imports: [OutboxModule],
   controllers: [ReferralsController],
-  providers: [ReferralsService, AgencyReferralClient, AgencyReferralOutboxHandler],
+  providers: [
+    ReferralsService,
+    ReferralRepository,
+    ReferralCaptureUseCase,
+    AttachReferralToAccountUseCase,
+    ConfirmReferralUseCase,
+    RejectReferralUseCase,
+    ReferralQueryService,
+    AgencyReferralClient,
+    AgencyReferralOutboxHandler,
+  ],
   exports: [ReferralsService],
 })
 export class ReferralsModule implements OnModuleInit {
