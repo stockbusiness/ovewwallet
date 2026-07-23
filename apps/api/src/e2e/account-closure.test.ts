@@ -7,11 +7,7 @@ import { hashSecret } from "@ove/auth";
 import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
-import { AccountsService } from "../accounts/accounts.service";
-import { CommonUserHubClient } from "../common-user-hub/common-user-hub.client";
-import { ReferralsService } from "../referrals/referrals.service";
-import { OutboxService } from "../outbox/outbox.service";
-import { AgencyReferralClient } from "../referrals/agency-referral-client";
+import { AccountClosureService } from "../accounts/account-closure.service";
 
 /** ユーザー本人による退会 (docs/account-closure.md参照)。 */
 describe("退会 (POST /api/v1/accounts/me/close)", () => {
@@ -102,9 +98,8 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
     // 通常はUIから到達不能 (退会に成功すると自分のセッションも即座に失効するため、
     // HTTP経由で「退会済みアカウントに対する退会リクエスト」は再現できない)。
     // サーバー側の冪等性ガード自体はサービス層で直接検証する。
-    const referrals = new ReferralsService(prisma, new OutboxService(prisma), new AgencyReferralClient(prisma));
-    const accounts = new AccountsService(prisma, new CommonUserHubClient(prisma), referrals);
-    await accounts.requestClosure(oveAccountId);
-    await expect(accounts.requestClosure(oveAccountId)).rejects.toThrow(/already closed/);
+    const closure = new AccountClosureService(prisma);
+    await closure.requestClosure(oveAccountId);
+    await expect(closure.requestClosure(oveAccountId)).rejects.toThrow(/already closed/);
   });
 });
