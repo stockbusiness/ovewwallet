@@ -2,11 +2,11 @@ import { BadRequestException, ForbiddenException, Inject, Injectable } from "@ne
 import {
   generateId,
   nextDisplayCode,
+  Prisma,
   ACCOUNT_CODE_COUNTER,
   WALLET_CODE_COUNTER,
   type IdentityType,
   type OveAccount,
-  type Prisma,
   type PrismaClient,
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
@@ -84,65 +84,86 @@ export class AccountRegistrationService {
       throw new BadRequestException("terms of service agreement is required to create a new account");
     }
 
-    const createdAccount = await this.db.$transaction(async (tx) => {
-      const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
-      const account = await this.accountRepository.create(tx, {
-        id: generateId(),
-        accountCode,
-        status: "ACTIVE",
-        displayName: params.displayName,
-        primaryEmail: params.email,
-        primaryPhone: params.phone,
-        termsAgreedAt: new Date(),
-        termsVersion: CURRENT_TERMS_VERSION,
-      });
-
-      await tx.accountIdentity.create({
-        data: {
+    let createdAccount: OveAccount;
+    try {
+      createdAccount = await this.db.$transaction(async (tx) => {
+        const accountCode = await nextDisplayCode(tx, ACCOUNT_CODE_COUNTER, "OVE-ACC");
+        const account = await this.accountRepository.create(tx, {
           id: generateId(),
-          oveAccountId: account.id,
-          identityType: params.identityType,
-          provider: params.provider,
-          providerSubject: params.providerSubject,
-          email: params.email,
-          phone: params.phone,
-          verifiedAt: new Date(),
-        },
-      });
-
-      const walletCode = await nextDisplayCode(tx, WALLET_CODE_COUNTER, "OVE-WLT");
-      await tx.wallet.create({
-        data: {
-          id: generateId(),
-          oveAccountId: account.id,
-          walletCode,
+          accountCode,
           status: "ACTIVE",
-        },
-      });
+          displayName: params.displayName,
+          primaryEmail: params.email,
+          primaryPhone: params.phone,
+          termsAgreedAt: new Date(),
+          termsVersion: CURRENT_TERMS_VERSION,
+        });
 
-      await tx.auditLog.create({
-        data: {
-          id: generateId(),
-          actorType: "SYSTEM",
-          actionType: "ACCOUNT_CREATED",
-          targetType: "ove_account",
-          targetId: account.id,
-          result: "SUCCESS",
-          afterData: {
-            accountCode,
+        await tx.accountIdentity.create({
+          data: {
+            id: generateId(),
+            oveAccountId: account.id,
             identityType: params.identityType,
             provider: params.provider,
-            termsVersion: CURRENT_TERMS_VERSION,
+            providerSubject: params.providerSubject,
+            email: params.email,
+            phone: params.phone,
+            verifiedAt: new Date(),
           },
-        },
+        });
+
+        const walletCode = await nextDisplayCode(tx, WALLET_CODE_COUNTER, "OVE-WLT");
+        await tx.wallet.create({
+          data: {
+            id: generateId(),
+            oveAccountId: account.id,
+            walletCode,
+            status: "ACTIVE",
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            id: generateId(),
+            actorType: "SYSTEM",
+            actionType: "ACCOUNT_CREATED",
+            targetType: "ove_account",
+            targetId: account.id,
+            result: "SUCCESS",
+            afterData: {
+              accountCode,
+              identityType: params.identityType,
+              provider: params.provider,
+              termsVersion: CURRENT_TERMS_VERSION,
+            },
+          },
+        });
+
+        if (params.onNewAccountCreated) {
+          await params.onNewAccountCreated(tx, account);
+        }
+
+        return account;
       });
-
-      if (params.onNewAccountCreated) {
-        await params.onNewAccountCreated(tx, account);
+    } catch (error) {
+      // モジュール化後レビュー対応 P1-4: 同一identity (provider+providerSubject) への
+      // 同時登録リクエストは、両方とも「未登録」判定を通過した後にaccount_identitiesの
+      // 一意制約で片方が失敗しうる。再検索して先に作成された側のアカウントを返す
+      // (500を返して登録自体を失敗させない)。
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const race = await this.db.accountIdentity.findUnique({
+          where: { provider_providerSubject: { provider: params.provider, providerSubject: params.providerSubject } },
+          include: { account: true },
+        });
+        if (race) {
+          if (race.account.status === "CLOSED") {
+            throw new ForbiddenException("this account has been closed");
+          }
+          return race.account;
+        }
       }
-
-      return account;
-    });
+      throw error;
+    }
 
     // 外部HTTP呼び出しをDBトランザクション内に含めない (接続保持・タイムアウトを
     // 避けるため)。ベストエフォートのため失敗しても登録自体は成功済みのまま返す。
