@@ -180,6 +180,34 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
       const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: accountId } });
       expect(account.commonUserId).toBe(originalCommonUserId);
     });
+
+    it("モジュール化後レビュー対応 P1-2回帰: 他アカウントに既に設定済みのcommon_user_idは自動設定せず競合として記録する", async () => {
+      const sharedCommonUserId = `cu_${generateId()}`;
+      const { accountId: existingAccountId } = await createAccountWithWallet();
+      await prisma.oveAccount.update({
+        where: { id: existingAccountId },
+        data: { commonUserId: sharedCommonUserId, commonUserLinkedAt: new Date() },
+      });
+
+      const { accountId: newAccountId } = await createAccountWithWallet();
+      const body = baseBody({
+        event_type: "common_user.resolved",
+        common_user_id: sharedCommonUserId,
+        source_user_id: newAccountId,
+      });
+      const headers = commonEventSignedHeaders(key, body);
+
+      const res = await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(201);
+      expect(res.body.result.action).toBe("conflict_ignored");
+
+      const newAccount = await prisma.oveAccount.findUniqueOrThrow({ where: { id: newAccountId } });
+      expect(newAccount.commonUserId).toBeNull();
+
+      const conflictLogs = await prisma.auditLog.findMany({
+        where: { targetType: "ove_account", targetId: newAccountId, actionType: "COMMON_USER_RESOLVED_CONFLICT" },
+      });
+      expect(conflictLogs).toHaveLength(1);
+    });
   });
 
   describe("customer.assignment.changed", () => {
@@ -201,6 +229,13 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
       expect(account.assignedAgencyId).toBe("AGENT-CODE-002");
       expect(account.registrationReferrerAgencyId).toBe("AGENT-CODE-001");
 
+      // モジュール化後レビュー対応 P1-1回帰: 担当代理店更新とAuditLog作成は
+      // 同一トランザクションで確定するため、更新が反映されていれば必ずAuditLogも存在する。
+      const auditLogsAfterFirst = await prisma.auditLog.findMany({
+        where: { targetType: "ove_account", targetId: accountId, actionType: "CUSTOMER_ASSIGNMENT_CHANGED" },
+      });
+      expect(auditLogsAfterFirst).toHaveLength(1);
+
       // 2回目のイベントでregistration_referrer_agency_idが異なる値でも上書きされない (ロック)。
       const secondBody = baseBody({
         event_type: "customer.assignment.changed",
@@ -214,6 +249,11 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
       account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: accountId } });
       expect(account.assignedAgencyId).toBe("AGENT-CODE-003");
       expect(account.registrationReferrerAgencyId).toBe("AGENT-CODE-001");
+
+      const auditLogsAfterSecond = await prisma.auditLog.findMany({
+        where: { targetType: "ove_account", targetId: accountId, actionType: "CUSTOMER_ASSIGNMENT_CHANGED" },
+      });
+      expect(auditLogsAfterSecond).toHaveLength(2);
     });
   });
 

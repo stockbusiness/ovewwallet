@@ -1,5 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { type OveAccount } from "@ove/database";
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import { generateId, type OveAccount, type PrismaClient } from "@ove/database";
+import { PRISMA } from "../common/prisma.module";
 import { CommonUserHubClient } from "../common-user-hub/common-user-hub.client";
 import { ReferralsService } from "../referrals/referrals.service";
 import { AccountRepository } from "./account.repository";
@@ -13,6 +14,7 @@ export class CommonUserLinkingService {
   private readonly logger = new Logger(CommonUserLinkingService.name);
 
   constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly commonUserHub: CommonUserHubClient,
     private readonly referrals: ReferralsService,
     private readonly accountRepository: AccountRepository,
@@ -34,6 +36,34 @@ export class CommonUserLinkingService {
         displayName: account.displayName,
       });
       if (!result) return;
+
+      // モジュール化後レビュー対応 P1-2: common_user_idにUNIQUE制約が無いため、
+      // 他アカウントに同じ値が既に設定されていないかを保存前に必ず確認する。
+      const conflictingAccounts = await this.accountRepository.findConflictingCommonUserLinks(
+        result.commonUserId,
+        account.id,
+      );
+      if (conflictingAccounts.length > 0) {
+        await this.db.auditLog.create({
+          data: {
+            id: generateId(),
+            actorType: "SYSTEM",
+            actionType: "COMMON_USER_RESOLVED_CONFLICT",
+            targetType: "ove_account",
+            targetId: account.id,
+            result: "FAILURE",
+            reason: `common_user_id "${result.commonUserId}" は既に他のOVEアカウントに設定済みのため自動設定しない`,
+            afterData: {
+              rejectedCommonUserId: result.commonUserId,
+              conflictingAccountIds: conflictingAccounts.map((a) => a.id),
+            },
+          },
+        });
+        this.logger.warn(
+          `common_user_id ${result.commonUserId} is already linked to another account; skipping auto-link for account ${account.id}`,
+        );
+        return;
+      }
 
       await this.accountRepository.linkCommonUser(account.id, result.commonUserId);
 

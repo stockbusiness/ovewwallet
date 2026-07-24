@@ -76,6 +76,19 @@ export class AccountRepository {
     return client.oveAccount.findMany({ where: { commonUserId: { in: commonUserIds } } });
   }
 
+  /**
+   * モジュール化後レビュー対応 P1-2: `common_user_id`はUNIQUE制約が無いため、
+   * 自アカウント以外に同じ値が既に設定されていないか、保存前に必ず確認する
+   * (`common_user.resolved`受信時・`CommonUserHubClient.resolve`後の両経路で使用)。
+   */
+  async findConflictingCommonUserLinks(
+    commonUserId: string,
+    excludeAccountId: string,
+    client: Db = this.db,
+  ): Promise<OveAccount[]> {
+    return client.oveAccount.findMany({ where: { commonUserId, id: { not: excludeAccountId } } });
+  }
+
   async findFirstByWalletIdOrThrow(walletId: string, client: Db = this.db): Promise<OveAccount> {
     return client.oveAccount.findFirstOrThrow({ where: { wallet: { id: walletId } } });
   }

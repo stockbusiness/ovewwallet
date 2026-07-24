@@ -52,6 +52,33 @@ export class CommonUserResolvedHandler implements CommonEventHandler {
       return { action: "conflict_ignored", ove_account_id: account.id };
     }
 
+    // モジュール化後レビュー対応 P1-2: common_user_idにUNIQUE制約が無いため、他アカウントに
+    // 同じ値が既に設定されていないかを保存前に必ず確認する (自動で複数アカウントへ
+    // 同じcommon_user_idを設定しない)。
+    const conflictingAccounts = await this.accountRepository.findConflictingCommonUserLinks(
+      body.common_user_id,
+      account.id,
+    );
+    if (conflictingAccounts.length > 0) {
+      await this.db.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: "EXTERNAL_SERVICE",
+          actorId: context.authenticatedSourceSystemKey,
+          actionType: "COMMON_USER_RESOLVED_CONFLICT",
+          targetType: "ove_account",
+          targetId: account.id,
+          result: "FAILURE",
+          reason: `common_user_id "${body.common_user_id}" は既に他のOVEアカウントに設定済みのため自動設定しない`,
+          afterData: {
+            rejectedCommonUserId: body.common_user_id,
+            conflictingAccountIds: conflictingAccounts.map((a) => a.id),
+          },
+        },
+      });
+      return { action: "conflict_ignored", ove_account_id: account.id };
+    }
+
     await this.accountRepository.linkCommonUser(account.id, body.common_user_id);
     return { action: "linked", ove_account_id: account.id, common_user_id: body.common_user_id };
   }

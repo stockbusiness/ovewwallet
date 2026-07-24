@@ -49,23 +49,28 @@ export class CustomerAssignmentChangedHandler implements CommonEventHandler {
       return { action: "no_change", ove_account_id: account.id };
     }
 
-    await this.agencyAssignments.updateAssignment(account.id, data);
-    await this.db.auditLog.create({
-      data: {
-        id: generateId(),
-        actorType: "EXTERNAL_SERVICE",
-        actorId: context.authenticatedSourceSystemKey,
-        actionType: "CUSTOMER_ASSIGNMENT_CHANGED",
-        targetType: "ove_account",
-        targetId: account.id,
-        result: "SUCCESS",
-        beforeData: {
-          assignedAgencyId: account.assignedAgencyId,
-          registrationReferrerAgencyId: account.registrationReferrerAgencyId,
+    // 更新とAuditLog作成は同一トランザクションで確定する。片方だけ成功すると、
+    // 再送時に「AuditLog記録前に既にassignedAgencyIdが最新値と一致 (=no_change)」
+    // と誤判定され、監査ログが永久に欠落しうるため。
+    await this.db.$transaction(async (tx) => {
+      await this.agencyAssignments.updateAssignment(account.id, data, tx);
+      await tx.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: "EXTERNAL_SERVICE",
+          actorId: context.authenticatedSourceSystemKey,
+          actionType: "CUSTOMER_ASSIGNMENT_CHANGED",
+          targetType: "ove_account",
+          targetId: account.id,
+          result: "SUCCESS",
+          beforeData: {
+            assignedAgencyId: account.assignedAgencyId,
+            registrationReferrerAgencyId: account.registrationReferrerAgencyId,
+          },
+          afterData: data as unknown as Prisma.InputJsonValue,
+          reason: `event_id=${body.event_id}`,
         },
-        afterData: data as unknown as Prisma.InputJsonValue,
-        reason: `event_id=${body.event_id}`,
-      },
+      });
     });
 
     return { action: "updated", ove_account_id: account.id };
