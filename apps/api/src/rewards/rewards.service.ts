@@ -1,9 +1,6 @@
-import { BadRequestException, Inject, Injectable } from "@nestjs/common";
-import type { PrismaClient, ServiceIntegration, TransactionType } from "@ove/database";
+import { BadRequestException, Injectable } from "@nestjs/common";
+import type { ServiceIntegration, TransactionType } from "@ove/database";
 import type { RewardGrantRequest } from "@ove/shared-types";
-import { PRISMA } from "../common/prisma.module";
-import { AccountsService } from "../accounts/accounts.service";
-import { AccountRepository } from "../accounts/account.repository";
 import { serializeTransaction } from "../wallets/wallets.service";
 import { GrantExternalServiceRewardUseCase } from "./grant-external-service-reward.use-case";
 import { RewardRuleRepository } from "./reward-rule.repository";
@@ -23,9 +20,6 @@ export const RULE_CODE_BY_TRANSACTION_TYPE: Record<string, string> = {
 @Injectable()
 export class RewardsService {
   constructor(
-    @Inject(PRISMA) private readonly db: PrismaClient,
-    private readonly accounts: AccountsService,
-    private readonly accountRepository: AccountRepository,
     private readonly grantExternalServiceReward: GrantExternalServiceRewardUseCase,
     private readonly rewardRules: RewardRuleRepository,
   ) {}
@@ -47,35 +41,22 @@ export class RewardsService {
   }
 
   async grant(request: RewardGrantRequest, serviceIntegration: ServiceIntegration) {
-    // 冪等キーが既に処理済みなら、上限チェックより前に既存取引をそのまま返す。
-    // (再送/リトライは "新規リクエスト" ではないため、上限判定の対象にしない)
-    const existing = await this.db.oveTransaction.findUnique({
-      where: { idempotencyKey: request.idempotency_key },
-    });
-    if (existing) {
-      const account = await this.accountRepository.findFirstByWalletIdOrThrow(existing.walletId);
-      return { ove_account_id: account.id, ...serializeTransaction(existing) };
-    }
-
     if (serviceIntegration.serviceCode !== request.service_code) {
       throw new BadRequestException("service_code does not match the authenticated API key");
     }
 
     const amount = BigInt(request.amount);
-    const account = await this.accounts.findOrCreateByServiceLink({
-      serviceIntegrationId: serviceIntegration.id,
-      externalUserId: request.external_user_id,
-    });
     const transactionType = request.transaction_type as TransactionType;
     const ruleCode = RULE_CODE_BY_TRANSACTION_TYPE[request.transaction_type];
 
-    // 追加整合性対策P0-3: perRequestAmountLimit/dailyAmountLimitの判定・CREDITを
+    // 追加整合性対策P0-3・PR#1最終修正: idempotency確認・perRequestAmountLimit/
+    // dailyAmountLimitの判定・アカウント解決 (未連携なら作成)・CREDITを、すべて
     // ServiceIntegration行ロック配下の単一トランザクションで行う
-    // (`GrantExternalServiceRewardUseCase`参照。同一サービスからの並行付与で
-    // dailyAmountLimitを突破しない)。
-    const { transaction } = await this.grantExternalServiceReward.execute({
+    // (`GrantExternalServiceRewardUseCase`参照)。上限超過等で拒否された場合は
+    // OveAccount/Wallet/AccountLinkを一切作らない。
+    const { oveAccountId, transaction } = await this.grantExternalServiceReward.execute({
       serviceIntegration,
-      oveAccountId: account.id,
+      externalUserId: request.external_user_id,
       amount,
       transactionType,
       idempotencyKey: request.idempotency_key,
@@ -86,6 +67,6 @@ export class RewardsService {
       ruleCode,
     });
 
-    return { ove_account_id: account.id, ...serializeTransaction(transaction) };
+    return { ove_account_id: oveAccountId, ...serializeTransaction(transaction) };
   }
 }

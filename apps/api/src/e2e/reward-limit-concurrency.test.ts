@@ -338,17 +338,6 @@ describe("ServiceIntegration日次上限: 並行付与でも突破しない (追
   });
 });
 
-async function createAccountWithWallet(): Promise<{ accountId: string }> {
-  const accountId = generateId();
-  await prisma.oveAccount.create({
-    data: { id: accountId, accountCode: `OVE-ACC-TEST-${generateId()}`, status: "ACTIVE" },
-  });
-  await prisma.wallet.create({
-    data: { id: generateId(), oveAccountId: accountId, walletCode: `OVE-WLT-TEST-${generateId()}`, status: "ACTIVE" },
-  });
-  return { accountId };
-}
-
 /**
  * PR #1最終修正: `ServiceIntegration`行を`FOR UPDATE`でロックした後も、認証時に取得した
  * 古い`params.serviceIntegration`スナップショットを上限判定へ使っていた回帰があった。
@@ -376,11 +365,10 @@ describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)",
     // staleIntegrationを取得した後にDB側の上限を引き下げる (ロック待ち中の変更に相当)。
     await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { perRequestAmountLimit: 100 } });
 
-    const { accountId } = await createAccountWithWallet();
     await expect(
       useCase.execute({
         serviceIntegration: staleIntegration as ServiceIntegration,
-        oveAccountId: accountId,
+        externalUserId: `stale-per-request-${generateId()}`,
         amount: 500n,
         transactionType: "AIART_ATTENDANCE",
         idempotencyKey: `key-stale-per-request-${generateId()}`,
@@ -402,11 +390,10 @@ describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)",
       data: { dailyAmountLimit: Number(grantedToday) },
     });
 
-    const { accountId } = await createAccountWithWallet();
     await expect(
       useCase.execute({
         serviceIntegration: staleIntegration as ServiceIntegration,
-        oveAccountId: accountId,
+        externalUserId: `stale-daily-${generateId()}`,
         amount: 100n,
         transactionType: "AIART_ATTENDANCE",
         idempotencyKey: `key-stale-daily-${generateId()}`,
@@ -420,11 +407,10 @@ describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)",
     const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
     await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { status: "SUSPENDED" } });
 
-    const { accountId } = await createAccountWithWallet();
     await expect(
       useCase.execute({
         serviceIntegration: staleIntegration as ServiceIntegration,
-        oveAccountId: accountId,
+        externalUserId: `stale-suspended-${generateId()}`,
         amount: 100n,
         transactionType: "AIART_ATTENDANCE",
         idempotencyKey: `key-stale-suspended-${generateId()}`,
@@ -443,11 +429,10 @@ describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)",
     const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
     await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { status: "REVOKED" } });
 
-    const { accountId } = await createAccountWithWallet();
     await expect(
       useCase.execute({
         serviceIntegration: staleIntegration as ServiceIntegration,
-        oveAccountId: accountId,
+        externalUserId: `stale-revoked-${generateId()}`,
         amount: 100n,
         transactionType: "AIART_ATTENDANCE",
         idempotencyKey: `key-stale-revoked-${generateId()}`,
@@ -461,16 +446,193 @@ describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)",
     const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
     const tampered = { ...staleIntegration, serviceCode: "SENGOKU_EC" } as ServiceIntegration;
 
-    const { accountId } = await createAccountWithWallet();
     await expect(
       useCase.execute({
         serviceIntegration: tampered,
-        oveAccountId: accountId,
+        externalUserId: `stale-servicecode-${generateId()}`,
         amount: 100n,
         transactionType: "AIART_ATTENDANCE",
         idempotencyKey: `key-stale-servicecode-${generateId()}`,
         displayName: "test",
       }),
     ).rejects.toThrow(/service_code/);
+  });
+});
+
+async function accountLinkFor(serviceIntegrationId: string, externalUserId: string) {
+  return prisma.accountLink.findUnique({
+    where: { serviceIntegrationId_externalUserId: { serviceIntegrationId, externalUserId } },
+  });
+}
+
+/**
+ * PR #1最終修正: 以前は上限判定より前にOveAccount/Wallet/AccountLinkを作成していたため、
+ * perRequestAmountLimit/dailyAmountLimit/RewardRule上限超過やServiceIntegration停止で
+ * CREDITが拒否されても、残高0の外部ユーザーレコードが残ってしまっていた。
+ * `GrantExternalServiceRewardUseCase`がアカウント解決を上限確認より後ろへ移したことで、
+ * 拒否時に何も作られないことを検証する。
+ */
+describe("上限拒否時の不要アカウント作成防止 (PR #1最終修正回帰)", () => {
+  it("perRequestAmountLimit超過時はAccountLink/OveAccount/Walletを作らない", async () => {
+    const integration = await createTestServiceIntegration("AIART", { perRequestAmountLimit: 100, dailyAmountLimit: 1_000_000 });
+    const externalUserId = `provisioning-per-request-${generateId()}`;
+    const res = await grant(app.getHttpServer(), integration, {
+      service_code: "AIART",
+      external_user_id: externalUserId,
+      event_type: "ATTENDANCE",
+      event_id: `EVT-${generateId()}`,
+      amount: 101,
+      transaction_type: "AIART_ATTENDANCE",
+      display_name: "test",
+      idempotency_key: `key-${generateId()}`,
+    });
+    expect(res.status).toBe(400);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).toBeNull();
+  });
+
+  it("dailyAmountLimit超過時はAccountLink/OveAccount/Walletを作らない", async () => {
+    const serviceCode = "AIART";
+    const grantedToday = await todaysGrantedSum(serviceCode);
+    const integration = await createTestServiceIntegration(serviceCode, {
+      perRequestAmountLimit: 1_000_000,
+      dailyAmountLimit: Number(grantedToday), // 既に消化済みで余地なし
+    });
+    const externalUserId = `provisioning-daily-${generateId()}`;
+    const res = await grant(app.getHttpServer(), integration, {
+      service_code: serviceCode,
+      external_user_id: externalUserId,
+      event_type: "ATTENDANCE",
+      event_id: `EVT-${generateId()}`,
+      amount: 100,
+      transaction_type: "AIART_ATTENDANCE",
+      display_name: "test",
+      idempotency_key: `key-${generateId()}`,
+    });
+    expect(res.status).toBe(400);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).toBeNull();
+  });
+
+  it("RewardRule上限超過時はAccountLink/OveAccount/Walletを作らない", async () => {
+    const serviceCode = "AIART";
+    const ruleBaseline = await prisma.oveTransaction.aggregate({
+      where: { transactionType: "AIART_ATTENDANCE", status: "COMPLETED" },
+      _sum: { amount: true },
+    });
+    const ruleBaselineSum = ruleBaseline._sum.amount ?? 0n;
+    await prisma.rewardRule.upsert({
+      where: { ruleCode: RULE_CODE },
+      update: { startsAt: null, endsAt: null, monthlyAmountLimit: null, globalAmountLimit: ruleBaselineSum },
+      create: {
+        id: generateId(),
+        ruleCode: RULE_CODE,
+        ruleName: "test",
+        sourceService: serviceCode,
+        rewardAmount: 10000,
+        approvalType: "AUTOMATIC",
+        status: "ACTIVE",
+        displayName: "test",
+        globalAmountLimit: ruleBaselineSum,
+      },
+    });
+
+    const integration = await createTestServiceIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    const externalUserId = `provisioning-rule-${generateId()}`;
+    const res = await grant(app.getHttpServer(), integration, {
+      service_code: serviceCode,
+      external_user_id: externalUserId,
+      event_type: "ATTENDANCE",
+      event_id: `EVT-${generateId()}`,
+      amount: 100,
+      transaction_type: "AIART_ATTENDANCE",
+      display_name: "test",
+      idempotency_key: `key-${generateId()}`,
+    });
+    expect(res.status).toBe(400);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).toBeNull();
+
+    // 他のdescribeブロックのテストに影響しないよう上限を解除しておく。
+    await prisma.rewardRule.updateMany({ where: { ruleCode: RULE_CODE }, data: { globalAmountLimit: null } });
+  });
+
+  it("SUSPENDED状態ではAccountLink/OveAccount/Walletを作らない", async () => {
+    const useCase = app.get(GrantExternalServiceRewardUseCase);
+    const serviceCode = "AIART";
+    const integration = await createTestServiceIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    const staleIntegration = await prisma.serviceIntegration.findUniqueOrThrow({ where: { id: integration.id } });
+    await prisma.serviceIntegration.update({ where: { id: integration.id }, data: { status: "SUSPENDED" } });
+
+    const externalUserId = `provisioning-suspended-${generateId()}`;
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration,
+        externalUserId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/suspended/);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).toBeNull();
+  });
+
+  it("REVOKED状態ではAccountLink/OveAccount/Walletを作らない", async () => {
+    const useCase = app.get(GrantExternalServiceRewardUseCase);
+    const serviceCode = "AIART";
+    const integration = await createTestServiceIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    const staleIntegration = await prisma.serviceIntegration.findUniqueOrThrow({ where: { id: integration.id } });
+    await prisma.serviceIntegration.update({ where: { id: integration.id }, data: { status: "REVOKED" } });
+
+    const externalUserId = `provisioning-revoked-${generateId()}`;
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration,
+        externalUserId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/revoked/);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).toBeNull();
+  });
+
+  it("正常付与時はOveAccount・Wallet・AccountLink・取引が作られる", async () => {
+    const integration = await createTestServiceIntegration("AIART", { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    const externalUserId = `provisioning-success-${generateId()}`;
+    const res = await grant(app.getHttpServer(), integration, {
+      service_code: "AIART",
+      external_user_id: externalUserId,
+      event_type: "ATTENDANCE",
+      event_id: `EVT-${generateId()}`,
+      amount: 100,
+      transaction_type: "AIART_ATTENDANCE",
+      display_name: "test",
+      idempotency_key: `key-${generateId()}`,
+    });
+    expect(res.status).toBe(201);
+
+    const link = await accountLinkFor(integration.id, externalUserId);
+    expect(link).not.toBeNull();
+    expect(link!.status).toBe("ACTIVE");
+    expect(link!.oveAccountId).not.toBeNull();
+
+    const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: link!.oveAccountId! } });
+    expect(account.status).toBe("ACTIVE");
+
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId: account.id } });
+    expect(wallet.availableBalance.toString()).toBe("100");
+
+    const transaction = await prisma.oveTransaction.findFirstOrThrow({ where: { walletId: wallet.id } });
+    expect(transaction.status).toBe("COMPLETED");
   });
 });

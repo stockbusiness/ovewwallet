@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { createTestServiceIntegration, signedHeaders } from "./test-helpers";
@@ -12,8 +12,14 @@ import { createTestServiceIntegration, signedHeaders } from "./test-helpers";
  * モジュール化後レビュー対応 P1-4: 同一identity/同一外部ユーザーへの同時初回登録
  * リクエストは、両方とも「未登録」判定を通過した後にaccount_identities/account_links
  * の一意制約で片方が失敗しうる (500応答になり、登録自体が失敗する不整合があった)。
- * `AccountRegistrationService`/`ExternalAccountProvisioningService`が一意制約違反を
- * 捕捉し、先に作成された側のアカウントを返すようになったことを検証する。
+ * `AccountRegistrationService`が一意制約違反を捕捉し、先に作成された側のアカウントを
+ * 返すようになったことを検証する (LINEログイン経路)。
+ *
+ * サービス連携 (account_links) 経由の同時初回付与については、PR #1最終修正で
+ * `GrantExternalServiceRewardUseCase`がServiceIntegration行ロック配下でアカウント解決も
+ * 行うようになり、同一ServiceIntegrationへの全リクエストがそこで直列化されるため、
+ * 一意制約違反そのものが起こらなくなった (`ExternalAccountProvisioningService`は
+ * 不要になり削除済み)。
  */
 describe("同時アカウント作成でも1ユーザーにつき1アカウント・500にならない (P1-4回帰)", () => {
   let app: INestApplication;

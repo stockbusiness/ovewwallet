@@ -1,31 +1,30 @@
 import { Injectable } from "@nestjs/common";
 import { type OveAccount } from "@ove/database";
-import { AccountRepository } from "./account.repository";
+import { AccountClosureService } from "./account-closure.service";
 import {
   AccountRegistrationService,
   CURRENT_TERMS_VERSION,
   type FindOrCreateIdentityParams,
 } from "./account-registration.service";
-import { ExternalAccountProvisioningService } from "./external-account-provisioning.service";
+import { AccountRepository } from "./account.repository";
 import { SessionManagementService } from "./session-management.service";
-import { AccountClosureService } from "./account-closure.service";
 
 export { CURRENT_TERMS_VERSION, type FindOrCreateIdentityParams };
 
 /**
  * リファクタリング指示書 Phase 2: 旧`AccountsService`はここまで縮小した
- * Facade。実装は`AccountRegistrationService`・`ExternalAccountProvisioningService`・
- * `CommonUserLinkingService`・`SessionManagementService`・`AccountClosureService`へ
- * 分割済みで、このクラスは既存の呼び出し元 (auth.service.ts, rewards.service.ts,
- * admin-migration.service.ts, accounts.controller.ts) との互換性を保つためだけに
- * 同じpublicメソッドシグネチャで委譲する。
+ * Facade。実装は`AccountRegistrationService`・`CommonUserLinkingService`・
+ * `SessionManagementService`・`AccountClosureService`へ分割済みで、このクラスは
+ * 既存の呼び出し元 (auth.service.ts, admin-migration.service.ts,
+ * accounts.controller.ts) との互換性を保つためだけに同じpublicメソッドシグネチャで
+ * 委譲する (外部サービスAPI経由のアカウント自動作成は`GrantExternalServiceRewardUseCase`
+ * がServiceIntegration行ロック配下で直接行うため、ここには存在しない。PR #1最終修正)。
  */
 @Injectable()
 export class AccountsService {
   constructor(
     private readonly accountRepository: AccountRepository,
     private readonly registration: AccountRegistrationService,
-    private readonly externalProvisioning: ExternalAccountProvisioningService,
     private readonly sessions: SessionManagementService,
     private readonly closure: AccountClosureService,
   ) {}
@@ -36,13 +35,6 @@ export class AccountsService {
 
   async findOrCreateByIdentity(params: FindOrCreateIdentityParams): Promise<OveAccount> {
     return this.registration.findOrCreateByIdentity(params);
-  }
-
-  async findOrCreateByServiceLink(params: {
-    serviceIntegrationId: string;
-    externalUserId: string;
-  }): Promise<OveAccount> {
-    return this.externalProvisioning.findOrCreateByServiceLink(params);
   }
 
   async listSessions(oveAccountId: string, currentSessionId: string) {

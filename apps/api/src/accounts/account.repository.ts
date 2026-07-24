@@ -120,7 +120,7 @@ export class AccountRepository {
     return client.oveAccount.findFirstOrThrow({ where: { wallet: { id: walletId } } });
   }
 
-  /** 新規アカウント作成 (`AccountRegistrationService`/`ExternalAccountProvisioningService`)。
+  /** 新規アカウント作成 (`AccountRegistrationService`/`GrantExternalServiceRewardUseCase`)。
    * 常に呼び出し元が開いた`$transaction`内から呼ぶため`tx`を必須にする。 */
   async create(tx: Prisma.TransactionClient, data: Prisma.OveAccountUncheckedCreateInput): Promise<OveAccount> {
     return tx.oveAccount.create({ data });
