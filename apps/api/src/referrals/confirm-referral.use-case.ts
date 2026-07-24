@@ -1,5 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { type OveTransaction, type PrismaClient, type WalletReferral } from "@ove/database";
+import {
+  generateId,
+  type OveTransaction,
+  type Prisma,
+  type PrismaClient,
+  type Wallet,
+  type WalletReferral,
+  type WalletReferralBenefit,
+} from "@ove/database";
 import { decryptSecret } from "@ove/auth";
 import { creditWalletInTransaction, lockWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
@@ -105,25 +113,20 @@ export class ConfirmReferralUseCase {
 
       const idempotencyKey = `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`;
 
-      // モジュール化後レビュー対応 P1-5: Phase 3の原子化以前に作られたデータでは、
-      // CREDIT取引は既に存在するのにbenefit/referralがPENDINGのまま、という不整合が
-      // 起こり得た (旧実装はCREDIT・状態更新が別トランザクションだったため)。
-      // 何も確認せずCREDITを作り直すと同じidempotencyKeyの一意制約違反で
-      // 恒久的に失敗し続けるため、既存取引の有無を確認し、あれば残高を変更せず
-      // 状態だけ整合させる (自己修復)。既存取引の内容が想定と異なる場合は
-      // 自動修復せず要レビューとして扱う。
+      // モジュール化後レビュー対応 P1-5、追加整合性対策P1-1で照合強化: Phase 3の原子化
+      // 以前に作られたデータでは、CREDIT取引は既に存在するのにbenefit/referralが
+      // PENDINGのまま、という不整合が起こり得た (旧実装はCREDIT・状態更新が別
+      // トランザクションだったため)。何も確認せずCREDITを作り直すと同じidempotencyKey
+      // の一意制約違反で恒久的に失敗し続けるため、既存取引の有無を確認し、あれば残高を
+      // 変更せず状態だけ整合させる (自己修復)。1項目でも一致しなければ自動修復せず
+      // 要レビューとして扱う。
       const existingTransaction = await tx.oveTransaction.findUnique({ where: { idempotencyKey } });
 
       let transaction: OveTransaction;
       if (existingTransaction) {
-        if (existingTransaction.walletId !== wallet.id || existingTransaction.amount !== benefit.amount) {
-          return {
-            action: "existing_transaction_mismatch_requires_review",
-            referral_id: referralInTx.id,
-            transaction_id: existingTransaction.id,
-          };
-        }
-        transaction = existingTransaction;
+        const healed = await this.reconcileExistingTransaction(tx, existingTransaction, wallet, benefit, referralInTx);
+        if (!healed.ok) return healed.result;
+        transaction = healed.transaction;
       } else {
         transaction = await creditWalletInTransaction(tx, {
           walletId: wallet.id,
@@ -148,6 +151,75 @@ export class ConfirmReferralUseCase {
 
       return { action: "confirmed", referral_id: referralInTx.id, transaction_id: transaction.id };
     });
+  }
+
+  /**
+   * 追加整合性対策P1-1: `confirmBenefitFromEvent`から分離した、既存CREDIT取引の照合ロジック。
+   * `creditWalletInTransaction`が本来設定するはずの全フィールドを網羅的に照合し、
+   * 完全一致時のみ既存取引をそのまま採用する (自己修復)。1項目でも不一致なら
+   * `REFERRAL_SELF_HEAL_MISMATCH`監査ログを残し、自動修復せず要レビューとして返す。
+   */
+  private async reconcileExistingTransaction(
+    tx: Prisma.TransactionClient,
+    existingTransaction: OveTransaction,
+    wallet: Wallet,
+    benefit: WalletReferralBenefit,
+    referralInTx: WalletReferral,
+  ): Promise<{ ok: true; transaction: OveTransaction } | { ok: false; result: ConfirmReferralResult }> {
+    const expectedMetadata = { referralId: referralInTx.id, benefitId: benefit.id };
+    const actualMetadata = existingTransaction.metadata as Record<string, unknown> | null;
+    const mismatch =
+      existingTransaction.walletId !== wallet.id ||
+      existingTransaction.amount !== benefit.amount ||
+      existingTransaction.transactionType !== "REFERRAL_REWARD" ||
+      existingTransaction.direction !== "CREDIT" ||
+      existingTransaction.status !== "COMPLETED" ||
+      existingTransaction.sourceService !== "AGENCY_SYSTEM" ||
+      existingTransaction.sourceReferenceId !== referralInTx.id ||
+      existingTransaction.createdByType !== "EXTERNAL_SERVICE" ||
+      actualMetadata?.["referralId"] !== expectedMetadata.referralId ||
+      actualMetadata?.["benefitId"] !== expectedMetadata.benefitId;
+
+    if (!mismatch) return { ok: true, transaction: existingTransaction };
+
+    await tx.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "SYSTEM",
+        actionType: "REFERRAL_SELF_HEAL_MISMATCH",
+        targetType: "wallet_referral",
+        targetId: referralInTx.id,
+        result: "FAILURE",
+        reason: `既存取引 ${existingTransaction.id} の内容が想定と一致しないため自動修復しない`,
+        beforeData: {
+          transactionId: existingTransaction.id,
+          walletId: existingTransaction.walletId,
+          amount: existingTransaction.amount.toString(),
+          transactionType: existingTransaction.transactionType,
+          direction: existingTransaction.direction,
+          status: existingTransaction.status,
+          sourceService: existingTransaction.sourceService,
+          sourceReferenceId: existingTransaction.sourceReferenceId,
+          createdByType: existingTransaction.createdByType,
+          metadata: existingTransaction.metadata,
+        },
+        afterData: {
+          expectedWalletId: wallet.id,
+          expectedAmount: benefit.amount.toString(),
+          expectedReferralId: referralInTx.id,
+          expectedBenefitId: benefit.id,
+        },
+      },
+    });
+
+    return {
+      ok: false,
+      result: {
+        action: "existing_transaction_mismatch_requires_review",
+        referral_id: referralInTx.id,
+        transaction_id: existingTransaction.id,
+      },
+    };
   }
 
   /**

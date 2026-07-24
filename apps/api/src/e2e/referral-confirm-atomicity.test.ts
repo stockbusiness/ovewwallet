@@ -130,8 +130,11 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId } });
 
     // Phase 3の原子化以前の旧実装由来を模した不整合データ: CREDIT取引は既に存在するが
-    // (残高にも反映済み)、benefit/referralはPENDINGのまま。
+    // (残高にも反映済み)、benefit/referralはPENDINGのまま。他の全フィールドは
+    // creditWalletInTransactionが実際に設定するものと完全一致させる (完全一致時のみ
+    // 自己修復することの回帰テストであるため)。
     const legacyIdempotencyKey = `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`;
+    const referral = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
     await prisma.oveTransaction.create({
       data: {
         id: generateId(),
@@ -145,9 +148,11 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
         balanceAfter: wallet.availableBalance + benefit.amount,
         displayName: "代理店紹介登録特典 (legacy)",
         sourceService: "AGENCY_SYSTEM",
+        sourceReferenceId: referral.id,
         idempotencyKey: legacyIdempotencyKey,
         completedAt: new Date(),
         createdByType: "EXTERNAL_SERVICE",
+        metadata: { referralId: referral.id, benefitId: benefit.id, eventId: "legacy-event" },
       },
     });
     await prisma.wallet.update({
@@ -183,4 +188,126 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
     const creditCount = await prisma.oveTransaction.count({ where: { idempotencyKey: legacyIdempotencyKey } });
     expect(creditCount).toBe(1);
   });
+
+  /**
+   * 追加整合性対策 P1-1: 自己修復照合の強化回帰。既存取引が1項目でも想定と異なれば
+   * 自動修復せず`existing_transaction_mismatch_requires_review`として扱い、
+   * 残高・状態を変更せず、監査ログ(REFERRAL_SELF_HEAL_MISMATCH)を残すことを検証する。
+   */
+  describe.each([
+    ["walletId不一致", (data: LegacyTxOverrides, otherWalletId: string) => ({ ...data, walletId: otherWalletId })],
+    ["amount不一致", (data: LegacyTxOverrides) => ({ ...data, amount: data.amount + 1 })],
+    ["transactionType不一致", (data: LegacyTxOverrides) => ({ ...data, transactionType: "ADMIN_GRANT" as const })],
+    ["direction不一致", (data: LegacyTxOverrides) => ({ ...data, direction: "DEBIT" as const })],
+    ["status不一致", (data: LegacyTxOverrides) => ({ ...data, status: "PENDING" as const })],
+    ["sourceService不一致", (data: LegacyTxOverrides) => ({ ...data, sourceService: "SHOPPING_SYSTEM" })],
+    ["sourceReferenceId不一致", (data: LegacyTxOverrides) => ({ ...data, sourceReferenceId: "wrong-referral-id" })],
+  ] as const)("旧紹介データ自己修復の照合強化 (追加整合性対策 P1-1回帰): %s", (_label, mutate) => {
+    it("自動修復せず要レビューとして扱い、残高・状態を変更せず監査ログを残す", async () => {
+      process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+      const server = app.getHttpServer();
+
+      const referralToken = `referral-mismatch-${generateId()}`;
+      const captureRes = await request(server).get(`/api/v1/referrals/capture?token=${referralToken}`).expect(302);
+      const referralCookieValue = (captureRes.headers["set-cookie"] as unknown as string[])
+        ?.find((c) => c.startsWith(`${REFERRAL_SESSION_COOKIE_NAME}=`))
+        ?.match(new RegExp(`${REFERRAL_SESSION_COOKIE_NAME}=([^;]+)`))?.[1];
+
+      const lineUserId = `e2e-referral-mismatch-${generateId()}`;
+      const login = await request(server)
+        .post("/api/v1/auth/line/login")
+        .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${referralCookieValue}`])
+        .send({ idToken: `mock.${lineUserId}`, termsAccepted: true })
+        .expect(201);
+      const oveAccountId = login.body.ove_account_id as string;
+
+      const benefit = await prisma.walletReferralBenefit.findUniqueOrThrow({
+        where: { idempotencyKey: `REFERRAL_SIGNUP_BONUS:${oveAccountId}` },
+      });
+      const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId } });
+      const referral = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
+
+      // walletId不一致ケース用に、実在する別のwalletを用意する (oveTransaction.walletIdは
+      // 外部キーのため、実在しないIDでは行自体を作成できない)。
+      const otherLogin = await request(server)
+        .post("/api/v1/auth/line/login")
+        .send({ idToken: `mock.other-${generateId()}`, termsAccepted: true })
+        .expect(201);
+      const otherWallet = await prisma.wallet.findUniqueOrThrow({
+        where: { oveAccountId: otherLogin.body.ove_account_id as string },
+      });
+
+      const baseData: LegacyTxOverrides = {
+        walletId: wallet.id,
+        amount: Number(benefit.amount),
+        transactionType: "REFERRAL_REWARD",
+        direction: "CREDIT",
+        status: "COMPLETED",
+        sourceService: "AGENCY_SYSTEM",
+        sourceReferenceId: referral.id,
+      };
+      const mutated = mutate(baseData, otherWallet.id);
+      const idempotencyKey = `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`;
+
+      await prisma.oveTransaction.create({
+        data: {
+          id: generateId(),
+          walletId: mutated.walletId,
+          transactionCode: `OVE-TXN-MISMATCH-${generateId()}`,
+          transactionType: mutated.transactionType,
+          direction: mutated.direction,
+          amount: mutated.amount,
+          status: mutated.status,
+          balanceBefore: wallet.availableBalance,
+          balanceAfter: wallet.availableBalance + BigInt(mutated.amount),
+          displayName: "代理店紹介登録特典 (mismatch fixture)",
+          sourceService: mutated.sourceService,
+          sourceReferenceId: mutated.sourceReferenceId,
+          idempotencyKey,
+          completedAt: new Date(),
+          createdByType: "EXTERNAL_SERVICE",
+          metadata: { referralId: referral.id, benefitId: benefit.id, eventId: "mismatch-fixture" },
+        },
+      });
+      const walletBeforeConfirm = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+
+      const referrals = new ReferralRepository(prisma);
+      const confirm = new ConfirmReferralUseCase(
+        prisma,
+        referrals,
+        new AgencyReferralClient(new AgencyReferralAdapter(new IntegrationHttpClient(), new IntegrationConfigProvider(prisma))),
+        new RejectReferralUseCase(referrals),
+        new AccountRepository(prisma),
+      );
+
+      const result = await confirm.confirmBenefitFromEvent({ walletUserId: oveAccountId, eventId: `mismatch-${generateId()}` });
+      expect(result.action).toBe("existing_transaction_mismatch_requires_review");
+
+      const benefitAfter = await prisma.walletReferralBenefit.findUniqueOrThrow({ where: { id: benefit.id } });
+      expect(benefitAfter.status).toBe("PENDING");
+
+      const referralAfter = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
+      expect(referralAfter.status).toBe("PENDING");
+
+      // walletIdが不一致のケースでは対象walletそのものが変わっていないため、
+      // このウォレットの残高は元々の(不整合fixture作成前の)値のまま。
+      const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+      expect(walletAfter.availableBalance.toString()).toBe(walletBeforeConfirm.availableBalance.toString());
+
+      const mismatchLogs = await prisma.auditLog.findMany({
+        where: { targetType: "wallet_referral", targetId: referral.id, actionType: "REFERRAL_SELF_HEAL_MISMATCH" },
+      });
+      expect(mismatchLogs).toHaveLength(1);
+    });
+  });
 });
+
+interface LegacyTxOverrides {
+  walletId: string;
+  amount: number;
+  transactionType: "REFERRAL_REWARD" | "ADMIN_GRANT";
+  direction: "CREDIT" | "DEBIT";
+  status: "COMPLETED" | "PENDING";
+  sourceService: string;
+  sourceReferenceId: string;
+}
