@@ -67,8 +67,17 @@ jobs:
       - name: Apply migrations to the test database
         run: pnpm db:migrate:test
 
+      # apps/user-wallet/next.config.mjsのrewrites() (/api/*をAPIサーバーへ転送) は
+      # NEXT_PUBLIC_API_URL未設定時に無効化され、この設定はnext buildの時点で
+      # .next/routes-manifest.jsonに焼き込まれる (next start時に再評価されない)。
+      # ローカル開発では各自のapps/user-wallet/.env.local (gitignore対象、CIには存在しない)
+      # が設定しているため、CIでのみこの転送が無効なまま動いてしまい、LINEモック
+      # ログイン後のフェッチがAPIへ届かず応答が返らなくなっていた (追加整合性対策P1-2で
+      # 発覚、詳細はテスト実行結果参照)。
       - name: Build (packages + apps, includes typecheck for Next.js apps)
         run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
 
       # apps/admin-wallet・apps/user-wallet の各`lint` (`next lint`) はESLint未設定のため
       # 対話プロンプトを要求してCIでは失敗する。型チェック自体は上のbuildステップ
