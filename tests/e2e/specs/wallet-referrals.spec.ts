@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { prisma } from "@ove/database";
 import { createTestAdmin, disconnect } from "../support/seed";
+import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
@@ -24,7 +25,7 @@ test.describe("代理店紹介トークン受け入れ: /invite/{token} → LINE
     const referredPage = await referredCtx.newPage();
 
     await referredPage.goto(`${APP_URL}/invite/${referralToken}`);
-    await referredPage.waitForURL(`${APP_URL}/login`, { timeout: 10_000 });
+    await referredPage.waitForURL(`${APP_URL}/login`, { timeout: NAV_TIMEOUT_SHORT });
 
     const loginResponsePromise = referredPage.waitForResponse(
       (res) => res.url().includes("/api/v1/auth/line/login") && res.request().method() === "POST",
@@ -33,7 +34,7 @@ test.describe("代理店紹介トークン受け入れ: /invite/{token} → LINE
     await referredPage.getByRole("button", { name: "LINEでログイン" }).click();
     const loginResponse = await loginResponsePromise;
     const { ove_account_id: oveAccountId } = (await loginResponse.json()) as { ove_account_id: string };
-    await referredPage.waitForURL(/\/wallet$/, { timeout: 15_000 });
+    await referredPage.waitForURL(/\/wallet$/, { timeout: NAV_TIMEOUT });
 
     const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: oveAccountId } });
     const referral = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
@@ -46,11 +47,11 @@ test.describe("代理店紹介トークン受け入れ: /invite/{token} → LINE
     await adminPage.getByLabel("メールアドレス").fill(admin.email);
     await adminPage.getByLabel("パスワード").fill(admin.password);
     await adminPage.getByRole("button", { name: "ログイン" }).click();
-    await adminPage.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+    await adminPage.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 
     await adminPage.goto(`${ADMIN_URL}/wallet-referrals`);
     const row = adminPage.locator("tr", { hasText: account.accountCode });
-    await expect(row).toBeVisible({ timeout: 10_000 });
+    await expect(row).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
     await expect(row).toContainText("登録済み・確認待ち");
     await expect(row).toContainText("3,000 OVE (PENDING)");
   });

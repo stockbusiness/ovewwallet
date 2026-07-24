@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createTestAdmin, createTestWallet, disconnect } from "../support/seed";
+import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
 
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
 
@@ -8,7 +9,7 @@ async function login(page: import("@playwright/test").Page, email: string, passw
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill(password);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+  await page.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 }
 
 /**
@@ -37,7 +38,7 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     await requesterPage.getByLabel("理由").fill("Playwright E2E: 重複アカウント");
     await requesterPage.getByRole("button", { name: "内容を確認する" }).click();
     await requesterPage.getByRole("button", { name: "申請する" }).click();
-    await expect(requesterPage.getByText("統合の申請を送信しました。")).toBeVisible({ timeout: 10_000 });
+    await expect(requesterPage.getByText("統合の申請を送信しました。")).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
 
     await requesterPage.getByRole("link", { name: "二段階承認画面" }).click();
     await requesterPage.waitForURL(/\/approval-requests$/);
@@ -47,7 +48,7 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     // 申請者本人による承認は職務分離違反として拒否される。他のテストが残した申請も
     // 一覧に並ぶため、このテストの行に絞って承認ボタンを押す。
     await requesterPage.locator("tr", { hasText: mergeRowText }).getByRole("button", { name: "承認" }).click();
-    await expect(requesterPage.getByText(/失敗|separation of duties/)).toBeVisible({ timeout: 10_000 });
+    await expect(requesterPage.getByText(/失敗|separation of duties/)).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
 
     // 拒否されているので、統合元の残高はまだ動いていない (利用可能残高・累計獲得の
     // 2箇所に同じ値が表示されるため、いずれかが見えていればよい)。
@@ -61,10 +62,10 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     await approverPage.goto(`${ADMIN_URL}/approval-requests`);
     await approverPage.locator("tr", { hasText: mergeRowText }).getByRole("button", { name: "承認" }).click();
     await expect(approverPage.locator("tr", { hasText: mergeRowText })).toContainText("APPROVED", {
-      timeout: 10_000,
+      timeout: NAV_TIMEOUT_SHORT,
     });
 
     await approverPage.goto(`${ADMIN_URL}/wallets/${target.walletId}`);
-    await expect(approverPage.getByText("2,500 OVE").first()).toBeVisible({ timeout: 10_000 }); // 500 + 2000
+    await expect(approverPage.getByText("2,500 OVE").first()).toBeVisible({ timeout: NAV_TIMEOUT_SHORT }); // 500 + 2000
   });
 });

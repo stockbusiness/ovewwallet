@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { computeTotpCode } from "@ove/auth";
 import { createTestAdmin, disconnect } from "../support/seed";
+import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
 
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
 
@@ -21,7 +22,7 @@ test.describe("admin-wallet: 管理者MFAのセットアップ→ログイン", 
     await page.getByLabel("メールアドレス").fill(email);
     await page.getByLabel("パスワード").fill(password);
     await page.getByRole("button", { name: "ログイン" }).click();
-    await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+    await page.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 
     await page.goto(`${ADMIN_URL}/security`);
     await expect(page.getByText("無効")).toBeVisible();
@@ -32,19 +33,19 @@ test.describe("admin-wallet: 管理者MFAのセットアップ→ログイン", 
 
     await page.getByLabel("認証アプリに表示された6桁のコード").fill(computeTotpCode(secret!.trim()));
     await page.getByRole("button", { name: "確認して有効化" }).click();
-    await expect(page.getByText("二要素認証を有効化しました")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("二要素認証を有効化しました")).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
     await expect(page.getByText("有効", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "ログアウト" }).click();
-    await page.waitForURL(/\/login$/, { timeout: 10_000 });
+    await page.waitForURL(/\/login$/, { timeout: NAV_TIMEOUT_SHORT });
 
     await page.getByLabel("メールアドレス").fill(email);
     await page.getByLabel("パスワード").fill(password);
     await page.getByRole("button", { name: "ログイン" }).click();
 
-    await expect(page.getByRole("heading", { name: "二要素認証" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "二要素認証" })).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
     await page.getByLabel("認証コード").fill(computeTotpCode(secret!.trim()));
     await page.getByRole("button", { name: "確認してログイン" }).click();
-    await page.waitForURL(/\/dashboard$/, { timeout: 15_000 });
+    await page.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
   });
 });
