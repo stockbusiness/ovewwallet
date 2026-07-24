@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { type PrismaClient, type WalletReferral } from "@ove/database";
+import { type OveTransaction, type PrismaClient, type WalletReferral } from "@ove/database";
 import { decryptSecret } from "@ove/auth";
 import { creditWalletInTransaction, lockWallet } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
@@ -103,17 +103,40 @@ export class ConfirmReferralUseCase {
         return { action: "benefit_not_pending", referral_id: referralInTx.id, benefit_status: benefit.status };
       }
 
-      const transaction = await creditWalletInTransaction(tx, {
-        walletId: wallet.id,
-        amount: benefit.amount,
-        transactionType: "REFERRAL_REWARD",
-        idempotencyKey: `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`,
-        displayName: "代理店紹介登録特典",
-        sourceService: "AGENCY_SYSTEM",
-        sourceReferenceId: referralInTx.id,
-        createdByType: "EXTERNAL_SERVICE",
-        metadata: { referralId: referralInTx.id, benefitId: benefit.id, eventId: params.eventId },
-      });
+      const idempotencyKey = `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`;
+
+      // モジュール化後レビュー対応 P1-5: Phase 3の原子化以前に作られたデータでは、
+      // CREDIT取引は既に存在するのにbenefit/referralがPENDINGのまま、という不整合が
+      // 起こり得た (旧実装はCREDIT・状態更新が別トランザクションだったため)。
+      // 何も確認せずCREDITを作り直すと同じidempotencyKeyの一意制約違反で
+      // 恒久的に失敗し続けるため、既存取引の有無を確認し、あれば残高を変更せず
+      // 状態だけ整合させる (自己修復)。既存取引の内容が想定と異なる場合は
+      // 自動修復せず要レビューとして扱う。
+      const existingTransaction = await tx.oveTransaction.findUnique({ where: { idempotencyKey } });
+
+      let transaction: OveTransaction;
+      if (existingTransaction) {
+        if (existingTransaction.walletId !== wallet.id || existingTransaction.amount !== benefit.amount) {
+          return {
+            action: "existing_transaction_mismatch_requires_review",
+            referral_id: referralInTx.id,
+            transaction_id: existingTransaction.id,
+          };
+        }
+        transaction = existingTransaction;
+      } else {
+        transaction = await creditWalletInTransaction(tx, {
+          walletId: wallet.id,
+          amount: benefit.amount,
+          transactionType: "REFERRAL_REWARD",
+          idempotencyKey,
+          displayName: "代理店紹介登録特典",
+          sourceService: "AGENCY_SYSTEM",
+          sourceReferenceId: referralInTx.id,
+          createdByType: "EXTERNAL_SERVICE",
+          metadata: { referralId: referralInTx.id, benefitId: benefit.id, eventId: params.eventId },
+        });
+      }
 
       await this.referrals.updateBenefit(
         benefit.id,

@@ -103,4 +103,84 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
     const referralAfter = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
     expect(referralAfter.status).toBe("CONFIRMED");
   });
+
+  it("モジュール化後レビュー対応 P1-5回帰: 旧実装由来のCREDIT既存+PENDING状態を、二重付与せず自己修復する", async () => {
+    process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+    const server = app.getHttpServer();
+
+    const referralToken = `referral-selfheal-${generateId()}`;
+    const captureRes = await request(server).get(`/api/v1/referrals/capture?token=${referralToken}`).expect(302);
+    const referralCookieValue = (captureRes.headers["set-cookie"] as unknown as string[])
+      ?.find((c) => c.startsWith(`${REFERRAL_SESSION_COOKIE_NAME}=`))
+      ?.match(new RegExp(`${REFERRAL_SESSION_COOKIE_NAME}=([^;]+)`))?.[1];
+    expect(referralCookieValue).toBeDefined();
+
+    const lineUserId = `e2e-referral-selfheal-${generateId()}`;
+    const login = await request(server)
+      .post("/api/v1/auth/line/login")
+      .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${referralCookieValue}`])
+      .send({ idToken: `mock.${lineUserId}`, termsAccepted: true })
+      .expect(201);
+    const oveAccountId = login.body.ove_account_id as string;
+
+    const benefit = await prisma.walletReferralBenefit.findUniqueOrThrow({
+      where: { idempotencyKey: `REFERRAL_SIGNUP_BONUS:${oveAccountId}` },
+    });
+    expect(benefit.status).toBe("PENDING");
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId } });
+
+    // Phase 3の原子化以前の旧実装由来を模した不整合データ: CREDIT取引は既に存在するが
+    // (残高にも反映済み)、benefit/referralはPENDINGのまま。
+    const legacyIdempotencyKey = `REFERRAL_SIGNUP_BONUS_CONFIRMED:${benefit.id}`;
+    await prisma.oveTransaction.create({
+      data: {
+        id: generateId(),
+        walletId: wallet.id,
+        transactionCode: `OVE-TXN-LEGACY-${generateId()}`,
+        transactionType: "REFERRAL_REWARD",
+        direction: "CREDIT",
+        amount: benefit.amount,
+        status: "COMPLETED",
+        balanceBefore: wallet.availableBalance,
+        balanceAfter: wallet.availableBalance + benefit.amount,
+        displayName: "代理店紹介登録特典 (legacy)",
+        sourceService: "AGENCY_SYSTEM",
+        idempotencyKey: legacyIdempotencyKey,
+        completedAt: new Date(),
+        createdByType: "EXTERNAL_SERVICE",
+      },
+    });
+    await prisma.wallet.update({
+      where: { id: wallet.id },
+      data: { availableBalance: { increment: benefit.amount }, lifetimeCredited: { increment: benefit.amount } },
+    });
+    const walletBeforeConfirm = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+
+    const referrals = new ReferralRepository(prisma);
+    const confirm = new ConfirmReferralUseCase(
+      prisma,
+      referrals,
+      new AgencyReferralClient(new AgencyReferralAdapter(new IntegrationHttpClient(), new IntegrationConfigProvider(prisma))),
+      new RejectReferralUseCase(referrals),
+      new AccountRepository(prisma),
+    );
+
+    const result = await confirm.confirmBenefitFromEvent({ walletUserId: oveAccountId, eventId: `selfheal-${generateId()}` });
+    expect(result.action).toBe("confirmed");
+    expect(result.transaction_id).toBeTruthy();
+
+    const benefitAfter = await prisma.walletReferralBenefit.findUniqueOrThrow({ where: { id: benefit.id } });
+    expect(benefitAfter.status).toBe("CONFIRMED");
+    expect(benefitAfter.ledgerTransactionId).toBe(result.transaction_id);
+
+    const referralAfter = await prisma.walletReferral.findUniqueOrThrow({ where: { walletUserId: oveAccountId } });
+    expect(referralAfter.status).toBe("CONFIRMED");
+
+    // 残高は二重加算されていない (既存のlegacy CREDITの分だけで変化なし)。
+    const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(walletAfter.availableBalance.toString()).toBe(walletBeforeConfirm.availableBalance.toString());
+
+    const creditCount = await prisma.oveTransaction.count({ where: { idempotencyKey: legacyIdempotencyKey } });
+    expect(creditCount).toBe(1);
+  });
 });
