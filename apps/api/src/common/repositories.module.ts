@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 import { AccountRepository } from "../accounts/account.repository";
+import { CommonUserLinkingUseCase } from "../accounts/common-user-linking.use-case";
 import { RewardRuleRepository } from "../rewards/reward-rule.repository";
 
 /**
@@ -12,10 +13,15 @@ import { RewardRuleRepository } from "../rewards/reward-rule.repository";
  * 逆に`ReferralsModule`が`AccountsModule`をimportすると循環になる)、循環依存や
  * 迂遠な再exportが発生するため、`PrismaModule`と同様に`@Global()`にして
  * `AppModule`で一度だけ読み込む。
+ *
+ * 追加整合性対策P0-1: `CommonUserLinkingUseCase`も同じ理由で同居させる。
+ * `AccountsModule`の`CommonUserLinkingService`と`CommonEventsModule`の
+ * `CommonUserResolvedHandler`/`CommonUserMergedHandler`という、互いにimport
+ * 関係のない2モジュールの双方から同一ロジックを使う必要があるため。
  */
 @Global()
 @Module({
-  providers: [AccountRepository, RewardRuleRepository],
-  exports: [AccountRepository, RewardRuleRepository],
+  providers: [AccountRepository, RewardRuleRepository, CommonUserLinkingUseCase],
+  exports: [AccountRepository, RewardRuleRepository, CommonUserLinkingUseCase],
 })
 export class RepositoriesModule {}

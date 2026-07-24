@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { CommonUserMergedEventSchema, type CommonEventBody } from "@ove/shared-types";
-import { AdminApprovalService } from "../../admin/admin-approval.service";
 import { AccountRepository } from "../../accounts/account.repository";
+import { CommonUserLinkingUseCase } from "../../accounts/common-user-linking.use-case";
+import { AdminApprovalService } from "../../admin/admin-approval.service";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
 
 /**
@@ -24,9 +25,10 @@ export class CommonUserMergedHandler implements CommonEventHandler {
   constructor(
     private readonly approvals: AdminApprovalService,
     private readonly accountRepository: AccountRepository,
+    private readonly linking: CommonUserLinkingUseCase,
   ) {}
 
-  async handle(_context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
+  async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
     if (!body.common_user_id) throw new BadRequestException("common_user_id is required");
     // 正式フィールドを優先し、未指定の送信元向けにmetadataを後方互換fallbackとして扱う。
     const previousCommonUserId =
@@ -45,7 +47,20 @@ export class CommonUserMergedHandler implements CommonEventHandler {
     if (accounts.length === 1) {
       const account = accounts[0]!;
       if (account.commonUserId !== body.common_user_id) {
-        await this.accountRepository.linkCommonUser(account.id, body.common_user_id);
+        // 追加整合性対策P0-1: `CommonUserLinkingUseCase`経由にすることで、他アカウントが
+        // 既にこの値を保持している場合 (通常は起こらない想定のレアケース。
+        // common_user.merged自体が矛盾したイベント順序を示唆する) も advisory lock越しに
+        // 権威ある競合判定を行い、自動判断せず要レビューとして扱う。
+        const result = await this.linking.link({
+          accountId: account.id,
+          commonUserId: body.common_user_id,
+          actorType: "EXTERNAL_SERVICE",
+          actorId: context.authenticatedSourceSystemKey,
+          reasonContext: `event_id=${body.event_id}`,
+        });
+        if (result.action === "conflict_requires_review") {
+          return { action: "relink_conflict_requires_review", ove_account_id: account.id };
+        }
       }
       return { action: "relinked", ove_account_id: account.id };
     }

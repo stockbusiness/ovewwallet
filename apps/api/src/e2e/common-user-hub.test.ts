@@ -3,13 +3,13 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { encryptSecret, hashSecret } from "@ove/auth";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
-import { encryptSecret, hashSecret } from "@ove/auth";
+import { AccountsService } from "../accounts/accounts.service";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
-import { AccountsService } from "../accounts/accounts.service";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "test-only-insecure-encryption-key";
 const CONFIG_ID = "default";
@@ -132,7 +132,10 @@ describe("共通顧客HUBへのcommon_user_id解決 (外部開発者向け連携
   });
 
   it("モジュール化後レビュー対応 P1-2回帰: HUBが他アカウントに設定済みのcommon_user_idを返しても自動設定しない", async () => {
-    const sharedCommonUserId = "cu_test_conflict_from_hub";
+    // テストDBは各テスト後の自動truncateが無く行が永続するため、固定リテラルは
+    // 過去の実行の残留データと衝突しうる (実際に発生した実例あり)。テスト実行ごとに
+    // 一意な値を使う。
+    const sharedCommonUserId = `cu_test_conflict_from_hub_${generateId()}`;
     const existingAccountId = generateId();
     await prisma.oveAccount.create({
       data: {

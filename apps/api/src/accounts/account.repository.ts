@@ -77,9 +77,11 @@ export class AccountRepository {
   }
 
   /**
-   * モジュール化後レビュー対応 P1-2: `common_user_id`はUNIQUE制約が無いため、
-   * 自アカウント以外に同じ値が既に設定されていないか、保存前に必ず確認する
+   * 他アカウントに同じ`common_user_id`が既に設定されていないか確認する
    * (`common_user.resolved`受信時・`CommonUserHubClient.resolve`後の両経路で使用)。
+   * 追加整合性対策P0-1: `CommonUserLinkingUseCase.link`が`lockByCommonUserId`
+   * (advisory lock) 取得後のトランザクション内でこれを呼ぶことで、事前確認
+   * (TOCTOU) ではなく権威ある競合判定として機能する。
    */
   async findConflictingCommonUserLinks(
     commonUserId: string,
@@ -87,6 +89,21 @@ export class AccountRepository {
     client: Db = this.db,
   ): Promise<OveAccount[]> {
     return client.oveAccount.findMany({ where: { commonUserId, id: { not: excludeAccountId } } });
+  }
+
+  /**
+   * 追加整合性対策P0-1: `common_user_id`単位のPostgreSQL advisory lock
+   * (`pg_advisory_xact_lock`、トランザクション終了時に自動解放) を取得する。
+   * 同じcommon_user_idへの並行`link()`呼び出しを直列化し、異なるcommon_user_id
+   * 同士は互いにブロックしない (`reward_rules`行ロックと異なり専用テーブルの
+   * 行が無いため、値そのものをロックキーにする)。呼び出し元の`$transaction`内で、
+   * 競合再確認より前に呼ぶこと。
+   */
+  async lockByCommonUserId(commonUserId: string, tx: Prisma.TransactionClient): Promise<void> {
+    // pg_advisory_xact_lockはvoidを返すため、行の列型を解釈しようとする$queryRawでは
+    // "Failed to deserialize column of type 'void'"になる。副作用 (ロック取得) だけが
+    // 目的なので$executeRawを使う。
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${commonUserId})::bigint)`;
   }
 
   async findFirstByWalletIdOrThrow(walletId: string, client: Db = this.db): Promise<OveAccount> {
