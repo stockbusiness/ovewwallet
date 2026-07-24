@@ -93,3 +93,13 @@ jobs:
 
       - name: Test (jest e2e + vitest unit tests)
         run: pnpm test
+
+      # 追加整合性対策 P1-2: 独立Playwright E2Eワークスペース (tests/e2e, @ove/e2e) は
+      # これまでCIで実行されておらず、ローカルでの手動実行にのみ依存していた。
+      # このrunnerには開発コンテナのようなブラウザの事前インストールが無いため、実行前に
+      # インストールする (依存パッケージも含める。ubuntu-latestではsudoなしで動く)。
+      - name: Install Playwright Chromium
+        run: pnpm --filter @ove/e2e exec playwright install --with-deps chromium
+
+      - name: Test (independent Playwright E2E)
+        run: pnpm test:e2e
