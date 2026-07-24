@@ -32,12 +32,19 @@ export interface GrantExternalServiceRewardResult {
  * 本UseCaseは単一トランザクション内で以下を順に行う:
  * 1. idempotency再確認
  * 2. ServiceIntegration行ロック (`ServiceIntegrationRepository.lockById`)
- * 3. perRequestAmountLimit確認
+ * 3. 最新ServiceIntegrationの再取得・status/serviceCode/perRequestAmountLimit確認
  * 4. dailyAmountLimit集計・確認 (ロック後のため同一ServiceIntegrationへの並行付与は直列化済み)
  * 5-7. RewardRule行ロック・上限確認・CREDIT (`GrantRewardUseCase.executeInTransaction`を共有)
  *
  * ロック順序はデッドロック防止のため ServiceIntegration → RewardRule → Wallet で統一する
  * (`GrantRewardUseCase.executeInTransaction`内の順序と整合)。
+ *
+ * PR #1最終修正: `lockById`はロックを取得するだけで行の内容を返さないため、以前は
+ * ロック後も呼び出し元 (`ExternalApiAuthGuard`が認証時に読んだスナップショット) の
+ * `params.serviceIntegration`をそのまま使っていた。ロック待ち中に管理者が
+ * status/serviceCode/perRequestAmountLimit/dailyAmountLimitを変更した場合、古い設定で
+ * CREDITされてしまう不整合があった。ロック後は`findById`で必ず再取得し、`params.serviceIntegration`
+ * は対象行を特定するための`.id`以外に使わない。
  */
 @Injectable()
 export class GrantExternalServiceRewardUseCase {
@@ -55,26 +62,35 @@ export class GrantExternalServiceRewardUseCase {
     });
     if (existing) return { transaction: existing };
 
-    if (params.amount > params.serviceIntegration.perRequestAmountLimit) {
-      throw new BadRequestException(
-        `amount exceeds per_request_amount_limit (${params.serviceIntegration.perRequestAmountLimit.toString()})`,
-      );
-    }
-
     try {
       const transaction = await this.db.$transaction(async (tx) => {
         await this.serviceIntegrations.lockById(params.serviceIntegration.id, tx);
+
+        const current = await this.serviceIntegrations.findById(params.serviceIntegration.id, tx);
+        if (!current) {
+          throw new BadRequestException("service integration not found");
+        }
+        if (current.status !== "ACTIVE") {
+          throw new BadRequestException(`service integration is ${current.status.toLowerCase()}`);
+        }
+        if (current.serviceCode !== params.serviceIntegration.serviceCode) {
+          throw new BadRequestException("service_code does not match the authenticated service integration");
+        }
 
         const existingInTx = await tx.oveTransaction.findUnique({
           where: { idempotencyKey: params.idempotencyKey },
         });
         if (existingInTx) return existingInTx;
 
+        if (params.amount > current.perRequestAmountLimit) {
+          throw new BadRequestException(`amount exceeds per_request_amount_limit (${current.perRequestAmountLimit.toString()})`);
+        }
+
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayGranted = await tx.oveTransaction.aggregate({
           where: {
-            sourceService: params.serviceIntegration.serviceCode,
+            sourceService: current.serviceCode,
             status: "COMPLETED",
             direction: "CREDIT",
             occurredAt: { gte: todayStart },
@@ -82,7 +98,7 @@ export class GrantExternalServiceRewardUseCase {
           _sum: { amount: true },
         });
         const grantedToday = todayGranted._sum.amount ?? 0n;
-        if (grantedToday + params.amount > params.serviceIntegration.dailyAmountLimit) {
+        if (grantedToday + params.amount > current.dailyAmountLimit) {
           throw new BadRequestException("daily_amount_limit for this service has been exceeded");
         }
 
@@ -93,10 +109,10 @@ export class GrantExternalServiceRewardUseCase {
           idempotencyKey: params.idempotencyKey,
           displayName: params.displayName,
           description: params.description,
-          sourceService: params.serviceIntegration.serviceCode,
+          sourceService: current.serviceCode,
           sourceReferenceId: params.sourceReferenceId,
           createdByType: "EXTERNAL_SERVICE",
-          createdById: params.serviceIntegration.id,
+          createdById: current.id,
           metadata: params.metadata,
           ruleCode: params.ruleCode,
         });

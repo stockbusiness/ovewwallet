@@ -1,11 +1,12 @@
 import "reflect-metadata";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { prisma, generateId, type ServiceIntegration } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
+import { GrantExternalServiceRewardUseCase } from "../rewards/grant-external-service-reward.use-case";
 import { createTestServiceIntegration, signedHeaders, type TestServiceIntegration } from "./test-helpers";
 
 const GRANT_PATH = "/api/v1/rewards/grant";
@@ -334,5 +335,142 @@ describe("ServiceIntegration日次上限: 並行付与でも突破しない (追
 
     const successCount = results.filter((r) => r.status === 201).length;
     expect(successCount).toBe(1);
+  });
+});
+
+async function createAccountWithWallet(): Promise<{ accountId: string }> {
+  const accountId = generateId();
+  await prisma.oveAccount.create({
+    data: { id: accountId, accountCode: `OVE-ACC-TEST-${generateId()}`, status: "ACTIVE" },
+  });
+  await prisma.wallet.create({
+    data: { id: generateId(), oveAccountId: accountId, walletCode: `OVE-WLT-TEST-${generateId()}`, status: "ACTIVE" },
+  });
+  return { accountId };
+}
+
+/**
+ * PR #1最終修正: `ServiceIntegration`行を`FOR UPDATE`でロックした後も、認証時に取得した
+ * 古い`params.serviceIntegration`スナップショットを上限判定へ使っていた回帰があった。
+ * ロック後は`ServiceIntegrationRepository.findById`で必ず再取得し、その値だけを使うことを
+ * 検証する。`ExternalApiAuthGuard`は認証時点で`status: "ACTIVE"`の行しか通さないため、
+ * 「ロック待ち中の変更」を実際のHTTPリクエストのタイミングだけで再現するのは難しい。
+ * ここではUseCase自体を直接呼び出し、DBの最新状態と食い違う古いオブジェクトを
+ * 明示的に渡すことで、DB最新値が優先されることを確定的に検証する。
+ */
+describe("ServiceIntegration最新状態の再取得 (PR #1最終修正回帰)", () => {
+  let useCase: GrantExternalServiceRewardUseCase;
+
+  beforeAll(() => {
+    useCase = app.get(GrantExternalServiceRewardUseCase);
+  });
+
+  async function freshIntegration(serviceCode: string, overrides: Partial<{ perRequestAmountLimit: number; dailyAmountLimit: number }> = {}) {
+    const integration = await createTestServiceIntegration(serviceCode, overrides);
+    return prisma.serviceIntegration.findUniqueOrThrow({ where: { id: integration.id } });
+  }
+
+  it("古いServiceIntegrationオブジェクトを渡してもperRequestAmountLimitはDB最新値を使う", async () => {
+    const serviceCode = "AIART";
+    const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    // staleIntegrationを取得した後にDB側の上限を引き下げる (ロック待ち中の変更に相当)。
+    await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { perRequestAmountLimit: 100 } });
+
+    const { accountId } = await createAccountWithWallet();
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration as ServiceIntegration,
+        oveAccountId: accountId,
+        amount: 500n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-stale-per-request-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/per_request_amount_limit/);
+  });
+
+  it("古いServiceIntegrationオブジェクトを渡してもdailyAmountLimitはDB最新値を使う", async () => {
+    const serviceCode = "AIART";
+    const grantedToday = await todaysGrantedSum(serviceCode);
+    const staleIntegration = await freshIntegration(serviceCode, {
+      perRequestAmountLimit: 1_000_000,
+      dailyAmountLimit: Number(grantedToday) + 100_000,
+    });
+    // ロック待ち中に日次上限が引き下げられ、既に消化済みの金額を下回った状態を再現する。
+    await prisma.serviceIntegration.update({
+      where: { id: staleIntegration.id },
+      data: { dailyAmountLimit: Number(grantedToday) },
+    });
+
+    const { accountId } = await createAccountWithWallet();
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration as ServiceIntegration,
+        oveAccountId: accountId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-stale-daily-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/daily_amount_limit/);
+  });
+
+  it("ロック待ち中にstatusがSUSPENDEDへ変更されていればCREDITしない", async () => {
+    const serviceCode = "AIART";
+    const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { status: "SUSPENDED" } });
+
+    const { accountId } = await createAccountWithWallet();
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration as ServiceIntegration,
+        oveAccountId: accountId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-stale-suspended-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/suspended/);
+
+    const transactions = await prisma.oveTransaction.findMany({
+      where: { idempotencyKey: { startsWith: "key-stale-suspended-" } },
+    });
+    expect(transactions).toHaveLength(0);
+  });
+
+  it("ロック待ち中にstatusがREVOKEDへ変更されていればCREDITしない", async () => {
+    const serviceCode = "AIART";
+    const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    await prisma.serviceIntegration.update({ where: { id: staleIntegration.id }, data: { status: "REVOKED" } });
+
+    const { accountId } = await createAccountWithWallet();
+    await expect(
+      useCase.execute({
+        serviceIntegration: staleIntegration as ServiceIntegration,
+        oveAccountId: accountId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-stale-revoked-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/revoked/);
+  });
+
+  it("serviceCodeがDB側と食い違う場合はCREDITしない", async () => {
+    const serviceCode = "AIART";
+    const staleIntegration = await freshIntegration(serviceCode, { perRequestAmountLimit: 1_000_000, dailyAmountLimit: 1_000_000 });
+    const tampered = { ...staleIntegration, serviceCode: "SENGOKU_EC" } as ServiceIntegration;
+
+    const { accountId } = await createAccountWithWallet();
+    await expect(
+      useCase.execute({
+        serviceIntegration: tampered,
+        oveAccountId: accountId,
+        amount: 100n,
+        transactionType: "AIART_ATTENDANCE",
+        idempotencyKey: `key-stale-servicecode-${generateId()}`,
+        displayName: "test",
+      }),
+    ).rejects.toThrow(/service_code/);
   });
 });
