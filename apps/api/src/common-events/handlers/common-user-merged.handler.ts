@@ -47,18 +47,20 @@ export class CommonUserMergedHandler implements CommonEventHandler {
     if (accounts.length === 1) {
       const account = accounts[0]!;
       if (account.commonUserId !== body.common_user_id) {
-        // 追加整合性対策P0-1: `CommonUserLinkingUseCase`経由にすることで、他アカウントが
-        // 既にこの値を保持している場合 (通常は起こらない想定のレアケース。
-        // common_user.merged自体が矛盾したイベント順序を示唆する) も advisory lock越しに
-        // 権威ある競合判定を行い、自動判断せず要レビューとして扱う。
-        const result = await this.linking.link({
+        // PR #1最終修正: 通常リンク用の`link()`は「対象アカウントに既に別の値が
+        // 設定済み = 競合」として扱うため、旧IDから新IDへの正当な再紐づけを弾いて
+        // しまう回帰があった。旧ID→新IDの移行専用の`relinkAfterMerge()`を使う
+        // (両IDのadvisory lockをソート順で取得し、逆順で同時に来る2つのmerge
+        // イベント同士がデッドロックしないようにする)。
+        const result = await this.linking.relinkAfterMerge({
           accountId: account.id,
-          commonUserId: body.common_user_id,
+          expectedPreviousCommonUserId: previousCommonUserId,
+          newCommonUserId: body.common_user_id,
           actorType: "EXTERNAL_SERVICE",
           actorId: context.authenticatedSourceSystemKey,
           reasonContext: `event_id=${body.event_id}`,
         });
-        if (result.action === "conflict_requires_review") {
+        if (result.action === "relink_conflict_requires_review") {
           return { action: "relink_conflict_requires_review", ove_account_id: account.id };
         }
       }

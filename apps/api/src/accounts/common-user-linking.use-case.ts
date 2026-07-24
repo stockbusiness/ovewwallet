@@ -20,6 +20,22 @@ export interface LinkCommonUserParams {
   reasonContext?: string;
 }
 
+export type RelinkAfterMergeAction = "relinked" | "relink_conflict_requires_review";
+
+export interface RelinkAfterMergeResult {
+  action: RelinkAfterMergeAction;
+  oveAccountId: string;
+}
+
+export interface RelinkAfterMergeParams {
+  accountId: string;
+  expectedPreviousCommonUserId: string;
+  newCommonUserId: string;
+  actorType: "SYSTEM" | "EXTERNAL_SERVICE";
+  actorId?: string;
+  reasonContext?: string;
+}
+
 /**
  * 追加整合性対策 P0-1: `common_user_id`の同時設定競合を防ぐ共通UseCase。
  * `CommonUserResolvedHandler` (共通イベント経由) と `CommonUserLinkingService`
@@ -94,6 +110,105 @@ export class CommonUserLinkingUseCase {
       await this.accountRepository.linkCommonUser(account.id, params.commonUserId, tx);
       return { action: "linked", oveAccountId: account.id, commonUserId: params.commonUserId };
     });
+  }
+
+  /**
+   * PR #1最終修正: `common_user.merged`受信時、旧`common_user_id`を持つローカルアカウントが
+   * 1件だけ存在する場合の再紐づけ専用経路。`link()`は「対象アカウントに既に別の
+   * common_user_idが設定済み = 競合」として扱うため、旧IDから新IDへの正当な移行を
+   * 弾いてしまう (このメソッドが無かった場合の回帰)。旧ID・新ID両方のadvisory lockを
+   * `Array.sort()`した昇順で取得することで、逆順で同時に処理される2つのmergeイベント
+   * 同士がデッドロックしない。
+   */
+  async relinkAfterMerge(params: RelinkAfterMergeParams): Promise<RelinkAfterMergeResult> {
+    return this.db.$transaction(async (tx) => {
+      const lockIds = [params.expectedPreviousCommonUserId, params.newCommonUserId].sort();
+      for (const id of lockIds) {
+        await this.accountRepository.lockByCommonUserId(id, tx);
+      }
+
+      const account = await this.accountRepository.findById(params.accountId, tx);
+      if (!account) {
+        throw new NotFoundException(`account ${params.accountId} not found`);
+      }
+
+      // 冪等: 同じmergeイベントの再送で既に新IDへ移行済みなら成功として扱う。
+      if (account.commonUserId === params.newCommonUserId) {
+        return { action: "relinked", oveAccountId: account.id };
+      }
+
+      if (
+        params.expectedPreviousCommonUserId === params.newCommonUserId ||
+        account.commonUserId !== params.expectedPreviousCommonUserId
+      ) {
+        await this.recordMergeConflict(tx, params, account.commonUserId, [], "現在のcommon_user_idが期待する旧IDと一致しない");
+        return { action: "relink_conflict_requires_review", oveAccountId: account.id };
+      }
+
+      // advisory lock取得後のため、この再確認が権威ある競合判定になる。
+      const conflicting = await this.accountRepository.findConflictingCommonUserLinks(
+        params.newCommonUserId,
+        account.id,
+        tx,
+      );
+      if (conflicting.length > 0) {
+        await this.recordMergeConflict(
+          tx,
+          params,
+          account.commonUserId,
+          conflicting.map((a) => a.id),
+          `新common_user_id "${params.newCommonUserId}" は既に他のOVEアカウントに設定済みのため自動更新しない`,
+        );
+        return { action: "relink_conflict_requires_review", oveAccountId: account.id };
+      }
+
+      await this.accountRepository.linkCommonUser(account.id, params.newCommonUserId, tx);
+      await tx.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: params.actorType,
+          actorId: params.actorId,
+          actionType: "COMMON_USER_MERGED_RELINKED",
+          targetType: "ove_account",
+          targetId: account.id,
+          result: "SUCCESS",
+          reason: params.reasonContext,
+          beforeData: { commonUserId: params.expectedPreviousCommonUserId } as unknown as Prisma.InputJsonValue,
+          afterData: { commonUserId: params.newCommonUserId } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return { action: "relinked", oveAccountId: account.id };
+    });
+  }
+
+  private async recordMergeConflict(
+    tx: Prisma.TransactionClient,
+    params: RelinkAfterMergeParams,
+    actualCommonUserId: string | null,
+    conflictingAccountIds: string[],
+    reason: string,
+  ): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: params.actorType,
+        actorId: params.actorId,
+        actionType: "COMMON_USER_MERGED_RELINK_CONFLICT",
+        targetType: "ove_account",
+        targetId: params.accountId,
+        result: "FAILURE",
+        reason: params.reasonContext ? `${reason} (${params.reasonContext})` : reason,
+        afterData: {
+          expectedPreviousCommonUserId: params.expectedPreviousCommonUserId,
+          actualCommonUserId,
+          newCommonUserId: params.newCommonUserId,
+          conflictingAccountIds,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+    this.logger.warn(
+      `common_user.merged relink conflict for account ${params.accountId}: ${reason} (expectedPrevious=${params.expectedPreviousCommonUserId}, new=${params.newCommonUserId})`,
+    );
   }
 
   private async recordConflict(
