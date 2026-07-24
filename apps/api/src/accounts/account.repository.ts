@@ -106,6 +106,16 @@ export class AccountRepository {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${commonUserId})::bigint)`;
   }
 
+  /**
+   * 追加整合性対策P0-2: `ove_accounts`行を`SELECT...FOR UPDATE`でロックする
+   * (`packages/ledger`の`lockWallet`と同じ設計)。呼び出し元の`$transaction`内で、
+   * `registrationReferrerAgencyId`等の「現在値に基づく判定」より前に呼ぶこと
+   * (ロック後に`findById(id, tx)`で再取得した値が権威ある最新状態になる)。
+   */
+  async lockById(id: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`SELECT id FROM ove_accounts WHERE id = ${id} FOR UPDATE`;
+  }
+
   async findFirstByWalletIdOrThrow(walletId: string, client: Db = this.db): Promise<OveAccount> {
     return client.oveAccount.findFirstOrThrow({ where: { wallet: { id: walletId } } });
   }

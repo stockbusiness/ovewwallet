@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import {
@@ -254,6 +254,52 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
         where: { targetType: "ove_account", targetId: accountId, actionType: "CUSTOMER_ASSIGNMENT_CHANGED" },
       });
       expect(auditLogsAfterSecond).toHaveLength(2);
+    });
+
+    it("追加整合性対策 P0-2回帰: 異なる紹介元代理店を名乗る2つのイベントが同時に来ても、最初に確定した値だけが残る", async () => {
+      const { accountId } = await createAccountWithWallet();
+      const commonUserId = `cu_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+
+      const concurrency = 10;
+      const bodies = Array.from({ length: concurrency }, (_, i) =>
+        baseBody({
+          event_type: "customer.assignment.changed",
+          common_user_id: commonUserId,
+          registration_referrer_agency_id: `AGENT-RACE-${i}`,
+        }),
+      );
+
+      await Promise.all(
+        bodies.map((body) => {
+          const headers = commonEventSignedHeaders(key, body);
+          return request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(201);
+        }),
+      );
+
+      const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: accountId } });
+      expect(account.registrationReferrerAgencyId).not.toBeNull();
+      expect(account.registrationReferrerAgencyId).toMatch(/^AGENT-RACE-\d$/);
+
+      // 確定した値を送ったイベントに対応する監査ログのbefore/afterが、実際の確定値と一致する
+      // (「registrationReferrerAgencyIdがnull→確定値」の遷移を記録した行が1件だけ存在する)。
+      const settledLogs = await prisma.auditLog.findMany({
+        where: { targetType: "ove_account", targetId: accountId, actionType: "CUSTOMER_ASSIGNMENT_CHANGED" },
+      });
+      const settlingLogs = settledLogs.filter((log) => {
+        const before = log.beforeData as Record<string, unknown> | null;
+        const after = log.afterData as Record<string, unknown> | null;
+        return before?.registrationReferrerAgencyId == null && after?.registrationReferrerAgencyId === account.registrationReferrerAgencyId;
+      });
+      expect(settlingLogs).toHaveLength(1);
+
+      // 他の9件は「登録済みのため変更なし」(no_changeまたはassigned_agency_idのみの変更) のはずで、
+      // registrationReferrerAgencyIdを上書きした形跡がない。
+      const overwritingLogs = settledLogs.filter((log) => {
+        const after = log.afterData as Record<string, unknown> | null;
+        return after?.registrationReferrerAgencyId != null && after.registrationReferrerAgencyId !== account.registrationReferrerAgencyId;
+      });
+      expect(overwritingLogs).toHaveLength(0);
     });
   });
 
