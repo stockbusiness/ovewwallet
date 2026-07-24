@@ -2,6 +2,8 @@ import { BadRequestException } from "@nestjs/common";
 import type { Prisma, PrismaClient, RewardRule, TransactionType } from "@ove/database";
 import type { RewardRuleRepository } from "./reward-rule.repository";
 
+type Db = PrismaClient | Prisma.TransactionClient;
+
 export interface EnforceRewardRuleLimitsParams {
   ruleCode: string;
   walletId: string;
@@ -24,9 +26,13 @@ export interface EnforceRewardRuleLimitsParams {
  * ルールが未登録、または`status`がACTIVEでない場合は何も検証せず素通りさせる
  * (`docs/external-api.md`の既存の運用方針: 運用担当者がルールを登録するまでは
  * ServiceIntegration側の上限のみ有効、という前提を維持する)。
+ *
+ * モジュール化後レビュー対応 P1-3: 呼び出し元が`reward_rules`行を`FOR UPDATE`で
+ * ロック済みの`$transaction`内から呼ぶことを想定し、`db`は`PrismaClient`単体だけでなく
+ * `Prisma.TransactionClient`も受け付ける (上限判定とCREDITを同一整合性単位にするため)。
  */
 export async function enforceRewardRuleLimits(
-  db: PrismaClient,
+  db: Db,
   rewardRules: RewardRuleRepository,
   params: EnforceRewardRuleLimitsParams,
 ): Promise<RewardRule | null> {

@@ -1,12 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
+  Prisma,
   type CreatedByType,
   type OveTransaction,
-  type Prisma,
   type PrismaClient,
   type TransactionType,
 } from "@ove/database";
-import { creditWallet } from "@ove/ledger";
+import { creditWalletInTransaction } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { enforceRewardRuleLimits } from "./reward-rule-limits";
 import { RewardRuleRepository } from "./reward-rule.repository";
@@ -66,37 +66,58 @@ export class GrantRewardUseCase {
 
     const wallet = await this.db.wallet.findUniqueOrThrow({ where: { oveAccountId: params.oveAccountId } });
 
-    let expiryDays: number | null = null;
-    if (params.ruleCode) {
-      const rule = await enforceRewardRuleLimits(this.db, this.rewardRules, {
-        ruleCode: params.ruleCode,
-        walletId: wallet.id,
-        transactionType: params.transactionType,
-        eventId: params.sourceReferenceId ?? params.idempotencyKey,
-        amount: params.amount,
-        extraWhere: params.ruleLimitsExtraWhere,
+    try {
+      const transaction = await this.db.$transaction(async (tx) => {
+        // トランザクション内で冪等キーを再確認する (creditWalletInTransaction自体は
+        // 確認しない契約のため、ここで行う。一意制約違反はtx全体をabortさせるため)。
+        const existingInTx = await tx.oveTransaction.findUnique({
+          where: { idempotencyKey: params.idempotencyKey },
+        });
+        if (existingInTx) return existingInTx;
+
+        let expiryDays: number | null = null;
+        if (params.ruleCode) {
+          // モジュール化後レビュー対応 P1-3: 上限判定とCREDITが別トランザクションだと、
+          // 同時リクエストで月次/累計上限を突破しうる。reward_rules行をFOR UPDATEで
+          // ロックしてから判定することで、同一ルールへの並行付与を直列化し、
+          // 上限判定とCREDITを同一整合性単位にする。
+          await this.rewardRules.lockByRuleCode(params.ruleCode, tx);
+          const rule = await enforceRewardRuleLimits(tx, this.rewardRules, {
+            ruleCode: params.ruleCode,
+            walletId: wallet.id,
+            transactionType: params.transactionType,
+            eventId: params.sourceReferenceId ?? params.idempotencyKey,
+            amount: params.amount,
+            extraWhere: params.ruleLimitsExtraWhere,
+          });
+          expiryDays = rule?.expiryDays ?? null;
+        }
+
+        return creditWalletInTransaction(tx, {
+          walletId: wallet.id,
+          amount: params.amount,
+          transactionType: params.transactionType,
+          idempotencyKey: params.idempotencyKey,
+          displayName: params.displayName,
+          description: params.description,
+          sourceService: params.sourceService,
+          sourceReferenceId: params.sourceReferenceId,
+          createdByType: params.createdByType,
+          createdById: params.createdById,
+          metadata: params.metadata,
+          expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
+        });
       });
-      expiryDays = rule?.expiryDays ?? null;
+
+      return { oveAccountId: params.oveAccountId, transaction };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const race = await this.db.oveTransaction.findUnique({
+          where: { idempotencyKey: params.idempotencyKey },
+        });
+        if (race) return { oveAccountId: params.oveAccountId, transaction: race };
+      }
+      throw error;
     }
-
-    const transaction = await creditWallet(
-      {
-        walletId: wallet.id,
-        amount: params.amount,
-        transactionType: params.transactionType,
-        idempotencyKey: params.idempotencyKey,
-        displayName: params.displayName,
-        description: params.description,
-        sourceService: params.sourceService,
-        sourceReferenceId: params.sourceReferenceId,
-        createdByType: params.createdByType,
-        createdById: params.createdById,
-        metadata: params.metadata,
-        expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
-      },
-      this.db,
-    );
-
-    return { oveAccountId: params.oveAccountId, transaction };
   }
 }
