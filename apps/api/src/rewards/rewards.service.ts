@@ -5,7 +5,7 @@ import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { AccountRepository } from "../accounts/account.repository";
 import { serializeTransaction } from "../wallets/wallets.service";
-import { GrantRewardUseCase } from "./grant-reward.use-case";
+import { GrantExternalServiceRewardUseCase } from "./grant-external-service-reward.use-case";
 import { RewardRuleRepository } from "./reward-rule.repository";
 
 /**
@@ -26,7 +26,7 @@ export class RewardsService {
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accounts: AccountsService,
     private readonly accountRepository: AccountRepository,
-    private readonly grantReward: GrantRewardUseCase,
+    private readonly grantExternalServiceReward: GrantExternalServiceRewardUseCase,
     private readonly rewardRules: RewardRuleRepository,
   ) {}
 
@@ -62,28 +62,6 @@ export class RewardsService {
     }
 
     const amount = BigInt(request.amount);
-    if (amount > serviceIntegration.perRequestAmountLimit) {
-      throw new BadRequestException(
-        `amount exceeds per_request_amount_limit (${serviceIntegration.perRequestAmountLimit.toString()})`,
-      );
-    }
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayGranted = await this.db.oveTransaction.aggregate({
-      where: {
-        sourceService: request.service_code,
-        status: "COMPLETED",
-        direction: "CREDIT",
-        occurredAt: { gte: todayStart },
-      },
-      _sum: { amount: true },
-    });
-    const grantedToday = todayGranted._sum.amount ?? 0n;
-    if (grantedToday + amount > serviceIntegration.dailyAmountLimit) {
-      throw new BadRequestException("daily_amount_limit for this service has been exceeded");
-    }
-
     const account = await this.accounts.findOrCreateByServiceLink({
       serviceIntegrationId: serviceIntegration.id,
       externalUserId: request.external_user_id,
@@ -91,17 +69,19 @@ export class RewardsService {
     const transactionType = request.transaction_type as TransactionType;
     const ruleCode = RULE_CODE_BY_TRANSACTION_TYPE[request.transaction_type];
 
-    const { transaction } = await this.grantReward.execute({
+    // 追加整合性対策P0-3: perRequestAmountLimit/dailyAmountLimitの判定・CREDITを
+    // ServiceIntegration行ロック配下の単一トランザクションで行う
+    // (`GrantExternalServiceRewardUseCase`参照。同一サービスからの並行付与で
+    // dailyAmountLimitを突破しない)。
+    const { transaction } = await this.grantExternalServiceReward.execute({
+      serviceIntegration,
       oveAccountId: account.id,
       amount,
       transactionType,
       idempotencyKey: request.idempotency_key,
       displayName: request.display_name,
       description: request.description,
-      sourceService: request.service_code,
       sourceReferenceId: request.event_id,
-      createdByType: "EXTERNAL_SERVICE",
-      createdById: serviceIntegration.id,
       metadata: { eventType: request.event_type, eventId: request.event_id },
       ruleCode,
     });

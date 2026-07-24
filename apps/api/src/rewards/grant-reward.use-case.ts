@@ -11,6 +11,8 @@ import { PRISMA } from "../common/prisma.module";
 import { enforceRewardRuleLimits } from "./reward-rule-limits";
 import { RewardRuleRepository } from "./reward-rule.repository";
 
+type TransactionClient = Prisma.TransactionClient;
+
 export interface GrantRewardParams {
   oveAccountId: string;
   amount: bigint;
@@ -64,51 +66,8 @@ export class GrantRewardUseCase {
       return { oveAccountId: params.oveAccountId, transaction: existing };
     }
 
-    const wallet = await this.db.wallet.findUniqueOrThrow({ where: { oveAccountId: params.oveAccountId } });
-
     try {
-      const transaction = await this.db.$transaction(async (tx) => {
-        // トランザクション内で冪等キーを再確認する (creditWalletInTransaction自体は
-        // 確認しない契約のため、ここで行う。一意制約違反はtx全体をabortさせるため)。
-        const existingInTx = await tx.oveTransaction.findUnique({
-          where: { idempotencyKey: params.idempotencyKey },
-        });
-        if (existingInTx) return existingInTx;
-
-        let expiryDays: number | null = null;
-        if (params.ruleCode) {
-          // モジュール化後レビュー対応 P1-3: 上限判定とCREDITが別トランザクションだと、
-          // 同時リクエストで月次/累計上限を突破しうる。reward_rules行をFOR UPDATEで
-          // ロックしてから判定することで、同一ルールへの並行付与を直列化し、
-          // 上限判定とCREDITを同一整合性単位にする。
-          await this.rewardRules.lockByRuleCode(params.ruleCode, tx);
-          const rule = await enforceRewardRuleLimits(tx, this.rewardRules, {
-            ruleCode: params.ruleCode,
-            walletId: wallet.id,
-            transactionType: params.transactionType,
-            eventId: params.sourceReferenceId ?? params.idempotencyKey,
-            amount: params.amount,
-            extraWhere: params.ruleLimitsExtraWhere,
-          });
-          expiryDays = rule?.expiryDays ?? null;
-        }
-
-        return creditWalletInTransaction(tx, {
-          walletId: wallet.id,
-          amount: params.amount,
-          transactionType: params.transactionType,
-          idempotencyKey: params.idempotencyKey,
-          displayName: params.displayName,
-          description: params.description,
-          sourceService: params.sourceService,
-          sourceReferenceId: params.sourceReferenceId,
-          createdByType: params.createdByType,
-          createdById: params.createdById,
-          metadata: params.metadata,
-          expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
-        });
-      });
-
+      const transaction = await this.db.$transaction((tx) => this.executeInTransaction(tx, params));
       return { oveAccountId: params.oveAccountId, transaction };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -119,5 +78,56 @@ export class GrantRewardUseCase {
       }
       throw error;
     }
+  }
+
+  /**
+   * 追加整合性対策P0-3: `GrantExternalServiceRewardUseCase`が、既に開いた自身の
+   * トランザクション (ServiceIntegration行ロック済み) の中でこのメソッドを直接呼べる
+   * ようにするための分離。`execute()`自身のトランザクションと二重に`$transaction`を
+   * 開かない (Prismaは入れ子の`$transaction`を素直に合成できないため、呼び出し元が
+   * 既に持っている`tx`をそのまま受け取る設計にする)。
+   */
+  async executeInTransaction(tx: TransactionClient, params: GrantRewardParams): Promise<OveTransaction> {
+    const wallet = await tx.wallet.findUniqueOrThrow({ where: { oveAccountId: params.oveAccountId } });
+
+    // トランザクション内で冪等キーを再確認する (creditWalletInTransaction自体は
+    // 確認しない契約のため、ここで行う。一意制約違反はtx全体をabortさせるため)。
+    const existingInTx = await tx.oveTransaction.findUnique({
+      where: { idempotencyKey: params.idempotencyKey },
+    });
+    if (existingInTx) return existingInTx;
+
+    let expiryDays: number | null = null;
+    if (params.ruleCode) {
+      // モジュール化後レビュー対応 P1-3: 上限判定とCREDITが別トランザクションだと、
+      // 同時リクエストで月次/累計上限を突破しうる。reward_rules行をFOR UPDATEで
+      // ロックしてから判定することで、同一ルールへの並行付与を直列化し、
+      // 上限判定とCREDITを同一整合性単位にする。
+      await this.rewardRules.lockByRuleCode(params.ruleCode, tx);
+      const rule = await enforceRewardRuleLimits(tx, this.rewardRules, {
+        ruleCode: params.ruleCode,
+        walletId: wallet.id,
+        transactionType: params.transactionType,
+        eventId: params.sourceReferenceId ?? params.idempotencyKey,
+        amount: params.amount,
+        extraWhere: params.ruleLimitsExtraWhere,
+      });
+      expiryDays = rule?.expiryDays ?? null;
+    }
+
+    return creditWalletInTransaction(tx, {
+      walletId: wallet.id,
+      amount: params.amount,
+      transactionType: params.transactionType,
+      idempotencyKey: params.idempotencyKey,
+      displayName: params.displayName,
+      description: params.description,
+      sourceService: params.sourceService,
+      sourceReferenceId: params.sourceReferenceId,
+      createdByType: params.createdByType,
+      createdById: params.createdById,
+      metadata: params.metadata,
+      expiresAt: expiryDays ? new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000) : undefined,
+    });
   }
 }
