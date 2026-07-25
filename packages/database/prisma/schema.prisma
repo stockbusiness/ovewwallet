@@ -1114,3 +1114,22 @@ model CollectibleHolding {
   @@index([contractAddress, tokenId])
   @@map("collectible_holdings")
 }
+
+/// NFTカードClaim導線実装指示書4章。戦国マーケットの受取URL(`/claim/{token}`)が
+/// 発行する生Claim Tokenをブラウザへ長期保存させないための、サーバー側セッション。
+/// `id`自体が不透明なランダム値であり、Cookie値・安全なReturn Path
+/// (`/claim/{id}`)の両方として使う (WalletReferralの`session_token_hash`と違い
+/// 2層に分けていないのは、指示書4章が明記する4項目 (claim_session_id/token_hash/
+/// expires_at/created_at) に沿った最小構成のため)。生Claim Token自体は
+/// `WalletReferral.referralTokenEncrypted`と同じ理由で可逆暗号化して保持する
+/// (Market Confirm API呼び出し時に平文が必要)。
+model ClaimSession {
+  id             String   @id
+  /// 同じ生Tokenで複数回訪問されても新規行を作らないための検索用ハッシュ。
+  tokenHash      String   @unique @map("token_hash")
+  tokenEncrypted String   @map("token_encrypted")
+  expiresAt      DateTime @map("expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("claim_sessions")
+}

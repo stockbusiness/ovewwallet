@@ -9,6 +9,12 @@ export interface IntegrationErrorResult {
   readonly retryable: boolean;
   readonly status?: number;
   readonly message: string;
+  /**
+   * 4xx/5xxレスポンスのJSON本文 (best-effort、パース不可なら未設定)。Claim Client等、
+   * 同じHTTPステータスでも本文の`code`/`reason`でエラー種別をさらに細分化する
+   * 呼び出し元向け (例: 409でも revoked / common_user_mismatch / processing を区別する)。
+   */
+  readonly body?: unknown;
 }
 
 export type IntegrationResult<T> = { ok: true; data: T } | { ok: false; error: IntegrationErrorResult };
@@ -18,8 +24,11 @@ export interface IntegrationRequestParams<T = void> {
   path: string;
   method?: "GET" | "POST";
   body?: unknown;
-  apiKey: string;
+  /** 省略時は`apiKeyHeader`を付与しない (HMAC等、単一APIキーヘッダー以外の認証方式を使う呼び出し元向け)。 */
+  apiKey?: string;
   apiKeyHeader?: string;
+  /** APIキー以外に付与したい追加ヘッダー (例: HMAC署名関連のX-SenNoKuni-*ヘッダー)。 */
+  extraHeaders?: Record<string, string>;
   correlationId?: string;
   timeoutMs?: number;
   /** 省略時はレスポンスボディを読まず、`res.ok`のみで成否判定する(既存クライアントの一部の挙動に合わせる)。 */
@@ -67,7 +76,7 @@ export class IntegrationHttpClient {
       method,
       requestId,
       correlationId,
-      apiKey: maskApiKey(params.apiKey),
+      apiKey: params.apiKey ? maskApiKey(params.apiKey) : undefined,
     };
 
     const controller = new AbortController();
@@ -78,7 +87,8 @@ export class IntegrationHttpClient {
         method,
         headers: {
           "content-type": "application/json",
-          [apiKeyHeader]: params.apiKey,
+          ...(params.apiKey ? { [apiKeyHeader]: params.apiKey } : {}),
+          ...params.extraHeaders,
           "x-request-id": requestId,
           "x-correlation-id": correlationId,
         },
@@ -89,9 +99,22 @@ export class IntegrationHttpClient {
       if (!res.ok) {
         const kind: IntegrationErrorKind = res.status >= 500 ? "http_5xx" : "http_4xx";
         logger.warn(`integration request failed: status=${res.status} ${JSON.stringify(logContext)}`);
+        const bodyText = await res.text().catch(() => undefined);
+        let parsedBody: unknown;
+        try {
+          parsedBody = bodyText ? JSON.parse(bodyText) : undefined;
+        } catch {
+          parsedBody = undefined;
+        }
         return {
           ok: false,
-          error: { kind, retryable: classifyRetryable(kind), status: res.status, message: `HTTP ${res.status}` },
+          error: {
+            kind,
+            retryable: classifyRetryable(kind),
+            status: res.status,
+            message: `HTTP ${res.status}`,
+            body: parsedBody,
+          },
         };
       }
 

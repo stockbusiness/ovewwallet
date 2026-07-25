@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon, WalletLogo } from "@ove/shared-ui";
 import { apiFetch, ApiError } from "@/lib/api";
+import { sanitizeInternalReturnPath } from "@/lib/claim-return-path";
 import {
   isLiffConfigured,
   ensureLiffLogin,
@@ -31,7 +32,24 @@ function getMockLineUserId(): string {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+/**
+ * `useSearchParams()`(`?return_to=`の読み取りに使用)はNext.js App Routerの
+ * 静的プリレンダリング時にSuspense境界を要求するため、本体を分離している。
+ */
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // NFTカードClaim導線実装指示書5章。ログイン完了後にどこへ戻るかは、この1箇所で
+  // 一度だけ計算し、LINE/メールOTP/千ノ国パスポートSSOの全経路が同じ値を使う。
+  // 不正な値(絶対URL・許可Prefix外)はnullになり、既定の"/wallet"へ遷移する。
+  const postLoginRedirect = sanitizeInternalReturnPath(searchParams.get("return_to")) ?? "/wallet";
   const [view, setView] = useState<View>("choose");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -105,7 +123,7 @@ export default function LoginPage() {
         // 場合は消さずに残しておき、次の読み込みで(liff.init()を経由せず)同じ
         // IDトークンで送信をやり直せるようにする (2026-07-18、pageshowリロード対策)。
         clearPendingSubmission();
-        router.push("/wallet");
+        router.push(postLoginRedirect);
       } catch (err) {
         const message = err instanceof ApiError ? err.message : String(err);
         appendDebugLog(`API送信失敗: ${message}`);
@@ -143,7 +161,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ idToken, termsAccepted }),
       });
-      router.push("/wallet");
+      router.push(postLoginRedirect);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
     } finally {
@@ -182,7 +200,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ email, code, termsAccepted }),
       });
-      router.push("/wallet");
+      router.push(postLoginRedirect);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "認証に失敗しました");
     } finally {
@@ -207,7 +225,7 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ code: ssoCode, termsAccepted }),
       });
-      router.push("/wallet");
+      router.push(postLoginRedirect);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "千ノ国パスポートIDでのログインに失敗しました");
     } finally {

@@ -143,4 +143,44 @@ describe("IntegrationHttpClient", () => {
     expect(result.ok).toBe(false);
     expect(JSON.stringify(result)).not.toContain("super-secret-raw-key");
   });
+
+  /**
+   * NFTカードClaim導線実装指示書向けの拡張回帰テスト。単一のAPIキーヘッダーではなく
+   * HMAC複数ヘッダー(X-SenNoKuni-*)で認証する`SengokuMarketClaimAdapter`のために、
+   * `apiKey`を省略可能にし`extraHeaders`を追加した。
+   */
+  it("sends extraHeaders and omits the API key header when apiKey is not provided", async () => {
+    let receivedHeaders: http.IncomingHttpHeaders = {};
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      res.statusCode = 200;
+      res.end();
+    });
+
+    const result = await client.request({
+      baseUrl,
+      path: "/x",
+      extraHeaders: { "x-sennokuni-signature": "sig-value", "x-sennokuni-key-id": "key-1" },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(receivedHeaders["x-sennokuni-signature"]).toBe("sig-value");
+    expect(receivedHeaders["x-sennokuni-key-id"]).toBe("key-1");
+    expect(receivedHeaders["x-api-key"]).toBeUndefined();
+  });
+
+  it("parses the JSON body of a non-ok response so callers can sub-classify by an application-level error code", async () => {
+    const baseUrl = await startServer((_req, res) => {
+      res.statusCode = 409;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ code: "processing" }));
+    });
+
+    const result = await client.request({ baseUrl, path: "/x", apiKey: "k" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.status).toBe(409);
+      expect(result.error.body).toEqual({ code: "processing" });
+    }
+  });
 });

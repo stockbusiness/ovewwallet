@@ -17,6 +17,8 @@ export const FEATURE_FLAG_KEYS = [
   "ENABLE_DIGITAL_COLLECTION",
   /** 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandlerを有効化する。 */
   "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX",
+  /** NFTカードClaim導線実装指示書: /claim/{token}画面・Claim概要/確定APIを有効化する。 */
+  "ENABLE_COLLECTIBLE_CLAIM_FLOW",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
