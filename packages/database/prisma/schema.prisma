@@ -241,19 +241,19 @@ model CodeCounter {
 // =====================================================================
 
 model OveAccount {
-  id                  String        @id
-  accountCode         String        @unique @map("account_code")
-  status              AccountStatus @default(PENDING)
-  displayName         String?       @map("display_name")
-  primaryEmail        String?       @map("primary_email")
-  primaryPhone        String?       @map("primary_phone")
-  verificationLevel   Int           @default(0) @map("verification_level")
-  mergedIntoAccountId String?       @map("merged_into_account_id")
+  id                           String        @id
+  accountCode                  String        @unique @map("account_code")
+  status                       AccountStatus @default(PENDING)
+  displayName                  String?       @map("display_name")
+  primaryEmail                 String?       @map("primary_email")
+  primaryPhone                 String?       @map("primary_phone")
+  verificationLevel            Int           @default(0) @map("verification_level")
+  mergedIntoAccountId          String?       @map("merged_into_account_id")
   /// OVE利用規約に同意した日時。アカウント作成時に必須で記録する
   /// (この機能追加前に作成されたアカウントは null になりうる)。
-  termsAgreedAt       DateTime?     @map("terms_agreed_at")
+  termsAgreedAt                DateTime?     @map("terms_agreed_at")
   /// 同意した利用規約のバージョン (例: "1.0")。
-  termsVersion        String?       @map("terms_version")
+  termsVersion                 String?       @map("terms_version")
   /// 代理店システム内共通顧客HUBが発行するcommon_user_id (外部開発者向け連携
   /// ガイド9章)。ENABLE_PLATFORM_USER_ID有効時、新規アカウント作成後にベスト
   /// エフォートで解決・保存する。解決前の既存アカウント・呼び出し失敗時はnull。
@@ -263,32 +263,32 @@ model OveAccount {
   /// 追加整合性対策P0-1: 異なる2アカウントへの同時設定競合(TOCTOU)は、DB制約
   /// ではなくPostgreSQL advisory lock (`CommonUserLinkingUseCase`が
   /// `pg_advisory_xact_lock`でcommon_user_id単位の書き込みを直列化) で防ぐ。
-  commonUserId        String?       @map("common_user_id")
-  commonUserLinkedAt  DateTime?     @map("common_user_linked_at")
+  commonUserId                 String?       @map("common_user_id")
+  commonUserLinkedAt           DateTime?     @map("common_user_linked_at")
   /// 千ノ国 全体統合 共通実装契約 4.2章。初回登録を発生させた紹介代理店の
   /// agents.agent_code。原則ロックし、一度設定したら上書きしない
   /// (アプリケーション層で保護、`CommonEventHandlersService`参照)。
-  registrationReferrerAgencyId String? @map("registration_referrer_agency_id")
+  registrationReferrerAgencyId String?       @map("registration_referrer_agency_id")
   /// 同4.2章。現在の顧客担当代理店のagent_code。`customer.assignment.changed`
   /// イベント受信のたびに更新される (運用上変更可能、変更履歴はAuditLogに残す)。
-  assignedAgencyId             String? @map("assigned_agency_id")
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
-  closedAt            DateTime?     @map("closed_at")
+  assignedAgencyId             String?       @map("assigned_agency_id")
+  createdAt                    DateTime      @default(now()) @map("created_at")
+  updatedAt                    DateTime      @updatedAt @map("updated_at")
+  closedAt                     DateTime?     @map("closed_at")
 
   mergedIntoAccount OveAccount?  @relation("AccountMerge", fields: [mergedIntoAccountId], references: [id])
   mergedAccounts    OveAccount[] @relation("AccountMerge")
 
-  identities        AccountIdentity[]
-  links             AccountLink[]
-  wallet            Wallet?
-  sessions          UserSession[]
-  walletReferrals   WalletReferral[]
-  noticeReads       NoticeRead[]
-  dailyBonusClaims  DailyBonusClaim[]
+  identities          AccountIdentity[]
+  links               AccountLink[]
+  wallet              Wallet?
+  sessions            UserSession[]
+  walletReferrals     WalletReferral[]
+  noticeReads         NoticeRead[]
+  dailyBonusClaims    DailyBonusClaim[]
+  collectibleHoldings CollectibleHolding[]
 
   @@index([commonUserId])
-
   @@map("ove_accounts")
 }
 
@@ -341,17 +341,17 @@ model ServiceIntegration {
 /// 単一行のみのシングルトン設定 (id は固定値 "default")。管理画面
 /// (/common-user-hub-config) から編集する。
 model CommonUserHubConfig {
-  id      String @id
-  baseUrl String @map("base_url")
+  id              String   @id
+  baseUrl         String   @map("base_url")
   /// 外部開発者向け連携ガイド2章の system_key。ウォレット自身の識別子。
-  systemKey String @map("system_key")
+  systemKey       String   @map("system_key")
   /// sengoku-ai.com発行の「AI受信用APIキー」(ガイド3.1章)。ENCRYPTION_KEYによる
   /// 可逆暗号化 (AES-256-GCM、ServiceIntegration.signingSecretEncryptedと同方式)。
-  apiKeyEncrypted String? @map("api_key_encrypted")
+  apiKeyEncrypted String?  @map("api_key_encrypted")
   /// 管理画面表示用のマスク済みプレビュー (例: "****abcd")。生値は含まない。
-  apiKeyPreview String?  @map("api_key_preview")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  updatedBy     String?  @map("updated_by")
+  apiKeyPreview   String?  @map("api_key_preview")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedBy       String?  @map("updated_by")
 
   @@map("common_user_hub_config")
 }
@@ -789,7 +789,7 @@ enum WalletReferralBenefitStatus {
 /// 同一テーブルで管理する (実装指示書5.5章の「紹介トークン」「紹介セッション」を
 /// status/walletUserIdの有無で表現し、別テーブルへ分割しない)。
 model WalletReferral {
-  id     String @id
+  id           String  @id
   /// 登録完了までnull。登録完了時にOVEアカウントIDを設定する。
   walletUserId String? @map("wallet_user_id")
   /// 将来 `ENABLE_PLATFORM_USER_ID` が有効になった場合の共通ID。Phase 1では未設定。
@@ -797,12 +797,12 @@ model WalletReferral {
 
   /// /invite/{token} のCookie発行に使う不透明トークンのハッシュ (このテーブル自体を
   /// セッションストアとして使う)。SHA-256 (`sha256Hex`、セッショントークンと同じ方式)。
-  sessionTokenHash String @unique @map("session_token_hash")
+  sessionTokenHash       String @unique @map("session_token_hash")
   /// 代理店システムが発行した紹介トークンの本体。Phase 2の外部送信時に平文が必要なため
   /// 可逆暗号化 (`encryptSecret`) で保存する。ログには絶対に出さない。
   referralTokenEncrypted String @map("referral_token_encrypted")
   /// 検索用の一方向ハッシュ。
-  referralTokenHash String @map("referral_token_hash")
+  referralTokenHash      String @map("referral_token_hash")
 
   /// Phase 2で代理店システムから確認結果を受け取った際に設定される代理店ID。
   /// 代理店のランク・階層情報自体はウォレット側で永続管理しない
@@ -822,7 +822,7 @@ model WalletReferral {
 
   status WalletReferralStatus @default(CAPTURED)
   /// `invite_url` (通常フロー) / `admin` (管理者による後付け) / `migration`。
-  source String @default("invite_url")
+  source String               @default("invite_url")
 
   capturedAt   DateTime  @default(now()) @map("captured_at")
   /// セッションの有効期限 (既定24時間、実装指示書2種の目安7日/24時間のうち短い方を採用)。
@@ -837,9 +837,9 @@ model WalletReferral {
   lastErrorCode    String? @map("last_error_code")
   lastErrorMessage String? @map("last_error_message")
   /// IP/UAは生値を保存せず、監査目的の一方向ハッシュのみ保存する (実装指示書16章)。
-  createdIpHash  String? @map("created_ip_hash")
-  userAgentHash  String? @map("user_agent_hash")
-  reason         String?
+  createdIpHash    String? @map("created_ip_hash")
+  userAgentHash    String? @map("user_agent_hash")
+  reason           String?
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -857,8 +857,8 @@ model WalletReferral {
 }
 
 model WalletReferralBenefit {
-  id             String @id
-  walletUserId   String @map("wallet_user_id")
+  id             String  @id
+  walletUserId   String  @map("wallet_user_id")
   /// LINEユーザーIDの一方向ハッシュ (生値は保存しない、実装指示書9章条件5)。
   lineUserIdHash String? @map("line_user_id_hash")
   referralId     String  @map("referral_id")
@@ -983,21 +983,116 @@ enum CommonEventSigningKeyStatus {
 /// 送信元システム (代理店システム等) ごと・鍵ID単位で複数保持し、ローテーション時は
 /// 新しい行を追加してから旧行をREVOKEDにする (即時失効させない移行を可能にする)。
 model CommonEventSigningKey {
-  id              String                      @id
-  keyId           String                      @unique @map("key_id")
-  sourceSystemKey String                       @map("source_system_key")
+  id                String                      @id
+  keyId             String                      @unique @map("key_id")
+  sourceSystemKey   String                      @map("source_system_key")
   /// HMAC検証には平文シークレットの復元が必要なため、ServiceIntegrationと同様に
   /// 一方向ハッシュではなくAES-256-GCM可逆暗号化で保存する。
-  secretEncrypted String                       @map("secret_encrypted")
+  secretEncrypted   String                      @map("secret_encrypted")
   /// この鍵で送信を許可するevent_type (例: "common_user.resolved"、末尾".*"でprefix一致、
   /// 例: "order.*")。既定は空配列=何も許可しない(secure-by-default、次期改修指示書P0-3)。
   /// 鍵発行時に明示的に許可対象を指定する必要がある。
-  allowedEventTypes String[]                  @default([]) @map("allowed_event_types")
-  status          CommonEventSigningKeyStatus  @default(ACTIVE)
-  createdAt       DateTime                     @default(now()) @map("created_at")
-  updatedAt       DateTime                     @updatedAt @map("updated_at")
-  revokedAt       DateTime?                    @map("revoked_at")
+  allowedEventTypes String[]                    @default([]) @map("allowed_event_types")
+  status            CommonEventSigningKeyStatus @default(ACTIVE)
+  createdAt         DateTime                    @default(now()) @map("created_at")
+  updatedAt         DateTime                    @updatedAt @map("updated_at")
+  revokedAt         DateTime?                   @map("revoked_at")
 
   @@index([sourceSystemKey, status])
   @@map("common_event_signing_keys")
+}
+
+// =====================================================================
+// 15. NFTコレクション (千ノ国ウォレット NFTコレクション実装指示書)
+//
+// 戦国マーケットで購入したデジタルカードを画像カードとして保管・表示する。
+// 将来のブロックチェーンMintに備えたデータ構造を持つが、MVPでは書き込まない
+// (`CollectibleHolding`の`network`/`chainId`/`contractAddress`/`tokenId`/
+// `transactionHash`/`ownerAddress`/`mintedAt`/`metadataUri`は将来用nullable項目)。
+// =====================================================================
+
+enum CollectibleAssetStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum CollectibleHoldingStatus {
+  ACTIVE
+  REVOKED
+  /// 以下はMVPでは到達しない将来のMint状態遷移用 (指示書5.2章)。
+  MINT_READY
+  MINTING
+  ONCHAIN
+  TRANSFERRED
+  BURNED
+  ERROR
+}
+
+/// カードのマスターデータ。同じ`assetCode`を複数ユーザーが保有しうる
+/// (`CollectibleHolding`側で保有者ごとに行を分ける)。
+model CollectibleAsset {
+  id           String                 @id
+  assetCode    String                 @unique @map("asset_code")
+  productCode  String?                @map("product_code")
+  name         String
+  description  String?
+  imageUrl     String                 @map("image_url")
+  thumbnailUrl String?                @map("thumbnail_url")
+  /// 画像の一方向ハッシュ (指示書17章「画像セキュリティ」、差し替え検知用)。
+  imageHash    String?                @map("image_hash")
+  rarity       String?
+  category     String?
+  editionSize  Int?                   @map("edition_size")
+  metadata     Json?
+  status       CollectibleAssetStatus @default(ACTIVE)
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
+
+  holdings CollectibleHolding[]
+
+  @@index([productCode])
+  @@map("collectible_assets")
+}
+
+/// 1ユーザーの1カード保有権 (entitlement) を表す。`entitlementId`が戦国マーケット側の
+/// `NftIssue.id`と1:1で対応し、`entitlement.granted`/`entitlement.revoked`の冪等キーになる。
+model CollectibleHolding {
+  id                 String                   @id
+  oveAccountId       String                   @map("ove_account_id")
+  collectibleAssetId String                   @map("collectible_asset_id")
+  /// 戦国マーケット側の`NftIssue.id` (指示書5.2章)。同一entitlementで複数Holdingを
+  /// 作らないためのUNIQUE制約。
+  entitlementId      String                   @unique @map("entitlement_id")
+  sourceSystemKey    String                   @map("source_system_key")
+  orderId            String?                  @map("order_id")
+  orderItemId        String?                  @map("order_item_id")
+  acquiredAt         DateTime                 @map("acquired_at")
+  status             CollectibleHoldingStatus @default(ACTIVE)
+  revokedAt          DateTime?                @map("revoked_at")
+  revokeReason       String?                  @map("revoke_reason")
+  /// 購入時スナップショット (指示書9章「Asset更新方針」推奨: CollectibleAssetが
+  /// マスター、こちらは取得時点の名称・画像URL等を保持する)。
+  metadata           Json?
+
+  // --- 将来Mint項目 (指示書18章)。MVPでは書き込まない。すべてnullableのまま。 ---
+  network         String?
+  chainId         String?   @map("chain_id")
+  contractAddress String?   @map("contract_address")
+  tokenId         String?   @map("token_id")
+  transactionHash String?   @map("transaction_hash")
+  ownerAddress    String?   @map("owner_address")
+  mintedAt        DateTime? @map("minted_at")
+  metadataUri     String?   @map("metadata_uri")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account OveAccount       @relation(fields: [oveAccountId], references: [id])
+  asset   CollectibleAsset @relation(fields: [collectibleAssetId], references: [id])
+
+  @@index([oveAccountId, status])
+  @@index([orderId])
+  @@index([orderItemId])
+  @@index([contractAddress, tokenId])
+  @@map("collectible_holdings")
 }

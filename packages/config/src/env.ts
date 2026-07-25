@@ -54,6 +54,10 @@ const envSchema = z.object({
   ENABLE_ONCHAIN_MIGRATION: z.enum(["true", "false"]).default("false"),
   // 千ノ国 全体統合 共通実装契約 (2026-07-21) の POST /api/integrations/events。
   ENABLE_COMMON_EVENT_INBOX: z.enum(["true", "false"]).default("false"),
+  // NFTコレクション実装指示書: ユーザー向けコレクションAPI・画面導線。
+  ENABLE_DIGITAL_COLLECTION: z.enum(["true", "false"]).default("false"),
+  // 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandler。
+  ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: z.enum(["true", "false"]).default("false"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
