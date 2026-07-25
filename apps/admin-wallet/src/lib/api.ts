@@ -317,7 +317,9 @@ export type FeatureFlags = Record<
   | "ENABLE_AGENCY_SYNC_RETRY"
   | "ENABLE_WALLET_REGISTRATION_BONUS"
   | "ENABLE_EXTERNAL_REWARD_TYPES"
-  | "ENABLE_ONCHAIN_MIGRATION",
+  | "ENABLE_ONCHAIN_MIGRATION"
+  | "ENABLE_DIGITAL_COLLECTION"
+  | "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX",
   boolean
 >;
 
@@ -329,4 +331,58 @@ export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   ENABLE_WALLET_REGISTRATION_BONUS: "登録ボーナス連携",
   ENABLE_EXTERNAL_REWARD_TYPES: "外部サービス起点の付与種別",
   ENABLE_ONCHAIN_MIGRATION: "オンチェーン移行",
+  ENABLE_DIGITAL_COLLECTION: "NFTコレクション機能",
+  ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: "NFTコレクション entitlement受信",
 };
+
+export interface CollectibleAssetItem {
+  id: string;
+  assetCode: string;
+  productCode: string | null;
+  name: string;
+  description: string | null;
+  imageUrl: string;
+  thumbnailUrl: string | null;
+  imageHash: string | null;
+  rarity: string | null;
+  category: string | null;
+  editionSize: number | null;
+  status: "ACTIVE" | "ARCHIVED";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CollectibleHoldingStatus =
+  | "ACTIVE"
+  | "REVOKED"
+  | "MINT_READY"
+  | "MINTING"
+  | "ONCHAIN"
+  | "TRANSFERRED"
+  | "BURNED"
+  | "ERROR";
+
+export interface CollectibleHoldingItem {
+  id: string;
+  oveAccountId: string;
+  collectibleAssetId: string;
+  entitlementId: string;
+  sourceSystemKey: string;
+  orderId: string | null;
+  orderItemId: string | null;
+  acquiredAt: string;
+  status: CollectibleHoldingStatus;
+  revokedAt: string | null;
+  revokeReason: string | null;
+  network: string | null;
+  chainId: string | null;
+  contractAddress: string | null;
+  tokenId: string | null;
+  transactionHash: string | null;
+  ownerAddress: string | null;
+  mintedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  asset: CollectibleAssetItem;
+  account?: { id: string; accountCode: string; commonUserId: string | null } | null;
+}

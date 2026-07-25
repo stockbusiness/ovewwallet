@@ -1,8 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   BottomNavigation,
   ThemeToggle,
@@ -14,7 +11,10 @@ import {
   CartIcon,
   MenuIcon,
 } from "@ove/shared-ui";
-import { apiFetch, ApiError, type OveAccount, type WalletBalance, type ReferralStatus } from "@/lib/api";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { apiFetch, ApiError, type OveAccount, type WalletBalance, type ReferralStatus, type MeFeatureFlags } from "@/lib/api";
 
 const REFERRAL_STATUS_LABEL: Record<"PENDING" | "CONFIRMED" | "REJECTED" | "REVOKED", string> = {
   PENDING: "審査中",
@@ -28,6 +28,7 @@ export default function WalletMenuPage() {
   const [account, setAccount] = useState<OveAccount | null>(null);
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
+  const [collectionEnabled, setCollectionEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [closingAccount, setClosingAccount] = useState(false);
@@ -54,6 +55,13 @@ export default function WalletMenuPage() {
         setReferralStatus(await apiFetch<ReferralStatus>("/api/v1/me/referral-status"));
       } catch {
         setReferralStatus({ referred: false });
+      }
+      // Feature Flag取得の失敗はメニュー導線を隠すだけにして、画面自体は止めない。
+      try {
+        const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
+        setCollectionEnabled(flags.digital_collection_enabled);
+      } catch {
+        setCollectionEnabled(false);
       }
     })();
   }, [router]);
@@ -135,6 +143,7 @@ export default function WalletMenuPage() {
         <MenuLink href="/wallet/services" label="連携サービス" />
         <MenuLink href="/wallet/earn" label="OVEを貯める" />
         <MenuLink href="/wallet/use" label="OVEを使う" />
+        {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
         <MenuLink href="/about" label="OVEについて" />
         <MenuLink href="/terms" label="利用規約" />

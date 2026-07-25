@@ -140,6 +140,58 @@ export interface ExpiringCreditsSummary {
   nearest_expires_at: string | null;
 }
 
+export interface MeFeatureFlags {
+  digital_collection_enabled: boolean;
+}
+
+export type CollectibleHoldingStatus =
+  | "ACTIVE"
+  | "REVOKED"
+  | "MINT_READY"
+  | "MINTING"
+  | "ONCHAIN"
+  | "TRANSFERRED"
+  | "BURNED"
+  | "ERROR";
+
+export interface CollectibleAssetSummary {
+  asset_code: string;
+  name: string;
+  description: string | null;
+  image_url: string;
+  thumbnail_url: string | null;
+  rarity: string | null;
+  category: string | null;
+  edition_size: number | null;
+}
+
+export interface CollectibleOnchainInfo {
+  network: string | null;
+  chain_id: string | null;
+  contract_address: string | null;
+  token_id: string | null;
+  transaction_hash: string | null;
+  owner_address: string | null;
+  minted_at: string | null;
+}
+
+export interface CollectibleHoldingSummary {
+  holding_id: string;
+  status: CollectibleHoldingStatus;
+  /** PR#2最終修正 P1-4: マーケット側の不変値。未送信ならnull (画面では非表示にする)。 */
+  serial_number: string | null;
+  acquired_at: string;
+  revoked_at: string | null;
+  revoke_reason: string | null;
+  asset: CollectibleAssetSummary;
+  onchain: CollectibleOnchainInfo;
+}
+
+export interface CollectibleListResponse {
+  items: CollectibleHoldingSummary[];
+  next_cursor: string | null;
+}
+
 export interface RewardRulePublic {
   rule_code: string;
   display_name: string;

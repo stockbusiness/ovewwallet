@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, type OnModuleInit } from "@nestjs/common";
 import type { CommonEventBody } from "@ove/shared-types";
 import { CommonEventHandlerRegistry } from "./common-event-handler-registry";
-import { CommonUserResolvedHandler } from "./handlers/common-user-resolved.handler";
 import { CommonUserMergedHandler } from "./handlers/common-user-merged.handler";
+import { CommonUserResolvedHandler } from "./handlers/common-user-resolved.handler";
 import { CustomerAssignmentChangedHandler } from "./handlers/customer-assignment-changed.handler";
+import { EntitlementGrantedHandler } from "./handlers/entitlement-granted.handler";
+import { EntitlementRevokedHandler } from "./handlers/entitlement-revoked.handler";
 import { ReferralConfirmedHandler } from "./handlers/referral-confirmed.handler";
 import { RewardGrantedHandler } from "./handlers/reward-granted.handler";
 import { RewardReversedHandler } from "./handlers/reward-reversed.handler";
@@ -27,6 +29,8 @@ export class CommonEventHandlersService implements OnModuleInit {
     private readonly referralConfirmed: ReferralConfirmedHandler,
     private readonly rewardGranted: RewardGrantedHandler,
     private readonly rewardReversed: RewardReversedHandler,
+    private readonly entitlementGranted: EntitlementGrantedHandler,
+    private readonly entitlementRevoked: EntitlementRevokedHandler,
   ) {}
 
   /** 同一event_typeの二重登録はここで即座に起動失敗させる (指示書Phase 4受入条件)。 */
@@ -37,6 +41,8 @@ export class CommonEventHandlersService implements OnModuleInit {
     this.registry.register(this.referralConfirmed);
     this.registry.register(this.rewardGranted);
     this.registry.register(this.rewardReversed);
+    this.registry.register(this.entitlementGranted);
+    this.registry.register(this.entitlementRevoked);
   }
 
   async dispatch(eventType: string, body: CommonEventBody, authenticatedSourceSystemKey: string): Promise<unknown> {

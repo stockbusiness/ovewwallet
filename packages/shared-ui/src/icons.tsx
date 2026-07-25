@@ -175,3 +175,23 @@ export function DownloadIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function SparkleIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.5 13.6 9l5.4 1.6-5.4 1.6L12 18l-1.6-5.8L5 10.6 10.4 9Z" />
+      <path d="M19 4v3M17.5 5.5h3" />
+    </svg>
+  );
+}
+
+export function ImageOffIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="1.6" />
+      <path d="M7 15.5l3.2-3.5a1.4 1.4 0 0 1 2 0l1.3 1.4" />
+      <circle cx="9" cy="9.5" r="1.3" />
+      <path d="M3.5 3.5l17 17" />
+    </svg>
+  );
+}

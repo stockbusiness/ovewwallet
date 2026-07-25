@@ -51,10 +51,18 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: "../..",
       timeout: 60_000,
-      // ENABLE_WALLET_REFERRAL_TOKEN はこのAPIプロセスにだけ立てる (`.env.test` 本体には
-      // 追加しない。apps/api の jest e2e (`outbox.test.ts`) が「未設定時は全フラグfalse」を
-      // 検証しており、.env.test 側で有効化するとそちらが壊れるため)。
-      env: { ENABLE_WALLET_REFERRAL_TOKEN: "true" },
+      // ENABLE_WALLET_REFERRAL_TOKEN/ENABLE_DIGITAL_COLLECTION はこのAPIプロセスにだけ立てる
+      // (`.env.test` 本体には追加しない。apps/api の jest e2e (`outbox.test.ts`) が
+      // 「未設定時は全フラグfalse」を検証しており、.env.test 側で有効化するとそちらが壊れるため)。
+      // COLLECTIBLE_IMAGE_ALLOWED_HOSTS (次期改修指示書P0-1のPR#2最終修正 P1-2):
+      // Playwrightのカード投入ヘルパー(support/seed.ts)がpicsum.photosの画像URLを使うため、
+      // Next.js Image Optimizerのremote patterns (apps/*/next.config.mjs) が同じホストを
+      // 許可するようapps/api・apps/user-wallet・apps/admin-walletの3プロセス全てに揃える。
+      env: {
+        ENABLE_WALLET_REFERRAL_TOKEN: "true",
+        ENABLE_DIGITAL_COLLECTION: "true",
+        COLLECTIBLE_IMAGE_ALLOWED_HOSTS: "picsum.photos",
+      },
     },
     {
       command: "pnpm --filter @ove/user-wallet start",
@@ -62,6 +70,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: "../..",
       timeout: 60_000,
+      env: { COLLECTIBLE_IMAGE_ALLOWED_HOSTS: "picsum.photos" },
     },
     {
       command: "pnpm --filter @ove/admin-wallet start",
@@ -69,6 +78,7 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       cwd: "../..",
       timeout: 60_000,
+      env: { COLLECTIBLE_IMAGE_ALLOWED_HOSTS: "picsum.photos" },
     },
   ],
 });

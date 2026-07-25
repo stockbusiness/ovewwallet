@@ -13,6 +13,10 @@ export const FEATURE_FLAG_KEYS = [
   "ENABLE_ONCHAIN_MIGRATION",
   /** 千ノ国 全体統合 共通実装契約 (2026-07-21) の POST /api/integrations/events を有効化する。 */
   "ENABLE_COMMON_EVENT_INBOX",
+  /** NFTコレクション実装指示書: ユーザー向けコレクションAPI・画面導線を有効化する。 */
+  "ENABLE_DIGITAL_COLLECTION",
+  /** 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandlerを有効化する。 */
+  "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

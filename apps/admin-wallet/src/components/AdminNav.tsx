@@ -16,6 +16,8 @@ const LINKS = [
   { href: "/common-user-hub-config", label: "共通顧客HUB送信設定" },
   { href: "/agency-links", label: "代理店連携状態" },
   { href: "/wallet-referrals", label: "紹介トークン受け入れ" },
+  { href: "/collectible-cards", label: "カードマスター管理" },
+  { href: "/collectible-holdings", label: "カード保有一覧" },
   { href: "/migrations", label: "既存ユーザー移行" },
   { href: "/approval-requests", label: "二段階承認" },
   { href: "/audit-logs", label: "操作ログ" },

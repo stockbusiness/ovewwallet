@@ -1,3 +1,11 @@
+// PR#2最終修正 P1-2: `COLLECTIBLE_IMAGE_ALLOWED_HOSTS` (カンマ区切り) からNext.js Image
+// Optimizerのremote patternsを組み立てる。未設定時は空配列 (リモート画像を一切許可しない、
+// Feature Flag既定OFFと同じ「安全側に倒す」方針)。
+const collectibleImageAllowedHosts = (process.env.COLLECTIBLE_IMAGE_ALLOWED_HOSTS ?? "")
+  .split(",")
+  .map((hostname) => hostname.trim())
+  .filter((hostname) => hostname.length > 0);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -17,6 +25,15 @@ const nextConfig = {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
     if (!apiUrl) return [];
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
+  },
+  // NFTコレクション実装指示書「画像セキュリティ」。カード画像はHTTPSのみ許可し
+  // (httpのホストは列挙しない)、SVGはNext.js Image Optimizerの既定挙動通り
+  // 最適化を無効化させない限り配信できない(dangerouslyAllowSVGを明示的にfalseのまま維持)。
+  // PR#2最終修正 P1-2: 任意ホストを許可する`hostname: "**"`ワイルドカードは廃止し、
+  // `COLLECTIBLE_IMAGE_ALLOWED_HOSTS`で明示された許可ホストのみに限定する。
+  images: {
+    remotePatterns: collectibleImageAllowedHosts.map((hostname) => ({ protocol: "https", hostname })),
+    dangerouslyAllowSVG: false,
   },
 };
 
