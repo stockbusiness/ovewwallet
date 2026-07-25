@@ -18,6 +18,13 @@ const nextConfig = {
     if (!apiUrl) return [];
     return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
   },
+  // NFTコレクション実装指示書「画像セキュリティ」。カード画像はHTTPSのみ許可し
+  // (httpのホストは列挙しない)、SVGはNext.js Image Optimizerの既定挙動通り
+  // 最適化を無効化させない限り配信できない(dangerouslyAllowSVGを明示的にfalseのまま維持)。
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    dangerouslyAllowSVG: false,
+  },
 };
 
 export default nextConfig;

@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from
 import { ApiTags } from "@nestjs/swagger";
 import type { CollectibleAsset, CollectibleHolding, CollectibleHoldingStatus } from "@ove/database";
 import { z } from "zod";
-import type { CollectibleHoldingWithAsset } from "../collectibles/collectible-holdings.repository";
+import type { CollectibleHoldingWithAssetAndAccount } from "../collectibles/collectible-holdings.repository";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
@@ -64,7 +64,7 @@ export class AdminCollectiblesController {
     @Query("status") status?: string,
     @Query("token_id") tokenId?: string,
     @Query("limit") limit?: string,
-  ): Promise<CollectibleHoldingWithAsset[]> {
+  ): Promise<CollectibleHoldingWithAssetAndAccount[]> {
     return this.collectibles.searchHoldings({
       commonUserId,
       accountCode,
@@ -80,7 +80,7 @@ export class AdminCollectiblesController {
   @Get("holdings/:id")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
-  async getHolding(@Param("id") id: string): Promise<CollectibleHoldingWithAsset> {
+  async getHolding(@Param("id") id: string): Promise<CollectibleHoldingWithAssetAndAccount> {
     return this.collectibles.getHolding(id);
   }
 

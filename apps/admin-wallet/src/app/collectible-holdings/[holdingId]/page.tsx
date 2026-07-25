@@ -1,0 +1,154 @@
+"use client";
+
+import Image from "next/image";
+import { useParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import AdminNav from "@/components/AdminNav";
+import { apiFetch, ApiError, type CollectibleHoldingItem } from "@/lib/api";
+
+/** NFTコレクション実装指示書14章。保有詳細+管理画面からの手動取消。 */
+export default function CollectibleHoldingDetailPage() {
+  const params = useParams<{ holdingId: string }>();
+  const router = useRouter();
+  const [holding, setHolding] = useState<CollectibleHoldingItem | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [revoking, setRevoking] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await apiFetch<CollectibleHoldingItem>(`/api/v1/admin/collectible/holdings/${params.holdingId}`);
+      setHolding(data);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push("/login");
+        return;
+      }
+      if (err instanceof ApiError && err.status === 404) {
+        setError("保有が見つかりません");
+        return;
+      }
+      setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
+    }
+  }, [params.holdingId, router]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function revoke() {
+    if (!reason.trim()) return;
+    if (!window.confirm("このカードの利用権を取消します。よろしいですか？")) return;
+    setRevoking(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/collectible/holdings/${params.holdingId}/revoke`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      setMessage("取消しました");
+      setReason("");
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "取消に失敗しました");
+    } finally {
+      setRevoking(false);
+    }
+  }
+
+  if (error) {
+    return (
+      <div>
+        <AdminNav />
+        <main className="mx-auto max-w-3xl p-6">
+          <p className="text-sm text-red-600">{error}</p>
+        </main>
+      </div>
+    );
+  }
+
+  if (!holding) {
+    return (
+      <div>
+        <AdminNav />
+        <main className="mx-auto max-w-3xl p-6">
+          <p className="text-sm text-neutral-500">読み込み中...</p>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <AdminNav />
+      <main className="mx-auto max-w-3xl p-6">
+        <h1 className="mb-4 text-xl font-bold">カード保有詳細</h1>
+
+        <section className="mb-6 flex gap-4 rounded-lg border border-neutral-200 bg-white p-4">
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-md bg-neutral-100">
+            <Image src={holding.asset.imageUrl} alt={holding.asset.name} fill sizes="96px" className="object-cover" />
+          </div>
+          <div className="text-sm">
+            <p className="font-semibold">{holding.asset.name}</p>
+            <p className="text-xs text-neutral-500">asset_code: {holding.asset.assetCode}</p>
+            {holding.asset.rarity && <p className="text-xs text-neutral-500">レアリティ: {holding.asset.rarity}</p>}
+          </div>
+        </section>
+
+        <table className="mb-6 w-full rounded-lg border border-neutral-200 bg-white text-left text-sm">
+          <tbody>
+            <Row label="保有ID" value={holding.id} mono />
+            <Row label="保有アカウント" value={holding.account?.accountCode ?? holding.oveAccountId} mono />
+            <Row label="common_user_id" value={holding.account?.commonUserId ?? "-"} mono />
+            <Row label="entitlement_id" value={holding.entitlementId} mono />
+            <Row label="order_id" value={holding.orderId ?? "-"} mono />
+            <Row label="order_item_id" value={holding.orderItemId ?? "-"} mono />
+            <Row label="送信元" value={holding.sourceSystemKey} />
+            <Row label="取得日" value={new Date(holding.acquiredAt).toLocaleString("ja-JP")} />
+            <Row label="状態" value={holding.status} />
+            {holding.revokedAt && <Row label="取消日" value={new Date(holding.revokedAt).toLocaleString("ja-JP")} />}
+            {holding.revokeReason && <Row label="取消理由" value={holding.revokeReason} />}
+            {holding.network && <Row label="ネットワーク" value={holding.network} />}
+            {holding.tokenId && <Row label="token_id" value={holding.tokenId} mono />}
+            {holding.contractAddress && <Row label="コントラクトアドレス" value={holding.contractAddress} mono />}
+          </tbody>
+        </table>
+
+        {holding.status !== "REVOKED" && (
+          <section className="rounded-lg border border-neutral-200 bg-white p-4">
+            <h2 className="mb-2 text-sm font-semibold">手動取消</h2>
+            <div className="flex items-end gap-3">
+              <label className="flex-1 text-xs">
+                取消理由
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-neutral-300 px-2 py-1 text-sm"
+                />
+              </label>
+              <button
+                onClick={revoke}
+                disabled={revoking || !reason.trim()}
+                className="rounded-md bg-red-600 px-4 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                {revoking ? "処理中..." : "取消する"}
+              </button>
+            </div>
+            {message && <p className="mt-2 text-sm text-emerald-600">{message}</p>}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <tr className="border-t border-neutral-100">
+      <td className="w-48 p-3 text-xs text-neutral-500">{label}</td>
+      <td className={`p-3 ${mono ? "font-mono text-xs" : ""}`}>{value}</td>
+    </tr>
+  );
+}

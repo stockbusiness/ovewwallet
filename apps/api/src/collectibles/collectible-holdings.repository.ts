@@ -38,6 +38,14 @@ export interface AdminListHoldingsParams {
 const HOLDING_WITH_ASSET_INCLUDE = { asset: true } as const;
 export type CollectibleHoldingWithAsset = CollectibleHolding & { asset: Prisma.CollectibleAssetGetPayload<object> };
 
+const HOLDING_WITH_ASSET_AND_ACCOUNT_INCLUDE = {
+  asset: true,
+  account: { select: { id: true, accountCode: true, commonUserId: true } },
+} as const;
+export type CollectibleHoldingWithAssetAndAccount = CollectibleHoldingWithAsset & {
+  account: { id: string; accountCode: string; commonUserId: string | null };
+};
+
 /**
  * NFTコレクション実装指示書11章。`CollectibleHolding`(ユーザーごとのカード保有権) への
  * Prismaアクセスを集約する。
@@ -113,7 +121,7 @@ export class CollectibleHoldingsRepository {
   }
 
   /** 管理画面向け検索一覧 (指示書14章)。 */
-  async adminList(params: AdminListHoldingsParams, client: Db = this.db): Promise<CollectibleHoldingWithAsset[]> {
+  async adminList(params: AdminListHoldingsParams, client: Db = this.db): Promise<CollectibleHoldingWithAssetAndAccount[]> {
     return client.collectibleHolding.findMany({
       where: {
         entitlementId: params.entitlementId,
@@ -123,9 +131,14 @@ export class CollectibleHoldingsRepository {
         account: params.commonUserId || params.accountCode ? { commonUserId: params.commonUserId, accountCode: params.accountCode } : undefined,
         asset: params.productCode ? { productCode: params.productCode } : undefined,
       },
-      include: HOLDING_WITH_ASSET_INCLUDE,
+      include: HOLDING_WITH_ASSET_AND_ACCOUNT_INCLUDE,
       orderBy: { createdAt: "desc" },
       take: params.limit,
     });
+  }
+
+  /** 管理画面向け詳細 (指示書14章)。保有者のアカウント情報も併せて返す。 */
+  async findByIdWithAssetAndAccount(id: string, client: Db = this.db): Promise<CollectibleHoldingWithAssetAndAccount | null> {
+    return client.collectibleHolding.findUnique({ where: { id }, include: HOLDING_WITH_ASSET_AND_ACCOUNT_INCLUDE });
   }
 }

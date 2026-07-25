@@ -1,5 +1,5 @@
-import { prisma, generateId, nextDisplayCode, ACCOUNT_CODE_COUNTER, WALLET_CODE_COUNTER } from "@ove/database";
 import { hashSecret } from "@ove/auth";
+import { prisma, generateId, nextDisplayCode, ACCOUNT_CODE_COUNTER, WALLET_CODE_COUNTER } from "@ove/database";
 
 /**
  * Playwright E2Eテスト用のデータ投入ヘルパー。テストごとにユニークなメール/コードで
@@ -37,6 +37,34 @@ export async function createTestWallet(balance = 0): Promise<{ accountId: string
     },
   });
   return { accountId: account.id, accountCode, walletId: wallet.id, walletCode };
+}
+
+/** NFTコレクション画面のPlaywright確認用。entitlement.grantedの実イベントは経由せず、直接DBへ投入する。 */
+export async function createTestCollectible(
+  oveAccountId: string,
+  overrides: Partial<Record<string, unknown>> = {},
+): Promise<{ holdingId: string; assetName: string }> {
+  const assetName = "上杉謙信カード (Playwright)";
+  const asset = await prisma.collectibleAsset.create({
+    data: {
+      id: generateId(),
+      assetCode: `ASSET-PW-${generateId()}`,
+      name: assetName,
+      imageUrl: "https://picsum.photos/seed/ove-pw/400/400",
+    },
+  });
+  const holding = await prisma.collectibleHolding.create({
+    data: {
+      id: generateId(),
+      oveAccountId,
+      collectibleAssetId: asset.id,
+      entitlementId: `ent_pw_${generateId()}`,
+      sourceSystemKey: "sengoku-market",
+      acquiredAt: new Date(),
+      ...overrides,
+    },
+  });
+  return { holdingId: holding.id, assetName };
 }
 
 export async function disconnect(): Promise<void> {

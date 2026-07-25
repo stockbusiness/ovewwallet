@@ -4,7 +4,10 @@ import {
   CollectibleAssetsRepository,
   type CreateCollectibleAssetParams,
 } from "../collectibles/collectible-assets.repository";
-import { CollectibleHoldingsRepository, type CollectibleHoldingWithAsset } from "../collectibles/collectible-holdings.repository";
+import {
+  CollectibleHoldingsRepository,
+  type CollectibleHoldingWithAssetAndAccount,
+} from "../collectibles/collectible-holdings.repository";
 import { RevokeCollectibleUseCase } from "../collectibles/revoke-collectible.use-case";
 
 export interface UpdateCollectibleAssetParams {
@@ -65,7 +68,7 @@ export class AdminCollectiblesService {
     return this.assets.update(id, params);
   }
 
-  async searchHoldings(params: AdminSearchHoldingsParams): Promise<CollectibleHoldingWithAsset[]> {
+  async searchHoldings(params: AdminSearchHoldingsParams): Promise<CollectibleHoldingWithAssetAndAccount[]> {
     return this.holdings.adminList({
       commonUserId: params.commonUserId,
       accountCode: params.accountCode,
@@ -78,8 +81,8 @@ export class AdminCollectiblesService {
     });
   }
 
-  async getHolding(id: string): Promise<CollectibleHoldingWithAsset> {
-    const holding = await this.holdings.findByIdWithAsset(id);
+  async getHolding(id: string): Promise<CollectibleHoldingWithAssetAndAccount> {
+    const holding = await this.holdings.findByIdWithAssetAndAccount(id);
     if (!holding) throw new NotFoundException("collectible holding not found");
     return holding;
   }

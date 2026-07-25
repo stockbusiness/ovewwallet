@@ -95,6 +95,13 @@ export class MeController {
     return this.wallets.getExpiringCreditsSummary(req.account.id);
   }
 
+  /** メニュー画面の「コレクション」導線をFeature Flagで出し分けるための最小限の公開情報。 */
+  @Get("feature-flags")
+  @UseGuards(SessionAuthGuard)
+  async myFeatureFlags() {
+    return { digital_collection_enabled: isFeatureEnabled("ENABLE_DIGITAL_COLLECTION") };
+  }
+
   /** NFTコレクション一覧 (指示書12章)。動的セグメント`:holdingId`より前に登録する必要はない
    * (固定パス"collectibles"の直後に来るためcollectibles/:holdingIdと衝突しない)。 */
   @Get("collectibles")
