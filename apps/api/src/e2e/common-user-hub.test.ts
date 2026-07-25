@@ -3,13 +3,13 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { encryptSecret, hashSecret } from "@ove/auth";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
-import { encryptSecret, hashSecret } from "@ove/auth";
+import { AccountsService } from "../accounts/accounts.service";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
-import { AccountsService } from "../accounts/accounts.service";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "test-only-insecure-encryption-key";
 const CONFIG_ID = "default";
@@ -104,9 +104,12 @@ describe("共通顧客HUBへのcommon_user_id解決 (外部開発者向け連携
   });
 
   it("resolves and stores common_user_id on new registration when the feature flag and config are set", async () => {
+    // 固定文字列だと、P1-2 (common_user_id重複防止) 導入後は過去のテスト実行で残った
+    // 同名の行と衝突し、意図しないconflict_ignoredになりうるため毎回ユニークな値を使う。
+    const resolvedCommonUserId = `cu_test_resolved_${generateId()}`;
     hub = await startMockHub((path) => {
       if (path.startsWith("/api/common-users/resolve")) {
-        return { status: 200, body: { ok: true, common_user_id: "cu_test_resolved", created: true, matched_by: "created" } };
+        return { status: 200, body: { ok: true, common_user_id: resolvedCommonUserId, created: true, matched_by: "created" } };
       }
       return { status: 404, body: { ok: false } };
     });
@@ -116,7 +119,7 @@ describe("共通顧客HUBへのcommon_user_id解決 (外部開発者向け連携
     const oveAccountId = await registerViaLineLogin(app.getHttpServer());
 
     const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: oveAccountId } });
-    expect(account.commonUserId).toBe("cu_test_resolved");
+    expect(account.commonUserId).toBe(resolvedCommonUserId);
     expect(account.commonUserLinkedAt).not.toBeNull();
 
     const resolveRequests = hub.requests.filter((r) => r.path.startsWith("/api/common-users/resolve"));
@@ -126,6 +129,42 @@ describe("共通顧客HUBへのcommon_user_id解決 (外部開発者向け連携
       external_user_id: oveAccountId,
       create_if_missing: true,
     });
+  });
+
+  it("モジュール化後レビュー対応 P1-2回帰: HUBが他アカウントに設定済みのcommon_user_idを返しても自動設定しない", async () => {
+    // テストDBは各テスト後の自動truncateが無く行が永続するため、固定リテラルは
+    // 過去の実行の残留データと衝突しうる (実際に発生した実例あり)。テスト実行ごとに
+    // 一意な値を使う。
+    const sharedCommonUserId = `cu_test_conflict_from_hub_${generateId()}`;
+    const existingAccountId = generateId();
+    await prisma.oveAccount.create({
+      data: {
+        id: existingAccountId,
+        accountCode: `OVE-ACC-TEST-${generateId()}`,
+        status: "ACTIVE",
+        commonUserId: sharedCommonUserId,
+        commonUserLinkedAt: new Date(),
+      },
+    });
+
+    hub = await startMockHub((path) => {
+      if (path.startsWith("/api/common-users/resolve")) {
+        return { status: 200, body: { ok: true, common_user_id: sharedCommonUserId, created: false, matched_by: "existing" } };
+      }
+      return { status: 404, body: { ok: false } };
+    });
+    await seedConfig({ baseUrl: hub.url, apiKey: "test-outbound-key" });
+    process.env.ENABLE_PLATFORM_USER_ID = "true";
+
+    const oveAccountId = await registerViaLineLogin(app.getHttpServer());
+
+    const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: oveAccountId } });
+    expect(account.commonUserId).toBeNull();
+
+    const conflictLogs = await prisma.auditLog.findMany({
+      where: { targetType: "ove_account", targetId: oveAccountId, actionType: "COMMON_USER_RESOLVED_CONFLICT" },
+    });
+    expect(conflictLogs).toHaveLength(1);
   });
 
   it("does not call the hub and leaves common_user_id null when ENABLE_PLATFORM_USER_ID is disabled (default)", async () => {

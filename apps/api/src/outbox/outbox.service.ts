@@ -1,6 +1,6 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { generateId, type Prisma, type PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
+import { OutboxRepository } from "./outbox.repository";
 
 export interface OutboxEnqueueParams {
   eventType: string;
@@ -39,7 +39,7 @@ export class OutboxService {
   private readonly logger = new Logger(OutboxService.name);
   private readonly destinations = new Map<string, OutboxDestinationHandler>();
 
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(private readonly repository: OutboxRepository) {}
 
   registerDestination(destinationService: string, handler: OutboxDestinationHandler): void {
     this.destinations.set(destinationService, handler);
@@ -51,18 +51,14 @@ export class OutboxService {
    * 同一トランザクションで確定し、イベント登録漏れが起きない。
    */
   async enqueue(tx: Prisma.TransactionClient | PrismaClient, params: OutboxEnqueueParams) {
-    return tx.integrationOutbox.upsert({
-      where: { idempotencyKey: params.idempotencyKey },
-      update: {},
-      create: {
-        id: generateId(),
-        eventType: params.eventType,
-        aggregateType: params.aggregateType,
-        aggregateId: params.aggregateId,
-        destinationService: params.destinationService,
-        payload: params.payload as Prisma.InputJsonValue,
-        idempotencyKey: params.idempotencyKey,
-      },
+    return this.repository.upsertByIdempotencyKey(tx, {
+      id: generateId(),
+      eventType: params.eventType,
+      aggregateType: params.aggregateType,
+      aggregateId: params.aggregateId,
+      destinationService: params.destinationService,
+      payload: params.payload as Prisma.InputJsonValue,
+      idempotencyKey: params.idempotencyKey,
     });
   }
 
@@ -75,14 +71,10 @@ export class OutboxService {
     let processed = 0;
     let failed = 0;
 
-    const due = await this.db.integrationOutbox.findMany({
-      where: { status: "PENDING", availableAt: { lte: new Date() } },
-      orderBy: { createdAt: "asc" },
-      take: limit,
-    });
+    const due = await this.repository.findDuePending(limit);
 
     for (const event of due) {
-      const claimed = await this.claim(event.id);
+      const claimed = await this.repository.claim(event.id);
       if (!claimed) continue;
 
       const handler = this.destinations.get(event.destinationService);
@@ -91,10 +83,7 @@ export class OutboxService {
           throw new Error(`no destination handler registered for "${event.destinationService}"`);
         }
         await handler.send(event);
-        await this.db.integrationOutbox.update({
-          where: { id: event.id },
-          data: { status: "SENT", processedAt: new Date(), lockedAt: null },
-        });
+        await this.repository.markSent(event.id);
         processed++;
       } catch (err) {
         await this.recordFailure(event.id, event.attemptCount + 1, err);
@@ -105,48 +94,26 @@ export class OutboxService {
     return { processed, failed };
   }
 
-  private async claim(id: string): Promise<boolean> {
-    const result = await this.db.integrationOutbox.updateMany({
-      where: { id, status: "PENDING" },
-      data: { status: "PROCESSING", lockedAt: new Date() },
-    });
-    return result.count === 1;
-  }
-
   private async recordFailure(id: string, attemptCount: number, err: unknown): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     const exhausted = attemptCount >= MAX_ATTEMPTS;
     const backoffSeconds = Math.min(BASE_BACKOFF_SECONDS * 2 ** (attemptCount - 1), MAX_BACKOFF_SECONDS);
     this.logger.warn(`outbox event ${id} failed (attempt ${attemptCount}): ${message}`);
 
-    await this.db.integrationOutbox.update({
-      where: { id },
-      data: {
-        status: exhausted ? "FAILED" : "PENDING",
-        attemptCount,
-        lockedAt: null,
-        lastErrorMessage: message.slice(0, 1000),
-        availableAt: exhausted ? undefined : new Date(Date.now() + backoffSeconds * 1000),
-      },
+    await this.repository.recordFailure(id, {
+      status: exhausted ? "FAILED" : "PENDING",
+      attemptCount,
+      lastErrorMessage: message.slice(0, 1000),
+      availableAt: exhausted ? undefined : new Date(Date.now() + backoffSeconds * 1000),
     });
   }
 
   /** 管理画面からの手動再送 (開発ガイドライン15章)。FAILED/PENDINGいずれからも再送できる。 */
   async manualRetry(id: string): Promise<void> {
-    await this.db.integrationOutbox.update({
-      where: { id },
-      data: { status: "PENDING", availableAt: new Date(), lockedAt: null, attemptCount: 0 },
-    });
+    await this.repository.manualRetry(id);
   }
 
   async list(params: { status?: string; destinationService?: string; limit?: number }): Promise<unknown[]> {
-    return this.db.integrationOutbox.findMany({
-      where: {
-        status: params.status ? (params.status as never) : undefined,
-        destinationService: params.destinationService,
-      },
-      orderBy: { createdAt: "desc" },
-      take: Math.min(params.limit ?? 100, 500),
-    });
+    return this.repository.list(params);
   }
 }

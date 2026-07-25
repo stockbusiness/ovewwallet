@@ -3,6 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import "./common/bigint-json";
 import { PrismaModule } from "./common/prisma.module";
+import { RepositoriesModule } from "./common/repositories.module";
 import { KeyValueStoreModule } from "./common/kv-store.module";
 import { requestIdMiddleware } from "./common/request-id.middleware";
 import { AccountsModule } from "./accounts/accounts.module";
@@ -21,6 +22,7 @@ import { HealthController } from "./health.controller";
 @Module({
   imports: [
     PrismaModule,
+    RepositoriesModule,
     KeyValueStoreModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     AccountsModule,

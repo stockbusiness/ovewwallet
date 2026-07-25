@@ -149,10 +149,83 @@ export const CommonEventBodySchema = z
     valid_from: z.string().nullable().optional(),
     valid_until: z.string().nullable().optional(),
     correlation_id: z.string().max(255).nullable().optional(),
+    /**
+     * リファクタリング指示書 Phase 5 (event_type別DTO)「正式フィールド候補」。
+     * 従来`metadata.amount`/`metadata.previous_common_user_id`/
+     * `metadata.original_event_id`としてのみ受け取っていた値を正式な最上位
+     * フィールドへ昇格する。後方互換期間中は正式フィールドを優先し、未指定なら
+     * 各ハンドラが`metadata`を旧形式fallbackとして参照する
+     * (`common-events/handlers/*.handler.ts`参照)。
+     */
+    amount: z.number().optional(),
+    previous_common_user_id: z.string().max(255).nullable().optional(),
+    original_event_id: z.string().max(255).nullable().optional(),
     metadata: z.record(z.unknown()).nullable().optional(),
   })
   .passthrough();
 export type CommonEventBody = z.infer<typeof CommonEventBodySchema>;
+
+/**
+ * リファクタリング指示書 Phase 5 (event_type別DTO)。共通イベントの基本封筒フィールド。
+ * `CommonEventBodySchema`(コントローラでの受信ゲート、全event_type共通・全項目任意) とは
+ * 別に、event_typeごとの専用Schema (`*EventSchema`) が継承する土台として定義する。
+ * `occurred_at`はコントローラのゲートと同じ緩い検証のままにし、専用Schema側で新たな
+ * 拒否要因を増やさない。
+ */
+const BaseCommonEventSchema = z.object({
+  event_id: z.string().min(1).max(255),
+  event_type: z.string().min(1).max(100),
+  event_version: z.string().min(1).max(20),
+  occurred_at: z.string().min(1),
+  source_system_key: z.string().min(1).max(100),
+  correlation_id: z.string().max(255).nullable().optional(),
+  metadata: z.record(z.unknown()).nullable().optional(),
+});
+
+/**
+ * event_type別Schema群。契約6.2章のうちウォレットが反応する6種類 (Phase 4の
+ * `CommonEventHandler.schema`) に対応する。正式フィールド (amount等) は後方互換期間中
+ * のため任意項目のままとし、必須チェックは各ハンドラの業務ロジック側で行う
+ * (metadataフォールバックを許容する必要があるため)。
+ */
+export const CommonUserResolvedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("common_user.resolved"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  source_user_id: z.string().max(255).nullable().optional(),
+}).passthrough();
+
+export const CommonUserMergedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("common_user.merged"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  previous_common_user_id: z.string().max(255).nullable().optional(),
+}).passthrough();
+
+export const CustomerAssignmentChangedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("customer.assignment.changed"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  assigned_agency_id: z.string().max(255).nullable().optional(),
+  registration_referrer_agency_id: z.string().max(255).nullable().optional(),
+}).passthrough();
+
+export const ReferralConfirmedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("referral.confirmed"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  referral_session_key: z.string().max(255).nullable().optional(),
+}).passthrough();
+
+export const RewardGrantedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("reward.granted"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  product_code: z.string().max(255).nullable().optional(),
+  amount: z.number().optional(),
+}).passthrough();
+
+export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("reward.reversed"),
+  original_event_id: z.string().max(255).nullable().optional(),
+  entitlement_id: z.string().max(255).nullable().optional(),
+  order_id: z.string().max(255).nullable().optional(),
+}).passthrough();
 
 /** 契約6.2章の必須イベントのうち、ウォレットが実際に反応するもの (5つの実装対象領域に対応)。 */
 export const COMMON_EVENT_HANDLED_TYPES = [

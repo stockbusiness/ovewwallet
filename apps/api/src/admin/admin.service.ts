@@ -11,6 +11,7 @@ import {
 import { PRISMA } from "../common/prisma.module";
 import { toCsv } from "../common/csv";
 import { serializeTransaction } from "../wallets/wallets.service";
+import { AccountRepository } from "../accounts/account.repository";
 import { AdminApprovalService, HIGH_VALUE_THRESHOLD } from "./admin-approval.service";
 
 /**
@@ -31,6 +32,7 @@ export class AdminService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly approvals: AdminApprovalService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   /** PC向け管理ダッシュボード (指示書13章) 用の集計値・過去30日推移。 */
@@ -40,7 +42,7 @@ export class AdminService {
     todayDebited: string;
     dailyTrend: Array<{ date: string; credited: string; debited: string }>;
   }> {
-    const totalAccounts = await this.db.oveAccount.count();
+    const totalAccounts = await this.accountRepository.countAll();
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -109,12 +111,7 @@ export class AdminService {
   }
 
   async listAccounts(params: { status?: string; limit?: number }) {
-    return this.db.oveAccount.findMany({
-      where: params.status ? { status: params.status as never } : undefined,
-      orderBy: { createdAt: "desc" },
-      take: Math.min(params.limit ?? 50, 200),
-      include: { wallet: true },
-    });
+    return this.accountRepository.list({ status: params.status, take: Math.min(params.limit ?? 50, 200) });
   }
 
   /**
@@ -123,12 +120,7 @@ export class AdminService {
    * (`docs/transaction-export.md`と同じ方針)。状態での絞り込みも一覧画面と同様に可能。
    */
   async exportAccountsCsv(params: { status?: string }): Promise<string> {
-    const accounts = await this.db.oveAccount.findMany({
-      where: params.status ? { status: params.status as never } : undefined,
-      orderBy: { createdAt: "desc" },
-      take: 10000,
-      include: { wallet: true },
-    });
+    const accounts = await this.accountRepository.list({ status: params.status, take: 10000 });
 
     const header = ["アカウントコード", "状態", "表示名", "メールアドレス", "登録日時", "ウォレットコード", "利用可能残高"];
     const rows = accounts.map((a) => [
@@ -146,16 +138,7 @@ export class AdminService {
 
   /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */
   async getAccountDetail(accountId: string): Promise<unknown> {
-    const account = await this.db.oveAccount.findUnique({
-      where: { id: accountId },
-      include: {
-        wallet: true,
-        identities: { orderBy: { createdAt: "desc" } },
-        links: { include: { serviceIntegration: { select: { serviceCode: true, serviceName: true } } } },
-        mergedIntoAccount: { select: { id: true, accountCode: true } },
-        mergedAccounts: { select: { id: true, accountCode: true } },
-      },
-    });
+    const account = await this.accountRepository.findAccountDetail(accountId);
     if (!account) throw new NotFoundException("account not found");
 
     const auditLogs = await this.db.auditLog.findMany({
@@ -173,7 +156,7 @@ export class AdminService {
 
   /** 全セッション無効化 (指示書16章): 端末を問わずアカウントの有効なセッションを一括で失効させる。 */
   async revokeAllSessions(accountId: string, adminId: string): Promise<{ revokedCount: number }> {
-    const account = await this.db.oveAccount.findUnique({ where: { id: accountId } });
+    const account = await this.accountRepository.findById(accountId);
     if (!account) throw new NotFoundException("account not found");
 
     const { count } = await this.db.userSession.updateMany({
@@ -215,7 +198,7 @@ export class AdminService {
     reason: string;
     verifiedBy: string;
   }): Promise<unknown> {
-    const account = await this.db.oveAccount.findUnique({ where: { id: params.accountId }, include: { wallet: true } });
+    const account = await this.accountRepository.findByIdWithWallet(params.accountId);
     if (!account) throw new NotFoundException("account not found");
     if (account.status !== "REVIEWING") {
       throw new ConflictException(`account ${params.accountId} is not in REVIEWING status (status=${account.status})`);
@@ -253,7 +236,7 @@ export class AdminService {
       );
     }
 
-    await this.db.oveAccount.update({ where: { id: params.accountId }, data: { status: "ACTIVE" } });
+    await this.accountRepository.updateStatus(params.accountId, "ACTIVE");
 
     await this.db.auditLog.create({
       data: {

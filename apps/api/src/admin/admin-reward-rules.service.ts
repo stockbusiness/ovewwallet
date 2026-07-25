@@ -3,6 +3,7 @@ import { generateId, type PrismaClient, type TransactionType } from "@ove/databa
 import { expireDueCreditLots, previewExpiringCreditLots } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { RULE_CODE_BY_TRANSACTION_TYPE } from "../rewards/rewards.service";
+import { RewardRuleRepository } from "../rewards/reward-rule.repository";
 
 export interface CreateRewardRuleParams {
   ruleCode: string;
@@ -49,10 +50,13 @@ export interface UpdateRewardRuleParams {
  */
 @Injectable()
 export class AdminRewardRulesService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly rewardRules: RewardRuleRepository,
+  ) {}
 
   async list() {
-    return this.db.rewardRule.findMany({ orderBy: { createdAt: "desc" } });
+    return this.rewardRules.listAll();
   }
 
   /**
@@ -63,7 +67,7 @@ export class AdminRewardRulesService {
    * `null`になる (0件ではなく「集計不能」を意味する)。
    */
   async getIssuanceSummary() {
-    const rules = await this.db.rewardRule.findMany({ orderBy: { createdAt: "desc" } });
+    const rules = await this.rewardRules.listAll();
     const transactionTypeByRuleCode = new Map(
       Object.entries(RULE_CODE_BY_TRANSACTION_TYPE).map(([transactionType, ruleCode]) => [ruleCode, transactionType]),
     );
@@ -92,54 +96,49 @@ export class AdminRewardRulesService {
   }
 
   async create(params: CreateRewardRuleParams) {
-    const existing = await this.db.rewardRule.findUnique({ where: { ruleCode: params.ruleCode } });
+    const existing = await this.rewardRules.findByRuleCode(params.ruleCode);
     if (existing) throw new ConflictException(`reward rule ${params.ruleCode} already exists`);
 
-    return this.db.rewardRule.create({
-      data: {
-        id: generateId(),
-        ruleCode: params.ruleCode,
-        ruleName: params.ruleName,
-        sourceService: params.sourceService as never,
-        rewardAmount: params.rewardAmount,
-        displayName: params.displayName,
-        description: params.description,
-        perUserLimit: params.perUserLimit,
-        perEventLimit: params.perEventLimit,
-        monthlyCountLimit: params.monthlyCountLimit,
-        monthlyAmountLimit: params.monthlyAmountLimit,
-        globalAmountLimit: params.globalAmountLimit,
-        startsAt: params.startsAt ? new Date(params.startsAt) : undefined,
-        endsAt: params.endsAt ? new Date(params.endsAt) : undefined,
-        approvalType: (params.approvalType as never) ?? "AUTOMATIC",
-        status: "ACTIVE",
-        expiryDays: params.expiryDays,
-      },
+    return this.rewardRules.create({
+      id: generateId(),
+      ruleCode: params.ruleCode,
+      ruleName: params.ruleName,
+      sourceService: params.sourceService as never,
+      rewardAmount: params.rewardAmount,
+      displayName: params.displayName,
+      description: params.description,
+      perUserLimit: params.perUserLimit,
+      perEventLimit: params.perEventLimit,
+      monthlyCountLimit: params.monthlyCountLimit,
+      monthlyAmountLimit: params.monthlyAmountLimit,
+      globalAmountLimit: params.globalAmountLimit,
+      startsAt: params.startsAt ? new Date(params.startsAt) : undefined,
+      endsAt: params.endsAt ? new Date(params.endsAt) : undefined,
+      approvalType: (params.approvalType as never) ?? "AUTOMATIC",
+      status: "ACTIVE",
+      expiryDays: params.expiryDays,
     });
   }
 
   async update(ruleCode: string, params: UpdateRewardRuleParams) {
-    const existing = await this.db.rewardRule.findUnique({ where: { ruleCode } });
+    const existing = await this.rewardRules.findByRuleCode(ruleCode);
     if (!existing) throw new NotFoundException(`reward rule ${ruleCode} not found`);
 
-    return this.db.rewardRule.update({
-      where: { ruleCode },
-      data: {
-        ruleName: params.ruleName,
-        rewardAmount: params.rewardAmount,
-        displayName: params.displayName,
-        description: params.description,
-        status: params.status as never,
-        perUserLimit: params.perUserLimit,
-        perEventLimit: params.perEventLimit,
-        monthlyCountLimit: params.monthlyCountLimit,
-        monthlyAmountLimit: params.monthlyAmountLimit,
-        globalAmountLimit: params.globalAmountLimit,
-        startsAt: params.startsAt === undefined ? undefined : params.startsAt ? new Date(params.startsAt) : null,
-        endsAt: params.endsAt === undefined ? undefined : params.endsAt ? new Date(params.endsAt) : null,
-        approvalType: params.approvalType as never,
-        expiryDays: params.expiryDays,
-      },
+    return this.rewardRules.update(ruleCode, {
+      ruleName: params.ruleName,
+      rewardAmount: params.rewardAmount,
+      displayName: params.displayName,
+      description: params.description,
+      status: params.status as never,
+      perUserLimit: params.perUserLimit,
+      perEventLimit: params.perEventLimit,
+      monthlyCountLimit: params.monthlyCountLimit,
+      monthlyAmountLimit: params.monthlyAmountLimit,
+      globalAmountLimit: params.globalAmountLimit,
+      startsAt: params.startsAt === undefined ? undefined : params.startsAt ? new Date(params.startsAt) : null,
+      endsAt: params.endsAt === undefined ? undefined : params.endsAt ? new Date(params.endsAt) : null,
+      approvalType: params.approvalType as never,
+      expiryDays: params.expiryDays,
     });
   }
 

@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@ove/database";
-import { creditWallet, debitWallet } from "./credit-debit";
+import { creditWallet, creditWalletInTransaction, debitWallet } from "./credit-debit";
 import { InsufficientBalanceError, WalletNotActiveError } from "./errors";
 import { createTestWallet, truncateLedgerTables } from "./test-helpers";
 
@@ -108,6 +108,51 @@ describe("creditWallet / debitWallet", () => {
     });
     expect(rejectionLog).not.toBeNull();
     expect(rejectionLog?.result).toBe("FAILURE");
+  });
+
+  it("creditWalletInTransaction credits within an already-open transaction (Phase 3 原子性)", async () => {
+    const { wallet } = await createTestWallet(0n);
+    const key = `PHASE3_ATOMIC:${wallet.id}`;
+
+    const txn = await prisma.$transaction((tx) =>
+      creditWalletInTransaction(tx, {
+        walletId: wallet.id,
+        amount: 500,
+        transactionType: "REFERRAL_REWARD",
+        idempotencyKey: key,
+        displayName: "代理店紹介登録特典",
+        createdByType: "EXTERNAL_SERVICE",
+      }),
+    );
+
+    expect(txn.status).toBe("COMPLETED");
+    const updated = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(updated.availableBalance).toBe(500n);
+  });
+
+  it("creditWalletInTransaction rolls back together with a later failure in the same transaction", async () => {
+    const { wallet } = await createTestWallet(0n);
+    const key = `PHASE3_ROLLBACK:${wallet.id}`;
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await creditWalletInTransaction(tx, {
+          walletId: wallet.id,
+          amount: 700,
+          transactionType: "REFERRAL_REWARD",
+          idempotencyKey: key,
+          displayName: "代理店紹介登録特典",
+          createdByType: "EXTERNAL_SERVICE",
+        });
+        throw new Error("simulated failure after credit, in the same transaction");
+      }),
+    ).rejects.toThrow("simulated failure after credit");
+
+    // 同一トランザクション内での後続失敗により、CREDIT自体もロールバックされる。
+    const updated = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(updated.availableBalance).toBe(0n);
+    const txnCount = await prisma.oveTransaction.count({ where: { idempotencyKey: key } });
+    expect(txnCount).toBe(0);
   });
 
   it("rejects operations on a non-ACTIVE wallet", async () => {

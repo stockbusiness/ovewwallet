@@ -1,5 +1,14 @@
 import { Module } from "@nestjs/common";
 import { AdminController } from "./admin.controller";
+import { AdminAuthController } from "./admin-auth.controller";
+import { AdminAccountsController } from "./admin-accounts.controller";
+import { AdminWalletsController } from "./admin-wallets.controller";
+import { AdminRewardsController } from "./admin-rewards.controller";
+import { AdminIntegrationsController } from "./admin-integrations.controller";
+import { AdminReferralsController } from "./admin-referrals.controller";
+import { AdminNoticesController } from "./admin-notices.controller";
+import { AdminMigrationsController } from "./admin-migrations.controller";
+import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminService } from "./admin.service";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
@@ -17,7 +26,18 @@ import { AccountsModule } from "../accounts/accounts.module";
 
 @Module({
   imports: [AccountsModule],
-  controllers: [AdminController],
+  controllers: [
+    AdminController,
+    AdminAuthController,
+    AdminAccountsController,
+    AdminWalletsController,
+    AdminRewardsController,
+    AdminIntegrationsController,
+    AdminReferralsController,
+    AdminNoticesController,
+    AdminMigrationsController,
+    AdminApprovalsController,
+  ],
   providers: [
     AdminService,
     AdminAuthService,

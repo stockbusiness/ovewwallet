@@ -257,6 +257,12 @@ model OveAccount {
   /// 代理店システム内共通顧客HUBが発行するcommon_user_id (外部開発者向け連携
   /// ガイド9章)。ENABLE_PLATFORM_USER_ID有効時、新規アカウント作成後にベスト
   /// エフォートで解決・保存する。解決前の既存アカウント・呼び出し失敗時はnull。
+  /// UNIQUE制約は付けない (既存の複数アカウントが同じcommon_user_idを保持する
+  /// 状態を「あり得ない」と扱わず、検出して要レビューとして扱う既存の防御的設計
+  /// (`CommonEventAccountResolver`・P0-5回帰テスト) と両立させるため)。
+  /// 追加整合性対策P0-1: 異なる2アカウントへの同時設定競合(TOCTOU)は、DB制約
+  /// ではなくPostgreSQL advisory lock (`CommonUserLinkingUseCase`が
+  /// `pg_advisory_xact_lock`でcommon_user_id単位の書き込みを直列化) で防ぐ。
   commonUserId        String?       @map("common_user_id")
   commonUserLinkedAt  DateTime?     @map("common_user_linked_at")
   /// 千ノ国 全体統合 共通実装契約 4.2章。初回登録を発生させた紹介代理店の
@@ -282,6 +288,7 @@ model OveAccount {
   dailyBonusClaims  DailyBonusClaim[]
 
   @@index([commonUserId])
+
   @@map("ove_accounts")
 }
 

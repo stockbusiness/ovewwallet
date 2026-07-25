@@ -18,6 +18,12 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // 追加整合性対策P1-2 (CIへの追加) で判明: GitHub Actions runnerはこの開発コンテナより
+  // CPU/メモリに余裕が無く、3アプリ+Postgres+Redisを同時に動かすと個々のリクエストが
+  // ローカルより大幅に遅くなることがある (実際にLINEモックログインの応答待ちだけで
+  // デフォルトの30秒テストタイムアウトを超えた実績あり)。CI実行時のみタイムアウトを
+  // 引き上げ、ローカル開発時の速いフィードバックは変えない。
+  timeout: process.env.CI ? 90_000 : 30_000,
   reporter: [["list"]],
   use: {
     trace: "retain-on-failure",

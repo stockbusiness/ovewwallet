@@ -5,7 +5,7 @@ name: CI
 # push/PRごとの自動チェックが存在しなかった状態への対応。
 on:
   push:
-    branches: [main]
+    branches: [claude/ove-wallet-platform]
   pull_request:
 
 jobs:
@@ -67,17 +67,48 @@ jobs:
       - name: Apply migrations to the test database
         run: pnpm db:migrate:test
 
+      # apps/user-wallet/next.config.mjsのrewrites() (/api/*をAPIサーバーへ転送) は
+      # NEXT_PUBLIC_API_URL未設定時に無効化され、この設定はnext buildの時点で
+      # .next/routes-manifest.jsonに焼き込まれる (next start時に再評価されない)。
+      # ローカル開発では各自のapps/user-wallet/.env.local (gitignore対象、CIには存在しない)
+      # が設定しているため、CIでのみこの転送が無効なまま動いてしまい、LINEモック
+      # ログイン後のフェッチがAPIへ届かず応答が返らなくなっていた (追加整合性対策P1-2で
+      # 発覚、詳細はテスト実行結果参照)。
       - name: Build (packages + apps, includes typecheck for Next.js apps)
         run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4000
 
-      # apps/admin-wallet・apps/user-wallet の `lint` (`next lint`) はESLint未設定のため
-      # 対話プロンプトを要求してCIでは失敗する (`docs/monitoring.md`「残作業」参照)。
-      # 型チェック自体は上のbuildステップ (`next build`) で行われているため、
-      # ここではtscベースのlintスクリプトを持つワークスペースのみを明示的に対象にする
-      # (ルートの`pnpm lint`は内部で`pnpm -r lint`を再度呼ぶため、`--filter=!...`による
-      # 除外では回避できない。ワークスペースを直接指定する)。
+      # apps/admin-wallet・apps/user-wallet の各`lint` (`next lint`) はESLint未設定のため
+      # 対話プロンプトを要求してCIでは失敗する。型チェック自体は上のbuildステップ
+      # (`next build`) で行われ、実質的なlintは下のルート`eslint .` (Phase 0で導入) が
+      # apps/user-wallet・apps/admin-walletも含めて全体をカバーするため、ここではtscベースの
+      # lintスクリプトを持つワークスペースのみを明示的に対象にする (ルートの`pnpm lint`は
+      # 内部で`pnpm -r lint`を再度呼ぶため、`--filter=!...`による除外では回避できない。
+      # ワークスペースを直接指定する)。
       - name: Lint (typecheck)
         run: pnpm -r --filter=./packages/* --filter=./apps/api lint
 
+      # リファクタリング指示書 Phase 0 (§6): ESLint (未使用import/変数・import順序・
+      # モジュール境界・行数/複雑度警告・process.env直接使用の段階的検出)。
+      # 型エラーとは別ステップにすることで、CI出力上どちらが失敗したか区別できるようにする。
+      - name: Lint (ESLint)
+        run: pnpm lint:eslint
+
+      # リファクタリング指示書 Phase 0 (§6): 循環依存検出。循環依存があればこのステップが
+      # 非ゼロ終了し、CI全体が失敗する。
+      - name: Circular dependency check
+        run: pnpm depcruise
+
       - name: Test (jest e2e + vitest unit tests)
         run: pnpm test
+
+      # 追加整合性対策 P1-2: 独立Playwright E2Eワークスペース (tests/e2e, @ove/e2e) は
+      # これまでCIで実行されておらず、ローカルでの手動実行にのみ依存していた。
+      # このrunnerには開発コンテナのようなブラウザの事前インストールが無いため、実行前に
+      # インストールする (依存パッケージも含める。ubuntu-latestではsudoなしで動く)。
+      - name: Install Playwright Chromium
+        run: pnpm --filter @ove/e2e exec playwright install --with-deps chromium
+
+      - name: Test (independent Playwright E2E)
+        run: pnpm test:e2e

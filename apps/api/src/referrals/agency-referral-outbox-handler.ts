@@ -3,6 +3,7 @@ import type { PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import type { OutboxDestinationHandler, OutboxEvent } from "../outbox/outbox.service";
 import { ReferralsService } from "./referrals.service";
+import { AccountRepository } from "../accounts/account.repository";
 
 /**
  * `IntegrationOutbox`の`destinationService: "AGENCY_SYSTEM"`宛イベント
@@ -20,6 +21,7 @@ export class AgencyReferralOutboxHandler implements OutboxDestinationHandler {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly referrals: ReferralsService,
+    private readonly accountRepository: AccountRepository,
   ) {}
 
   async send(event: OutboxEvent): Promise<void> {
@@ -31,7 +33,7 @@ export class AgencyReferralOutboxHandler implements OutboxDestinationHandler {
     if (!referral || !referral.walletUserId) return; // 対象アカウントが無い (登録競合で他リクエストが処理済み)
     if (referral.status !== "PENDING") return; // 既にCONFIRMED/REJECTED等、再送不要
 
-    const account = await this.db.oveAccount.findUnique({ where: { id: referral.walletUserId } });
+    const account = await this.accountRepository.findById(referral.walletUserId);
     if (!account?.commonUserId) {
       throw new Error("common_user_id is not resolved yet for this account; retry later");
     }
