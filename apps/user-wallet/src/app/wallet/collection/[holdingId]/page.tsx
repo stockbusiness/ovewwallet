@@ -69,7 +69,7 @@ export default function CollectionDetailPage() {
 
       <section className="flex flex-col gap-1">
         <p className="text-lg font-bold text-sengoku-text">{item.asset.name}</p>
-        <p className="text-xs text-sengoku-muted">#{item.serial_number}</p>
+        {item.serial_number && <p className="text-xs text-sengoku-muted">#{item.serial_number}</p>}
         {item.asset.rarity && (
           <span className="mt-1 inline-block w-fit rounded-full bg-sengoku-gold/15 px-3 py-1 text-xs font-semibold text-sengoku-gold">
             {item.asset.rarity}

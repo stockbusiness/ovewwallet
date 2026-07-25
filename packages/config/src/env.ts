@@ -58,6 +58,11 @@ const envSchema = z.object({
   ENABLE_DIGITAL_COLLECTION: z.enum(["true", "false"]).default("false"),
   // 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandler。
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: z.enum(["true", "false"]).default("false"),
+  // PR#2最終修正 P1-2: カード画像URLの許可ホスト (カンマ区切り)。未設定時はHTTPS/
+  // SVG拒否/private-IP拒否のみで判定し、ホスト許可リストは適用しない (opt-in)。
+  // apps/user-wallet・apps/admin-wallet の next.config.mjs もビルド時に同じ値を読み、
+  // Next.js Image Optimizerのremote patternsを組み立てる。
+  COLLECTIBLE_IMAGE_ALLOWED_HOSTS: z.string().optional().default(""),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

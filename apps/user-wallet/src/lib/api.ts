@@ -178,7 +178,8 @@ export interface CollectibleOnchainInfo {
 export interface CollectibleHoldingSummary {
   holding_id: string;
   status: CollectibleHoldingStatus;
-  serial_number: number;
+  /** PR#2最終修正 P1-4: マーケット側の不変値。未送信ならnull (画面では非表示にする)。 */
+  serial_number: string | null;
   acquired_at: string;
   revoked_at: string | null;
   revoke_reason: string | null;

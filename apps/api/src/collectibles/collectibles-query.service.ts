@@ -12,8 +12,12 @@ export interface ListMyCollectiblesParams {
 
 /**
  * NFTコレクション実装指示書12章。本人向け`GET /api/v1/me/collectibles`
- * (一覧・詳細) の組み立てを担う。`serial_number`はDBに保存せず、取得順から
- * 都度算出する表示専用の値 (指示書§5.2のデータモデルに列を追加しないための設計)。
+ * (一覧・詳細) の組み立てを担う。
+ *
+ * PR#2最終修正 P1-3/P1-4: `serial_number`は動的COUNTでの算出をやめ、付与時に固定された
+ * `holding.serialNumber`をそのまま返す (未送信ならnull・画面非表示)。カード表示情報も
+ * `holding.*Snapshot`列を優先し、専用列導入以前の行 (すべてnull) のみCollectibleAssetへ
+ * フォールバックする。
  */
 @Injectable()
 export class CollectiblesQueryService {
@@ -29,7 +33,7 @@ export class CollectiblesQueryService {
     });
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
-    const items = await Promise.all(page.map((holding) => this.toDto(holding)));
+    const items = page.map((holding) => this.toDto(holding));
     return { items, next_cursor: hasMore ? page[page.length - 1]!.id : null };
   }
 
@@ -40,22 +44,21 @@ export class CollectiblesQueryService {
     return this.toDto(holding);
   }
 
-  private async toDto(holding: CollectibleHoldingWithAsset) {
-    const serialNumber = await this.holdings.countAcquiredBeforeOrAt(holding.collectibleAssetId, holding.acquiredAt, holding.id);
+  private toDto(holding: CollectibleHoldingWithAsset) {
     return {
       holding_id: holding.id,
       status: holding.status,
-      serial_number: serialNumber,
+      serial_number: holding.serialNumber,
       acquired_at: holding.acquiredAt,
       revoked_at: holding.revokedAt,
       revoke_reason: holding.revokeReason,
       asset: {
         asset_code: holding.asset.assetCode,
-        name: holding.asset.name,
-        description: holding.asset.description,
-        image_url: holding.asset.imageUrl,
-        thumbnail_url: holding.asset.thumbnailUrl,
-        rarity: holding.asset.rarity,
+        name: holding.displayNameSnapshot ?? holding.asset.name,
+        description: holding.descriptionSnapshot ?? holding.asset.description,
+        image_url: holding.imageUrlSnapshot ?? holding.asset.imageUrl,
+        thumbnail_url: holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl,
+        rarity: holding.raritySnapshot ?? holding.asset.rarity,
         category: holding.asset.category,
         edition_size: holding.asset.editionSize,
       },

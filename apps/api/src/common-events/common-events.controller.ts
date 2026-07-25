@@ -23,6 +23,15 @@ import { InboundEventsService } from "./inbound-events.service";
 const SUPPORTED_EVENT_VERSIONS = new Set<string>(COMMON_EVENT_SUPPORTED_VERSIONS);
 
 /**
+ * PR#2最終修正 P0-3: `entitlement.granted`/`entitlement.revoked`はNFTコレクション専用の
+ * Feature Flag (`ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX`)で別途ゲートする。ハンドラ内で
+ * `skipped`を返す設計だとInbound Eventが`SUCCEEDED`として確定してしまい、Flagを後からONに
+ * しても同じevent_idが二度と再処理されない。Inbound Event行を作る前 (`receive`呼び出し前)に
+ * ここで弾くことで、Flag OFF中は行自体を作らず、ON後の再送で正しく処理できるようにする。
+ */
+const COLLECTIBLE_ENTITLEMENT_EVENT_TYPES = new Set(["entitlement.granted", "entitlement.revoked"]);
+
+/**
  * 千ノ国 全体統合 共通実装契約 v1.0 6章 / v1.1 DRAFT。代理店システム等から共通イベントを
  * 受信するInboxエンドポイント。`ENABLE_COMMON_EVENT_INBOX` (既定false) で
  * 段階的に有効化する。
@@ -79,6 +88,11 @@ export class CommonEventsController {
       throw new ForbiddenException(
         `key_id is not permitted to send event_type "${body.event_type}"`,
       );
+    }
+
+    // PR#2最終修正 P0-3: Inbound Event行を作る前にNFTコレクション専用Flagを確認する。
+    if (COLLECTIBLE_ENTITLEMENT_EVENT_TYPES.has(body.event_type) && !isFeatureEnabled("ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX")) {
+      throw new ServiceUnavailableException("collectible entitlement inbox is not enabled yet");
     }
 
     const { cached, result } = await this.inboundEvents.receive(body, req.commonEventSourceSystemKey);

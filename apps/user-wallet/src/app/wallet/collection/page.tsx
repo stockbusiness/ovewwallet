@@ -111,7 +111,7 @@ export default function CollectionListPage() {
                 </div>
                 <div className="p-2">
                   <p className="truncate text-sm font-semibold text-sengoku-text">{item.asset.name}</p>
-                  <p className="mt-0.5 text-[10px] text-sengoku-faint">#{item.serial_number}</p>
+                  {item.serial_number && <p className="mt-0.5 text-[10px] text-sengoku-faint">#{item.serial_number}</p>}
                   <p className="mt-1 text-[10px] text-sengoku-muted">{label.primary}</p>
                 </div>
               </Link>

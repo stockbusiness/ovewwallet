@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { generateId, type CollectibleAsset, type CollectibleHolding, type CollectibleHoldingStatus } from "@ove/database";
+import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { generateId, type CollectibleAsset, type CollectibleHolding, type CollectibleHoldingStatus, type Prisma, type PrismaClient } from "@ove/database";
+import { PRISMA } from "../common/prisma.module";
 import {
   CollectibleAssetsRepository,
   type CreateCollectibleAssetParams,
@@ -38,10 +39,16 @@ const MAX_LIST_LIMIT = 200;
 /**
  * NFTコレクション実装指示書14章。カードマスター(CollectibleAsset)のCRUDと、
  * 保有(CollectibleHolding)の検索・手動取消を管理画面向けに提供する。
+ *
+ * PR#2最終修正 P2-1: カードマスターの作成・更新はDB更新とAuditLogを同一トランザクションで
+ * 実行する。ステータスをACTIVE/ARCHIVEDへ変更した場合は専用のactionType
+ * (COLLECTIBLE_ASSET_ARCHIVED/COLLECTIBLE_ASSET_ACTIVATED) を、それ以外の項目変更は
+ * COLLECTIBLE_ASSET_UPDATEDを記録する。
  */
 @Injectable()
 export class AdminCollectiblesService {
   constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly assets: CollectibleAssetsRepository,
     private readonly holdings: CollectibleHoldingsRepository,
     private readonly revokeCollectible: RevokeCollectibleUseCase,
@@ -57,15 +64,73 @@ export class AdminCollectiblesService {
     return asset;
   }
 
-  async createAsset(params: Omit<CreateCollectibleAssetParams, "id">): Promise<CollectibleAsset> {
+  async createAsset(params: Omit<CreateCollectibleAssetParams, "id">, adminId: string): Promise<CollectibleAsset> {
     const existing = await this.assets.findByAssetCode(params.assetCode);
     if (existing) throw new ConflictException(`collectible asset ${params.assetCode} already exists`);
-    return this.assets.create({ id: generateId(), ...params });
+
+    return this.db.$transaction(async (tx) => {
+      const asset = await this.assets.create({ id: generateId(), ...params }, tx);
+      await tx.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: "ADMIN",
+          actorId: adminId,
+          actionType: "COLLECTIBLE_ASSET_CREATED",
+          targetType: "collectible_asset",
+          targetId: asset.id,
+          result: "SUCCESS",
+          afterData: { assetCode: asset.assetCode, name: asset.name, imageUrl: asset.imageUrl } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return asset;
+    });
   }
 
-  async updateAsset(id: string, params: UpdateCollectibleAssetParams): Promise<CollectibleAsset> {
-    await this.getAsset(id);
-    return this.assets.update(id, params);
+  async updateAsset(id: string, params: UpdateCollectibleAssetParams, adminId: string): Promise<CollectibleAsset> {
+    const before = await this.getAsset(id);
+
+    return this.db.$transaction(async (tx) => {
+      const updated = await this.assets.update(id, params, tx);
+      await tx.auditLog.create({
+        data: {
+          id: generateId(),
+          actorType: "ADMIN",
+          actorId: adminId,
+          actionType: this.updateActionType(before.status, params.status),
+          targetType: "collectible_asset",
+          targetId: updated.id,
+          result: "SUCCESS",
+          beforeData: {
+            name: before.name,
+            description: before.description,
+            imageUrl: before.imageUrl,
+            thumbnailUrl: before.thumbnailUrl,
+            rarity: before.rarity,
+            category: before.category,
+            editionSize: before.editionSize,
+            status: before.status,
+          } as unknown as Prisma.InputJsonValue,
+          afterData: {
+            name: updated.name,
+            description: updated.description,
+            imageUrl: updated.imageUrl,
+            thumbnailUrl: updated.thumbnailUrl,
+            rarity: updated.rarity,
+            category: updated.category,
+            editionSize: updated.editionSize,
+            status: updated.status,
+          } as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return updated;
+    });
+  }
+
+  private updateActionType(previousStatus: string, nextStatus: string | undefined): string {
+    if (nextStatus && nextStatus !== previousStatus) {
+      return nextStatus === "ARCHIVED" ? "COLLECTIBLE_ASSET_ARCHIVED" : "COLLECTIBLE_ASSET_ACTIVATED";
+    }
+    return "COLLECTIBLE_ASSET_UPDATED";
   }
 
   async searchHoldings(params: AdminSearchHoldingsParams): Promise<CollectibleHoldingWithAssetAndAccount[]> {

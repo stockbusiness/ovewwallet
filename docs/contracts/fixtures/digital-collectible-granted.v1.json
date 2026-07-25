@@ -1,0 +1,26 @@
+{
+  "event_id": "evt_digital_collectible_granted_v1",
+  "event_type": "entitlement.granted",
+  "event_version": "1.0",
+  "occurred_at": "2026-07-25T00:00:00Z",
+  "source_system_key": "sengoku-market",
+  "common_user_id": "cu_xxx",
+  "source_user_id": "market-user-id",
+  "order_id": "order-id",
+  "order_item_id": "order-item-id",
+  "product_code": "NOBUNAGA-SSR",
+  "entitlement_id": "nft-issue-id",
+  "quantity": 1,
+  "metadata": {
+    "entitlement_type": "digital_collectible",
+    "asset_code": "SENGOKU-NOBUNAGA-SSR",
+    "name": "織田信長 SSR",
+    "description": "商品説明",
+    "image_url": "https://cdn.sengoku-market.example.jp/cards/nobunaga-ssr.png",
+    "thumbnail_url": "https://cdn.sengoku-market.example.jp/cards/nobunaga-ssr-thumb.png",
+    "image_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000",
+    "rarity": "SSR",
+    "serial_number": "0034",
+    "blockchain_status": "NOT_MINTED"
+  }
+}

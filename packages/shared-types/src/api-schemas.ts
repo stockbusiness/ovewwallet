@@ -236,6 +236,9 @@ export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
 export const EntitlementGrantedEventSchema = BaseCommonEventSchema.extend({
   event_type: z.literal("entitlement.granted"),
   common_user_id: z.string().max(255).nullable().optional(),
+  // PR#2最終修正 P0-4: 業務項目はトップレベルに置くフラットな契約
+  // (docs/contracts/fixtures/digital-collectible-granted.v1.json参照)。
+  source_user_id: z.string().max(255).nullable().optional(),
   order_id: z.string().max(255).nullable().optional(),
   order_item_id: z.string().max(255).nullable().optional(),
   product_code: z.string().max(255).nullable().optional(),

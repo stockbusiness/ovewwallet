@@ -1,14 +1,23 @@
 import { z } from "zod";
+import { assertValidCollectibleImageUrl, InvalidCollectibleImageUrlError } from "../../common/image-url-validator";
 
 /**
- * NFTコレクション実装指示書「画像セキュリティ」。カード画像はHTTPS URLのみ許可し、
- * SVG(スクリプト実行のリスクがある)は拒否する。
+ * NFTコレクション実装指示書「画像セキュリティ」。PR#2最終修正 P1-2により、
+ * `entitlement.granted`のmetadata.image_url検証と同じ共有バリデーターを使う
+ * (HTTPS限定・SVG拒否・URL長上限・localhost/loopback/private IP/link-local拒否・
+ * `COLLECTIBLE_IMAGE_ALLOWED_HOSTS`許可リスト)。
  */
-const secureImageUrl = z
-  .string()
-  .url()
-  .refine((url) => url.startsWith("https://"), { message: "image URL must use https://" })
-  .refine((url) => !new URL(url).pathname.toLowerCase().endsWith(".svg"), { message: "SVG images are not allowed" });
+const secureImageUrl = z.string().url().superRefine((url, ctx) => {
+  try {
+    assertValidCollectibleImageUrl(url);
+  } catch (error) {
+    if (error instanceof InvalidCollectibleImageUrlError) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: error.message });
+    } else {
+      throw error;
+    }
+  }
+});
 
 export const CreateCollectibleAssetSchema = z.object({
   assetCode: z.string().min(1).max(255),

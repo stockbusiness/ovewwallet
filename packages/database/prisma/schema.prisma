@@ -1071,8 +1071,26 @@ model CollectibleHolding {
   revokedAt          DateTime?                @map("revoked_at")
   revokeReason       String?                  @map("revoke_reason")
   /// 購入時スナップショット (指示書9章「Asset更新方針」推奨: CollectibleAssetが
-  /// マスター、こちらは取得時点の名称・画像URL等を保持する)。
+  /// マスター、こちらは取得時点の名称・画像URL等を保持する)。P1-3で専用列を追加した後も
+  /// 破壊的変更禁止のため残す (専用列導入以前に作られた行の非公式スナップショットとして
+  /// 引き続き利用可能)。
   metadata           Json?
+
+  /// PR#2最終修正 P1-3: 付与時点で固定する表示用スナップショット。CollectibleAssetの
+  /// 後続編集を、既に付与済みのHoldingの表示へ反映させないための専用列
+  /// (metadataの非公式Jsonブロブと違い型付き・検索可能)。すべてnullable
+  /// (指示書10章「破壊的変更禁止」、既存行はCollectibleAssetからbackfill可能)。
+  displayNameSnapshot  String? @map("display_name_snapshot")
+  descriptionSnapshot  String? @map("description_snapshot")
+  imageUrlSnapshot     String? @map("image_url_snapshot")
+  thumbnailUrlSnapshot String? @map("thumbnail_url_snapshot")
+  imageHashSnapshot    String? @map("image_hash_snapshot")
+  raritySnapshot       String? @map("rarity_snapshot")
+  /// PR#2最終修正 P1-4: 戦国マーケットの`metadata.serial_number`をそのまま不変値として
+  /// 保存する ("0034"のような桁固定表記もあるため文字列)。未送信ならnull (画面では非表示)。
+  /// 動的COUNTによる算出 (旧`countAcquiredBeforeOrAt`) は他Holdingの増減で値が変動する
+  /// ため廃止した。
+  serialNumber         String? @map("serial_number")
 
   // --- 将来Mint項目 (指示書18章)。MVPでは書き込まない。すべてnullableのまま。 ---
   network         String?

@@ -155,7 +155,7 @@ describe("NFTコレクション API (Phase 3)", () => {
   });
 
   describe("GET /api/v1/me/collectibles/:holdingId", () => {
-    it("本人のHoldingは詳細を返す (serial_numberを含む)", async () => {
+    it("本人のHoldingは詳細を返す (serial_number未設定ならnull、PR#2最終修正P1-4)", async () => {
       const { cookie, oveAccountId } = await loginAsNewUser();
       const asset = await createAsset();
       const holding = await createHolding(oveAccountId, asset.id);
@@ -165,8 +165,36 @@ describe("NFTコレクション API (Phase 3)", () => {
         .set("Cookie", cookie)
         .expect(200);
       expect(res.body.holding_id).toBe(holding.id);
-      expect(res.body.serial_number).toBe(1);
+      expect(res.body.serial_number).toBeNull();
       expect(res.body.asset.asset_code).toBe(asset.assetCode);
+    });
+
+    it("serial_numberが付与時に保存されていればそのまま返る (動的算出はしない、PR#2最終修正P1-4)", async () => {
+      const { cookie, oveAccountId } = await loginAsNewUser();
+      const asset = await createAsset();
+      const holding = await createHolding(oveAccountId, asset.id, { serialNumber: "0034" });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/me/collectibles/${holding.id}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.serial_number).toBe("0034");
+    });
+
+    it("表示スナップショットが設定されていればAssetより優先される (PR#2最終修正P1-3)", async () => {
+      const { cookie, oveAccountId } = await loginAsNewUser();
+      const asset = await createAsset({ name: "上杉謙信カード(最新)", imageUrl: "https://example.com/cards/uesugi-v2.png" });
+      const holding = await createHolding(oveAccountId, asset.id, {
+        displayNameSnapshot: "上杉謙信カード(購入時)",
+        imageUrlSnapshot: "https://example.com/cards/uesugi-v1.png",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/me/collectibles/${holding.id}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.asset.name).toBe("上杉謙信カード(購入時)");
+      expect(res.body.asset.image_url).toBe("https://example.com/cards/uesugi-v1.png");
     });
 
     it("他人のHoldingは404 (存在自体を明かさない)", async () => {
@@ -211,22 +239,71 @@ describe("NFTコレクション API (Phase 3)", () => {
       expect(updateRes.body.rarity).toBe("SR");
     });
 
-    it("HTTP以外・SVG画像URLは400で拒否される", async () => {
-      await request(app.getHttpServer())
-        .post("/api/v1/admin/collectible/assets")
-        .set("Cookie", adminCookie)
-        .send({ assetCode: `ASSET-BAD-${generateId()}`, name: "x", imageUrl: "http://example.com/x.png" })
-        .expect(400);
-
-      await request(app.getHttpServer())
-        .post("/api/v1/admin/collectible/assets")
-        .set("Cookie", adminCookie)
-        .send({ assetCode: `ASSET-BAD-${generateId()}`, name: "x", imageUrl: "https://example.com/x.svg" })
-        .expect(400);
+    it("HTTP以外・SVG・localhost・private IPの画像URLは400で拒否される (PR#2最終修正P1-2)", async () => {
+      const badUrls = [
+        "http://example.com/x.png",
+        "https://example.com/x.svg",
+        "https://localhost/x.png",
+        "https://127.0.0.1/x.png",
+        "https://10.0.0.5/x.png",
+        "https://192.168.1.5/x.png",
+        "https://169.254.169.254/x.png",
+      ];
+      for (const imageUrl of badUrls) {
+        await request(app.getHttpServer())
+          .post("/api/v1/admin/collectible/assets")
+          .set("Cookie", adminCookie)
+          .send({ assetCode: `ASSET-BAD-${generateId()}`, name: "x", imageUrl })
+          .expect(400);
+      }
     });
 
     it("未認証なら401", async () => {
       await request(app.getHttpServer()).get("/api/v1/admin/collectible/assets").expect(401);
+    });
+
+    it("作成・更新のAuditLogが同一トランザクションで記録される (PR#2最終修正P2-1)", async () => {
+      const assetCode = `ASSET-AUDIT-${generateId()}`;
+      const createRes = await request(app.getHttpServer())
+        .post("/api/v1/admin/collectible/assets")
+        .set("Cookie", adminCookie)
+        .send({ assetCode, name: "毛利元就カード", imageUrl: "https://example.com/cards/mori.png" })
+        .expect(201);
+
+      const createdLog = await prisma.auditLog.findFirst({
+        where: { actionType: "COLLECTIBLE_ASSET_CREATED", targetId: createRes.body.id },
+      });
+      expect(createdLog?.result).toBe("SUCCESS");
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/collectible/assets/${createRes.body.id}`)
+        .set("Cookie", adminCookie)
+        .send({ rarity: "UR" })
+        .expect(200);
+      const updatedLog = await prisma.auditLog.findFirst({
+        where: { actionType: "COLLECTIBLE_ASSET_UPDATED", targetId: createRes.body.id },
+      });
+      expect(updatedLog).not.toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/collectible/assets/${createRes.body.id}`)
+        .set("Cookie", adminCookie)
+        .send({ status: "ARCHIVED" })
+        .expect(200);
+      const archivedLog = await prisma.auditLog.findFirst({
+        where: { actionType: "COLLECTIBLE_ASSET_ARCHIVED", targetId: createRes.body.id },
+      });
+      expect(archivedLog).not.toBeNull();
+
+      await request(app.getHttpServer())
+        .patch(`/api/v1/admin/collectible/assets/${createRes.body.id}`)
+        .set("Cookie", adminCookie)
+        .send({ status: "ACTIVE" })
+        .expect(200);
+      const activatedLog = await prisma.auditLog.findFirst({
+        where: { actionType: "COLLECTIBLE_ASSET_ACTIVATED", targetId: createRes.body.id },
+      });
+      expect(activatedLog).not.toBeNull();
     });
   });
 

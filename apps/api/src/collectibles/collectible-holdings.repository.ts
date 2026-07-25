@@ -14,6 +14,15 @@ export interface CreateCollectibleHoldingParams {
   orderItemId?: string | null;
   acquiredAt: Date;
   metadata?: Prisma.InputJsonValue;
+  /** PR#2最終修正 P1-3: 付与時点で固定する表示用スナップショット。 */
+  displayNameSnapshot?: string | null;
+  descriptionSnapshot?: string | null;
+  imageUrlSnapshot?: string | null;
+  thumbnailUrlSnapshot?: string | null;
+  imageHashSnapshot?: string | null;
+  raritySnapshot?: string | null;
+  /** PR#2最終修正 P1-4: マーケット側の不変値。未送信ならnull。 */
+  serialNumber?: string | null;
 }
 
 export interface ListMyHoldingsParams {
@@ -75,6 +84,11 @@ export class CollectibleHoldingsRepository {
     return client.collectibleHolding.findUnique({ where: { entitlementId } });
   }
 
+  /** PR#2最終修正 P0-2: 再送の一致検証に`collectibleAsset.assetCode`が要るため、Asset込みで取得する。 */
+  async findByEntitlementIdWithAsset(entitlementId: string, client: Db = this.db): Promise<CollectibleHoldingWithAsset | null> {
+    return client.collectibleHolding.findUnique({ where: { entitlementId }, include: HOLDING_WITH_ASSET_INCLUDE });
+  }
+
   /**
    * `entitlement.revoked`のACTIVE→REVOKED遷移を排他制御する
    * (`packages/ledger`の`lockWallet`と同じ設計)。呼び出し元の`$transaction`内で、
@@ -107,16 +121,6 @@ export class CollectibleHoldingsRepository {
       orderBy: [{ acquiredAt: "desc" }, { id: "desc" }],
       take: params.limit,
       ...(params.cursor ? { cursor: { id: params.cursor }, skip: 1 } : {}),
-    });
-  }
-
-  /** 同一カード内での取得順 (指示書12章`serial_number`表示用)。1始まりの順位を返す。 */
-  async countAcquiredBeforeOrAt(collectibleAssetId: string, acquiredAt: Date, id: string, client: Db = this.db): Promise<number> {
-    return client.collectibleHolding.count({
-      where: {
-        collectibleAssetId,
-        OR: [{ acquiredAt: { lt: acquiredAt } }, { acquiredAt, id: { lte: id } }],
-      },
     });
   }
 

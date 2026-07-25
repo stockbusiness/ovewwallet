@@ -38,8 +38,9 @@ export class AdminCollectiblesController {
   @Roles("SUPER_ADMIN", "OVE_OPERATOR")
   async createAsset(
     @Body(new ZodValidationPipe(CreateCollectibleAssetSchema)) body: z.infer<typeof CreateCollectibleAssetSchema>,
+    @Req() req: AuthenticatedAdminRequest,
   ): Promise<CollectibleAsset> {
-    return this.collectibles.createAsset(body);
+    return this.collectibles.createAsset(body, req.admin.id);
   }
 
   @Patch("assets/:id")
@@ -48,8 +49,9 @@ export class AdminCollectiblesController {
   async updateAsset(
     @Param("id") id: string,
     @Body(new ZodValidationPipe(UpdateCollectibleAssetSchema)) body: z.infer<typeof UpdateCollectibleAssetSchema>,
+    @Req() req: AuthenticatedAdminRequest,
   ): Promise<CollectibleAsset> {
-    return this.collectibles.updateAsset(id, body);
+    return this.collectibles.updateAsset(id, body, req.admin.id);
   }
 
   @Get("holdings")
