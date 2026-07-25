@@ -1,10 +1,11 @@
 import { Module } from "@nestjs/common";
+import { CollectiblesModule } from "../collectibles/collectibles.module";
+import { ReferralsModule } from "../referrals/referrals.module";
 import { MeController, ServiceAccountsController } from "./wallets.controller";
 import { WalletsService } from "./wallets.service";
-import { ReferralsModule } from "../referrals/referrals.module";
 
 @Module({
-  imports: [ReferralsModule],
+  imports: [ReferralsModule, CollectiblesModule],
   controllers: [MeController, ServiceAccountsController],
   providers: [WalletsService],
   exports: [WalletsService],

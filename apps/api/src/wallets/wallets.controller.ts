@@ -1,11 +1,13 @@
-import { Controller, Get, Param, Post, Query, Req, Res, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Controller, Get, Param, Post, Query, Req, Res, ServiceUnavailableException, UseGuards, UseInterceptors } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
-import { WalletsService } from "./wallets.service";
-import { ReferralsService } from "../referrals/referrals.service";
-import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
-import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
+import { CollectiblesQueryService } from "../collectibles/collectibles-query.service";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
+import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
+import { isFeatureEnabled } from "../common/feature-flags";
+import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
+import { ReferralsService } from "../referrals/referrals.service";
+import { WalletsService } from "./wallets.service";
 
 /**
  * 本人向けウォレットAPI (開発ガイドライン12章「本番公開前の必須項目」)。
@@ -18,6 +20,7 @@ export class MeController {
   constructor(
     private readonly wallets: WalletsService,
     private readonly referrals: ReferralsService,
+    private readonly collectibles: CollectiblesQueryService,
   ) {}
 
   @Get("wallet")
@@ -90,6 +93,35 @@ export class MeController {
   @UseGuards(SessionAuthGuard)
   async expiringCredits(@Req() req: AuthenticatedUserRequest) {
     return this.wallets.getExpiringCreditsSummary(req.account.id);
+  }
+
+  /** NFTコレクション一覧 (指示書12章)。動的セグメント`:holdingId`より前に登録する必要はない
+   * (固定パス"collectibles"の直後に来るためcollectibles/:holdingIdと衝突しない)。 */
+  @Get("collectibles")
+  @UseGuards(SessionAuthGuard)
+  async myCollectibles(
+    @Req() req: AuthenticatedUserRequest,
+    @Query("include_revoked") includeRevoked?: string,
+    @Query("limit") limit?: string,
+    @Query("cursor") cursor?: string,
+  ) {
+    if (!isFeatureEnabled("ENABLE_DIGITAL_COLLECTION")) {
+      throw new ServiceUnavailableException("digital collection is not enabled yet");
+    }
+    return this.collectibles.listMyCollectibles(req.account.id, {
+      includeRevoked: includeRevoked === "true",
+      limit: limit ? Number(limit) : undefined,
+      cursor,
+    });
+  }
+
+  @Get("collectibles/:holdingId")
+  @UseGuards(SessionAuthGuard)
+  async myCollectibleDetail(@Req() req: AuthenticatedUserRequest, @Param("holdingId") holdingId: string) {
+    if (!isFeatureEnabled("ENABLE_DIGITAL_COLLECTION")) {
+      throw new ServiceUnavailableException("digital collection is not enabled yet");
+    }
+    return this.collectibles.getMyCollectibleDetail(req.account.id, holdingId);
   }
 }
 

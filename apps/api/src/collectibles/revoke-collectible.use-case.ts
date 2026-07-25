@@ -1,12 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { generateId, type CollectibleHolding, type Prisma, type PrismaClient } from "@ove/database";
+import { generateId, type CollectibleHolding, type CreatedByType, type Prisma, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CollectibleHoldingsRepository } from "./collectible-holdings.repository";
 
 export interface RevokeCollectibleParams {
   entitlementId: string;
   reason: string;
+  /** AuditLogの`actorId`。外部イベント起点なら`source_system_key`、管理画面起点ならadminId。 */
   sourceSystemKey: string;
+  /** 既定は`EXTERNAL_SERVICE`(entitlement.revoked経由)。管理画面からの手動取消は`ADMIN`を渡す。 */
+  actorType?: CreatedByType;
   eventId: string;
 }
 
@@ -41,7 +44,7 @@ export class RevokeCollectibleUseCase {
       await tx.auditLog.create({
         data: {
           id: generateId(),
-          actorType: "EXTERNAL_SERVICE",
+          actorType: params.actorType ?? "EXTERNAL_SERVICE",
           actorId: params.sourceSystemKey,
           actionType: "COLLECTIBLE_REVOKED",
           targetType: "collectible_holding",

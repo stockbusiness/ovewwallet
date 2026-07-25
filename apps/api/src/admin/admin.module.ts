@@ -1,31 +1,34 @@
 import { Module } from "@nestjs/common";
-import { AdminController } from "./admin.controller";
-import { AdminAuthController } from "./admin-auth.controller";
+import { AccountsModule } from "../accounts/accounts.module";
+import { CollectiblesModule } from "../collectibles/collectibles.module";
+import { LineBroadcastService } from "../notices/line-broadcast.service";
+import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminAccountsController } from "./admin-accounts.controller";
-import { AdminWalletsController } from "./admin-wallets.controller";
-import { AdminRewardsController } from "./admin-rewards.controller";
-import { AdminIntegrationsController } from "./admin-integrations.controller";
-import { AdminReferralsController } from "./admin-referrals.controller";
-import { AdminNoticesController } from "./admin-notices.controller";
-import { AdminMigrationsController } from "./admin-migrations.controller";
+import { AdminAgencyLinksService } from "./admin-agency-links.service";
+import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
-import { AdminService } from "./admin.service";
+import { AdminAuthController } from "./admin-auth.controller";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
-import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
-import { AdminMigrationService } from "./admin-migration.service";
-import { AdminAccountMergeService } from "./admin-account-merge.service";
-import { AdminApprovalService } from "./admin-approval.service";
-import { AdminRewardRulesService } from "./admin-reward-rules.service";
-import { AdminAgencyLinksService } from "./admin-agency-links.service";
+import { AdminCollectiblesController } from "./admin-collectibles.controller";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
 import { AdminNoticesService } from "./admin-notices.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
-import { LineBroadcastService } from "../notices/line-broadcast.service";
-import { AccountsModule } from "../accounts/accounts.module";
+import { AdminCollectiblesService } from "./admin-collectibles.service";
+import { AdminIntegrationsController } from "./admin-integrations.controller";
+import { AdminMigrationService } from "./admin-migration.service";
+import { AdminMigrationsController } from "./admin-migrations.controller";
+import { AdminNoticesController } from "./admin-notices.controller";
+import { AdminReferralsController } from "./admin-referrals.controller";
+import { AdminRewardRulesService } from "./admin-reward-rules.service";
+import { AdminRewardsController } from "./admin-rewards.controller";
+import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
+import { AdminWalletsController } from "./admin-wallets.controller";
+import { AdminController } from "./admin.controller";
+import { AdminService } from "./admin.service";
 
 @Module({
-  imports: [AccountsModule],
+  imports: [AccountsModule, CollectiblesModule],
   controllers: [
     AdminController,
     AdminAuthController,
@@ -37,6 +40,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminNoticesController,
     AdminMigrationsController,
     AdminApprovalsController,
+    AdminCollectiblesController,
   ],
   providers: [
     AdminService,
@@ -51,6 +55,7 @@ import { AccountsModule } from "../accounts/accounts.module";
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
+    AdminCollectiblesService,
     LineBroadcastService,
   ],
   // AdminApprovalServiceは共通イベントハンドラ (common_user.merged) からも

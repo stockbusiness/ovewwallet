@@ -54,6 +54,15 @@ export class CollectibleHoldingsRepository {
     return client.collectibleHolding.findUnique({ where: { id }, include: HOLDING_WITH_ASSET_INCLUDE });
   }
 
+  /** 本人向け詳細画面 (指示書12章)。本人のOveAccountに属するHoldingのみ取得できる。 */
+  async findByIdForAccountWithAsset(
+    id: string,
+    oveAccountId: string,
+    client: Db = this.db,
+  ): Promise<CollectibleHoldingWithAsset | null> {
+    return client.collectibleHolding.findFirst({ where: { id, oveAccountId }, include: HOLDING_WITH_ASSET_INCLUDE });
+  }
+
   async findByEntitlementId(entitlementId: string, client: Db = this.db): Promise<CollectibleHolding | null> {
     return client.collectibleHolding.findUnique({ where: { entitlementId } });
   }
