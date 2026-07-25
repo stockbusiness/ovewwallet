@@ -58,6 +58,15 @@ export class CollectibleHoldingsRepository {
     return client.collectibleHolding.findUnique({ where: { entitlementId } });
   }
 
+  /**
+   * `entitlement.revoked`のACTIVE→REVOKED遷移を排他制御する
+   * (`packages/ledger`の`lockWallet`と同じ設計)。呼び出し元の`$transaction`内で、
+   * 現在状態の再取得より前に呼ぶこと。
+   */
+  async lockByEntitlementId(entitlementId: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`SELECT id FROM collectible_holdings WHERE entitlement_id = ${entitlementId} FOR UPDATE`;
+  }
+
   async create(data: CreateCollectibleHoldingParams, client: Db = this.db): Promise<CollectibleHolding> {
     return client.collectibleHolding.create({ data });
   }

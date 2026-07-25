@@ -1,10 +1,10 @@
 import "reflect-metadata";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { hashSecret } from "@ove/auth";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
-import { hashSecret } from "@ove/auth";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { OutboxService, type OutboxEvent } from "../outbox/outbox.service";
@@ -227,6 +227,8 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_EXTERNAL_REWARD_TYPES: false,
       ENABLE_ONCHAIN_MIGRATION: false,
       ENABLE_COMMON_EVENT_INBOX: false,
+      ENABLE_DIGITAL_COLLECTION: false,
+      ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: false,
     });
   });
 

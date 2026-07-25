@@ -227,6 +227,28 @@ export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
   order_id: z.string().max(255).nullable().optional(),
 }).passthrough();
 
+/**
+ * NFTコレクション実装指示書8章。戦国マーケットで購入したデジタルカードの利用権付与。
+ * 実際の必須チェック(metadata.entitlement_type/asset_code/name/image_url、
+ * quantity===1等)はハンドラ側で行う (他のevent_type別Schema同様、metadataは
+ * 後方互換のため任意項目のままにする)。
+ */
+export const EntitlementGrantedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("entitlement.granted"),
+  common_user_id: z.string().max(255).nullable().optional(),
+  order_id: z.string().max(255).nullable().optional(),
+  order_item_id: z.string().max(255).nullable().optional(),
+  product_code: z.string().max(255).nullable().optional(),
+  entitlement_id: z.string().max(255).nullable().optional(),
+  quantity: z.number().nullable().optional(),
+}).passthrough();
+
+/** NFTコレクション実装指示書8章。利用権の取消 (全額返金等)。 */
+export const EntitlementRevokedEventSchema = BaseCommonEventSchema.extend({
+  event_type: z.literal("entitlement.revoked"),
+  entitlement_id: z.string().max(255).nullable().optional(),
+}).passthrough();
+
 /** 契約6.2章の必須イベントのうち、ウォレットが実際に反応するもの (5つの実装対象領域に対応)。 */
 export const COMMON_EVENT_HANDLED_TYPES = [
   "common_user.resolved",
@@ -235,6 +257,9 @@ export const COMMON_EVENT_HANDLED_TYPES = [
   "referral.confirmed",
   "reward.granted",
   "reward.reversed",
+  /** NFTコレクション実装指示書8章。 */
+  "entitlement.granted",
+  "entitlement.revoked",
 ] as const;
 
 /** 共通契約v1.1 DRAFT 8章。サポート外`event_version`は422 unsupported_event_versionで拒否する。 */
