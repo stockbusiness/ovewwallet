@@ -204,7 +204,8 @@ export interface ClaimOverview {
 /** 同9章。`POST /api/v1/collectible-claims/{token}/confirm`。 */
 export interface ClaimConfirmResult {
   ok: boolean;
-  status: string;
+  status?: string;
+  action?: string;
 }
 
 export interface RewardRulePublic {

@@ -129,7 +129,7 @@ export default function ClaimPage() {
       const result = await apiFetch<ClaimConfirmResult & { error?: string }>(`/api/v1/collectible-claims/${claimSessionId}/confirm`, {
         method: "POST",
       });
-      if (result.status === "common_user_unresolved") {
+      if (result.action === "common_user_unresolved") {
         setState({ kind: "common_user_unresolved", claimSessionId, cardName: null });
         return;
       }

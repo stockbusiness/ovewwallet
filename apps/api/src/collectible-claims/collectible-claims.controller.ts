@@ -106,7 +106,8 @@ export class CollectibleClaimsController {
         return { ok: true, status: result.status };
       case "common_user_unresolved":
         res.status(202);
-        return { ok: false, status: "common_user_unresolved" };
+        // 指示書v2「common_user_id未解決」レスポンス契約: { ok: true, action: "common_user_unresolved" }
+        return { ok: true, action: "common_user_unresolved" };
       case "not_found":
         res.status(404);
         return { ok: false, error: "not_found" };

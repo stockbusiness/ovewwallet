@@ -167,7 +167,9 @@ describe("NFTカードClaim導線 (実装指示書)", () => {
         .post(`/api/v1/collectible-claims/${token}/confirm`)
         .set("Cookie", cookie)
         .expect(202);
-      expect(res.body.status).toBe("common_user_unresolved");
+      // 指示書v2の契約: { ok: true, action: "common_user_unresolved" }
+      expect(res.body.ok).toBe(true);
+      expect(res.body.action).toBe("common_user_unresolved");
       // POST(confirm)はMarketへ到達していない (GETの概要取得すら行っていない)。
       expect(receivedHeaders.length).toBe(before);
     });
