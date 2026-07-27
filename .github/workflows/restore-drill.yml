@@ -1,0 +1,65 @@
+name: Restore Drill (Railway)
+
+# 不足機能実装指示書 PR-W04「本番相当Backup／Restore試験」。
+# docs/backup.md「残作業 4. リストア訓練の定期実施」への対応 — 2026-07-17に1回だけ手動で
+# 行ったバックアップ→別DBへのリストア→行数比較を、scripts/verify-backup-restore.shで
+# 自動化し、定期実行する。本番PostgreSQLサーバー上に使い捨てDBを作成してリストアするだけで、
+# 本番DB自体は一切変更しない (backup-db.ymlと同じくRailway CLI経由でその場でDATABASE_URLを
+# 取得するため、新しいシークレットは追加していない)。
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 毎月1日 19:00 UTC (日本時間 翌4:00)。バックアップよりコストが高い (使い捨てDB作成+
+    # 全テーブルpg_restore) ため、日次ではなく月次にする (docs/backup.mdの「四半期に1回」
+    # という最低ラインより高頻度にして、リストア手順の陳腐化に早く気づけるようにする)。
+    - cron: "0 19 1 * *"
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    environment: RAILWAY
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Install PostgreSQL client (pg_dump/pg_restore/psql)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Link to Railway project
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+
+      - name: Fetch DATABASE_URL and run restore drill
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          POSTGRES_SERVICE=$(railway service list --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const s = JSON.parse(d);
+              const found = s.find(x => /postgres/i.test(x.name));
+              if (!found) { console.error('postgres service not found'); process.exit(1); }
+              console.log(found.name);
+            });
+          ")
+          echo "postgres service: $POSTGRES_SERVICE"
+
+          DATABASE_URL=$(railway variable list --service "$POSTGRES_SERVICE" --json | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              const v = JSON.parse(d);
+              console.log(v.DATABASE_PUBLIC_URL || v.DATABASE_URL || '');
+            });
+          ")
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URLの取得に失敗しました"
+            exit 1
+          fi
+
+          DATABASE_URL="$DATABASE_URL" ./scripts/verify-backup-restore.sh

@@ -20,6 +20,14 @@
   DATABASE_URL=postgresql://... ./scripts/restore-db.sh backups/ove_wallet_20260101_000000.dump
   ```
 
+- `scripts/verify-backup-restore.sh`: バックアップ→同じPostgresサーバー上の使い捨てDBへの
+  リストア→全テーブルの行数比較→使い捨てDBの削除、を非対話・自動で行う (不足機能実装
+  指示書PR-W04)。対象DB自体は一切変更しない。
+  ```
+  DATABASE_URL=postgresql://... ./scripts/verify-backup-restore.sh
+  ```
+  `.github/workflows/restore-drill.yml` で毎月1日に自動実行する (下記参照)。
+
 ## 動作確認済み (2026-07-17)
 
 ローカル開発DB (`ove_wallet_dev`) に対して実際にバックアップ→別DBへのリストアを実行し、
@@ -41,11 +49,20 @@
 - ワークフロー自体が失敗した場合、GitHub側の標準機能 (Actions実行失敗の通知設定)で
   検知できる。
 
+## リストア訓練の自動化 (不足機能実装指示書PR-W04対応)
+
+`.github/workflows/restore-drill.yml` で毎月1日19:00 UTC (日本時間翌4:00) に
+`scripts/verify-backup-restore.sh` を自動実行する (`workflow_dispatch`での手動実行にも対応)。
+本番PostgreSQLサーバー上に使い捨てDBを作成してリストアし、publicスキーマの全テーブルの
+行数比較まで行った上で使い捨てDBを削除する。対象は2026-07-17時点の9テーブルから
+スキーマ全体に拡大した (スキーマ変更に自動追従する)。バックアップ取得と同じくRailway CLI
+経由でその場でDATABASE_URLを取得するため、新しいシークレットは追加していない。
+
 ## 残作業 (人手・運用面で必要)
 
-1. **RAILWAY_API_TOKEN/RAILWAY_PROJECT_IDシークレットの確認**: `backup-db.yml`は
-   `deploy.yml`と同じシークレットを前提にしている。これらが未設定の場合、
-   ワークフローは失敗する (`deploy.yml`を一度でも実行済みであれば設定済みのはず)。
+1. **RAILWAY_API_TOKEN/RAILWAY_PROJECT_IDシークレットの確認**: `backup-db.yml`/
+   `restore-drill.yml`は`deploy.yml`と同じシークレットを前提にしている。これらが
+   未設定の場合、ワークフローは失敗する (`deploy.yml`を一度でも実行済みであれば設定済みのはず)。
 2. **恒久的な保存先(S3等)への移行**: 現状はGitHub Actions artifact (30日保持) への
    保存のみ。より長期の保持・独立したストレージが必要な場合は、アップロードステップを
    S3等へのアップロードに置き換える必要がある (アプリ本体と同じディスク/コンテナに
@@ -55,9 +72,10 @@
    よっては物理バックアップ (ボリュームスナップショット) が提供される場合がある。
    契約プランを確認し、本スクリプトによる論理バックアップ (アプリ側で完結し、
    他環境への復元やDB移行にも使える) と役割を分けて運用する。
-4. **リストア訓練の定期実施**: 今回の動作確認は1回限りのローカル検証。本番運用開始後は
-   定期的に (例: 四半期に1回) 実際のバックアップからのリストア訓練を行い、手順の陳腐化や
-   スキーマ変更による復元失敗が無いことを継続的に確認する。
+4. **リストア訓練の実行結果の監視**: `restore-drill.yml`が失敗した場合の通知は現状
+   GitHub Actions標準の実行失敗通知のみに依存している。指示書PR-W04 §8.4の「Backup失敗通知」
+   を専用のアラートチャネル (Slack等) で受けたい場合は別途連携が必要 (実環境の通知先が
+   未確定のため、本対応では実装していない)。
 5. **ENCRYPTION_KEYとの整合性**: `wallet_referrals.referral_token_encrypted` 等はアプリ側の
   `ENCRYPTION_KEY` で暗号化されている。DBだけを別環境へリストアしても、対応する
   `ENCRYPTION_KEY` が無ければ復号できない点に注意 (`docs/deployment.md`
