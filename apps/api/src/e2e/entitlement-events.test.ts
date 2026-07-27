@@ -331,6 +331,55 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const count = await prisma.collectibleHolding.count({ where: { entitlementId: body.entitlement_id } });
       expect(count).toBe(0);
     });
+
+    it("16. 同一注文2点購入: 同一order_id・同一asset_codeでentitlement_id/serial_numberが異なる2件のentitlement.grantedはHolding 2件・Asset 1件になり、serial_numberは重複しない (不足機能実装指示書PR-W03 quantity=2)", async () => {
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const orderId = `order_${generateId()}`;
+      const assetCode = `ASSET-QTY2-${generateId()}`;
+      const bodyA = grantedBody({
+        common_user_id: commonUserId,
+        order_id: orderId,
+        order_item_id: `item_${generateId()}_1`,
+        metadata: {
+          entitlement_type: "digital_collectible",
+          asset_code: assetCode,
+          name: "織田信長カード",
+          image_url: "https://example.com/cards/oda.png",
+          serial_number: "0001",
+        },
+      });
+      const bodyB = grantedBody({
+        common_user_id: commonUserId,
+        order_id: orderId,
+        order_item_id: `item_${generateId()}_2`,
+        metadata: {
+          entitlement_type: "digital_collectible",
+          asset_code: assetCode,
+          name: "織田信長カード",
+          image_url: "https://example.com/cards/oda.png",
+          serial_number: "0002",
+        },
+      });
+
+      const resA = await postEvent(bodyA).expect(201);
+      const resB = await postEvent(bodyB).expect(201);
+      expect(resA.body.result.action).toBe("granted");
+      expect(resB.body.result.action).toBe("granted");
+      expect(resA.body.result.holding_id).not.toBe(resB.body.result.holding_id);
+
+      const holdings = await prisma.collectibleHolding.findMany({
+        where: { orderId },
+        include: { asset: true },
+      });
+      expect(holdings).toHaveLength(2);
+      expect(new Set(holdings.map((h) => h.asset.assetCode)).size).toBe(1);
+      const serials = holdings.map((h) => h.serialNumber).sort();
+      expect(serials).toEqual(["0001", "0002"]);
+      expect(new Set(serials).size).toBe(2);
+
+      const assetCount = await prisma.collectibleAsset.count({ where: { assetCode } });
+      expect(assetCount).toBe(1);
+    });
   });
 
   describe("entitlement.revoked", () => {
