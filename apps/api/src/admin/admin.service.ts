@@ -10,6 +10,7 @@ import {
 } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { toCsv } from "../common/csv";
+import { captureMessage } from "../common/sentry";
 import { serializeTransaction } from "../wallets/wallets.service";
 import { AccountRepository } from "../accounts/account.repository";
 import { AdminApprovalService, HIGH_VALUE_THRESHOLD } from "./admin-approval.service";
@@ -479,6 +480,17 @@ export class AdminService {
   async reconcile() {
     const results = await reconcileAllWallets(this.db);
     const mismatched = results.filter((r) => !r.isConsistent);
+    // 不足機能実装指示書PR-W04 §8.4「Reconciliation mismatch」。管理画面を誰かが開いた
+    // タイミングでしか気づけない状態を避けるため、不一致が見つかったらSentryへも通知する
+    // (SENTRY_DSN未設定時はno-op)。自動修正はしない(指示書17章の方針を維持)。
+    if (mismatched.length > 0) {
+      captureMessage(
+        `Wallet reconciliation found ${mismatched.length} mismatched wallet(s): ${mismatched
+          .map((r) => `${r.walletCode} (diff=${r.difference})`)
+          .join(", ")}`,
+        "error",
+      );
+    }
     return {
       checkedWalletCount: results.length,
       mismatchedWalletCount: mismatched.length,

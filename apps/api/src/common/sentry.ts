@@ -22,3 +22,13 @@ export function captureException(exception: unknown): void {
   if (!process.env.SENTRY_DSN) return;
   Sentry.captureException(exception);
 }
+
+/**
+ * 不足機能実装指示書PR-W04 §8.4「Outbox FAILED」「Reconciliation mismatch」の監視用。
+ * 例外ではなく運用上の異常事態 (Dead Letter到達・残高不整合など) をSentryへ通知するために
+ * `captureException`とは別に用意する。`SENTRY_DSN`未設定時はno-op (既存方針と同じ)。
+ */
+export function captureMessage(message: string, level: "warning" | "error" = "warning"): void {
+  if (!process.env.SENTRY_DSN) return;
+  Sentry.captureMessage(message, level);
+}

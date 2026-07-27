@@ -1,9 +1,10 @@
 import * as Sentry from "@sentry/node";
-import { initSentry, captureException } from "./sentry";
+import { initSentry, captureException, captureMessage } from "./sentry";
 
 jest.mock("@sentry/node", () => ({
   init: jest.fn(),
   captureException: jest.fn(),
+  captureMessage: jest.fn(),
 }));
 
 describe("sentry (SENTRY_DSN未設定時はno-op)", () => {
@@ -20,9 +21,11 @@ describe("sentry (SENTRY_DSN未設定時はno-op)", () => {
 
     initSentry();
     captureException(new Error("boom"));
+    captureMessage("outbox event permanently failed");
 
     expect(Sentry.init).not.toHaveBeenCalled();
     expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
   });
 
   it("initializes and forwards exceptions when SENTRY_DSN is set", () => {
@@ -34,5 +37,16 @@ describe("sentry (SENTRY_DSN未設定時はno-op)", () => {
     const error = new Error("boom");
     captureException(error);
     expect(Sentry.captureException).toHaveBeenCalledWith(error);
+  });
+
+  it("forwards messages with the given level when SENTRY_DSN is set (PR-W04 §8.4)", () => {
+    process.env.SENTRY_DSN = "https://example@o0.ingest.sentry.io/0";
+
+    initSentry();
+    captureMessage("outbox event permanently failed", "error");
+    expect(Sentry.captureMessage).toHaveBeenCalledWith("outbox event permanently failed", "error");
+
+    captureMessage("wallet reconciliation mismatch detected");
+    expect(Sentry.captureMessage).toHaveBeenCalledWith("wallet reconciliation mismatch detected", "warning");
   });
 });
