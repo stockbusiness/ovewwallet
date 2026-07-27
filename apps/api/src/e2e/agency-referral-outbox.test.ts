@@ -132,7 +132,7 @@ describe("AGENCY_SYSTEM宛Outboxイベントの実送信 (wallet.referral.regist
     // 開始時に一度だけAGENCY_SYSTEM宛の残留イベントをクリアする。
     await prisma.integrationOutbox.deleteMany({ where: { destinationService: "AGENCY_SYSTEM" } });
 
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

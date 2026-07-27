@@ -36,7 +36,7 @@ describe("agency referral token acceptance (実装指示書 v1.0, Phase 1)", () 
   }
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

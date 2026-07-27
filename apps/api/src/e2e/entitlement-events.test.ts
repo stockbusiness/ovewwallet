@@ -27,7 +27,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
   let otherKey: TestCommonEventSigningKey;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

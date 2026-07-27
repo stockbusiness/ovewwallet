@@ -17,7 +17,7 @@ describe("失効予告レポート (GET /api/v1/admin/expire-credits/preview)", 
   let adminCookie: string[];
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

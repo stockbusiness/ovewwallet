@@ -23,7 +23,7 @@ describe("POST /api/integrations/events (次期改修指示書P0-1/P0-3/P0-4/P0-
   let app: INestApplication;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

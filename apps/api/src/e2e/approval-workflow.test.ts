@@ -37,7 +37,7 @@ describe("two-step approval workflow (指示書13章 二段階承認)", () => {
   let walletId: string;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

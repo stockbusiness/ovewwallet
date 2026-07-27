@@ -24,7 +24,7 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
   let key: TestCommonEventSigningKey;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
