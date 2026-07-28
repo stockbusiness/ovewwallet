@@ -11,6 +11,9 @@ import { defineConfig, devices } from "@playwright/test";
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
+// NFTカードClaim導線実装指示書のE2E用。戦国マーケットClaim APIを模したローカル
+// サーバー (support/fake-market-server.mjs)。
+const FAKE_MARKET_URL = process.env.FAKE_MARKET_URL ?? "http://127.0.0.1:4900";
 
 export default defineConfig({
   testDir: "./specs",
@@ -46,6 +49,13 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: "node support/fake-market-server.mjs",
+      url: `${FAKE_MARKET_URL}/health`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 10_000,
+      env: { FAKE_MARKET_PORT: new URL(FAKE_MARKET_URL).port },
+    },
+    {
       command: "pnpm --filter @ove/api start",
       url: `${API_URL}/health`,
       reuseExistingServer: !process.env.CI,
@@ -62,6 +72,12 @@ export default defineConfig({
         ENABLE_WALLET_REFERRAL_TOKEN: "true",
         ENABLE_DIGITAL_COLLECTION: "true",
         COLLECTIBLE_IMAGE_ALLOWED_HOSTS: "picsum.photos",
+        // NFTカードClaim導線実装指示書。fake-market-server.mjs (下のwebServerで起動) を
+        // 戦国マーケットのClaim APIとして扱う。
+        ENABLE_COLLECTIBLE_CLAIM_FLOW: "true",
+        SENGOKU_MARKET_CLAIM_BASE_URL: FAKE_MARKET_URL,
+        SENGOKU_MARKET_CLAIM_KEY_ID: "e2e-claim-key",
+        SENGOKU_MARKET_CLAIM_HMAC_SECRET: "e2e-claim-secret",
       },
     },
     {

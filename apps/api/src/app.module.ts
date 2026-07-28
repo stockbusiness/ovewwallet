@@ -8,6 +8,7 @@ import { AgencyModule } from "./agency/agency.module";
 import { AuthModule } from "./auth/auth.module";
 import { CommonEventsModule } from "./common-events/common-events.module";
 import { CollectiblesModule } from "./collectibles/collectibles.module";
+import { CollectibleClaimsModule } from "./collectible-claims/collectible-claims.module";
 import { KeyValueStoreModule } from "./common/kv-store.module";
 import { PrismaModule } from "./common/prisma.module";
 import { RepositoriesModule } from "./common/repositories.module";
@@ -38,6 +39,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     DailyBonusModule,
     CommonEventsModule,
     CollectiblesModule,
+    CollectibleClaimsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

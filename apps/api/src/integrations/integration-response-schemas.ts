@@ -24,3 +24,30 @@ export const CaptureReferralResponseSchema = z.object({
 export const ConfirmReferralResponseSchema = z.object({
   status: z.string().optional(),
 });
+
+/**
+ * NFTカードClaim導線実装指示書。戦国マーケットClaim APIのレスポンス。
+ * 2xxで返る状態はマーケット側が管理するライフサイクルであり、ウォレット側では
+ * キャッシュ・所有しない (毎回GETで問い合わせる)。
+ */
+export const MARKET_CLAIM_STATUS_VALUES = ["PENDING", "DELIVERY_PENDING", "DELIVERED", "EXPIRED", "REVOKED"] as const;
+
+export const MarketClaimStatusResponseSchema = z.object({
+  status: z.enum(MARKET_CLAIM_STATUS_VALUES),
+  card_name: z.string().nullable().optional(),
+  expires_at: z.string().nullable().optional(),
+});
+
+export const MarketClaimConfirmResponseSchema = z.object({
+  status: z.string().optional(),
+});
+
+/**
+ * 409応答本文の機械可読な種別。同じHTTPステータスでも
+ * revoked/common_user_mismatch/processingを区別する必要があるため
+ * (指示書7章「エラー分類」)、ステータスコードだけでなく本文もパースする。
+ */
+export const MarketClaimErrorBodySchema = z.object({
+  code: z.enum(["revoked", "common_user_mismatch", "processing", "not_found", "expired"]).optional(),
+  message: z.string().optional(),
+});

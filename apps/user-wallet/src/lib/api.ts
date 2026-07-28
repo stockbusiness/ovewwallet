@@ -192,6 +192,22 @@ export interface CollectibleListResponse {
   next_cursor: string | null;
 }
 
+/** NFTカードClaim導線実装指示書8章。`GET /api/v1/collectible-claims/{token}`。 */
+export interface ClaimOverview {
+  claim_session_id: string;
+  status: "PENDING" | "DELIVERY_PENDING" | "DELIVERED" | "EXPIRED" | "REVOKED";
+  card_name: string | null;
+  expires_at: string | null;
+  requires_login: boolean;
+}
+
+/** 同9章。`POST /api/v1/collectible-claims/{token}/confirm`。 */
+export interface ClaimConfirmResult {
+  ok: boolean;
+  status?: string;
+  action?: string;
+}
+
 export interface RewardRulePublic {
   rule_code: string;
   display_name: string;

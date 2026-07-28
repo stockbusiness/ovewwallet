@@ -63,6 +63,13 @@ const envSchema = z.object({
   // apps/user-wallet・apps/admin-wallet の next.config.mjs もビルド時に同じ値を読み、
   // Next.js Image Optimizerのremote patternsを組み立てる。
   COLLECTIBLE_IMAGE_ALLOWED_HOSTS: z.string().optional().default(""),
+
+  // NFTカードClaim導線実装指示書7章。戦国マーケットClaim APIへのサーバー間呼び出し設定。
+  // ENABLE_COLLECTIBLE_CLAIM_FLOW=false (既定) の間は未設定のままでよい。
+  SENGOKU_MARKET_CLAIM_BASE_URL: z.string().optional().default(""),
+  SENGOKU_MARKET_CLAIM_KEY_ID: z.string().optional().default(""),
+  SENGOKU_MARKET_CLAIM_HMAC_SECRET: z.string().optional().default(""),
+  ENABLE_COLLECTIBLE_CLAIM_FLOW: z.enum(["true", "false"]).default("false"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
