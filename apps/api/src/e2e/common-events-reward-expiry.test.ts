@@ -27,7 +27,7 @@ describe("共通イベントreward.granted: reward_ruleのexpiry_daysが台帳�
   let key: TestCommonEventSigningKey;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

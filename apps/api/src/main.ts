@@ -16,7 +16,10 @@ async function bootstrap() {
   // SENTRY_DSN未設定時は何もしない (`docs/monitoring.md` 参照)。
   initSentry();
 
-  const app = await NestFactory.create(AppModule);
+  // rawBody: true (共通イベントHMAC署名検証用)。仕様書「受信bodyを再serializeせずraw bodyを
+  // 使う」に対応するため、Nest標準のbody-parserにverifyコールバックを追加させ`req.rawBody`
+  // (Buffer)を取得できるようにする (`common-event-auth.guard.ts`参照)。
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // helmetのデフォルトはCross-Origin-Resource-Policy: same-originを付与し、
   // CORSでオリジンを許可していても別オリジンからのfetchをブラウザ側で

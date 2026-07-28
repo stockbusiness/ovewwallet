@@ -1,4 +1,12 @@
-import { type CanActivate, type ExecutionContext, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import {
+  type CanActivate,
+  type ExecutionContext,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import type { RawBodyRequest } from "@nestjs/common";
 import type { Request } from "express";
 import { CommonEventAuthenticator } from "@ove/auth";
 import { KV_STORE } from "../common/kv-store.module";
@@ -12,16 +20,17 @@ export interface AuthenticatedCommonEventRequest extends Request {
 }
 
 /**
- * 千ノ国 全体統合 共通実装契約 6.1章の`X-SenNoKuni-*`ヘッダー検証。既存の
+ * 千ノ国 全体統合 共通実装契約 v1.1 FINAL 8〜9章の`X-SenNoKuni-*`ヘッダー・HMAC検証。既存の
  * `ExternalApiAuthGuard` (X-OVE-*) や `AgencyApiKeyGuard` (単純なAPIキー照合のみ) とは
  * 異なる、契約が新たに定めた認証方式のため専用ガードにする。署名対象文字列の詳細は
- * `CommonEventAuthenticator`のコメント参照 (次期改修指示書P0-2でnonce/key_id/method/path
- * を署名対象へ追加済み)。
+ * `CommonEventAuthenticator`のコメント参照。
  *
- * 署名対象の「生ボディ」は、既存の`ExternalApiAuthGuard`と同様の理由
- * (グローバルなraw body captureミドルウェアを追加しない) により
- * `JSON.stringify(req.body)`で代替する。送信側はキー順序・エスケープをNode.jsの
- * `JSON.stringify`と一致させる必要がある (`docs/external-api.md`の既存の注記と同じ制約)。
+ * 署名対象の「生ボディ」はNestの`rawBody: true`起動オプション (`main.ts`/各e2eの
+ * `NestFactory.create`) が`body-parser`のverifyコールバックで捕捉した`req.rawBody`
+ * (Buffer) をそのまま使う。契約v1.1 FINAL §9「受信bodyを再serializeせずraw bodyを使う」に
+ * 対応するための変更 (旧実装は`JSON.stringify(req.body)`で代替しており、送信側の
+ * キー順序/エスケープがNode.jsの`JSON.stringify`と一致しない限り正当な署名でも
+ * 検証に失敗しうる欠陥があった)。
  */
 @Injectable()
 export class CommonEventAuthGuard implements CanActivate {
@@ -31,7 +40,7 @@ export class CommonEventAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request>();
+    const req = context.switchToHttp().getRequest<RawBodyRequest<Request>>();
 
     const keyId = req.header("x-sennokuni-key-id");
     const timestamp = req.header("x-sennokuni-timestamp");
@@ -47,7 +56,13 @@ export class CommonEventAuthGuard implements CanActivate {
       throw new UnauthorizedException("unknown or revoked key_id");
     }
 
-    const rawBody = JSON.stringify(req.body ?? {});
+    if (!req.rawBody) {
+      // `rawBody: true`が起動オプションに渡っていない場合にここへ到達する。実装ミスであり
+      // 送信元の責任ではないため、認証失敗ではなく明確なサーバーエラーとして扱う。
+      throw new InternalServerErrorException("raw body capture is not enabled (NestFactory.create rawBody option)");
+    }
+    const rawBody = req.rawBody.toString("utf8");
+
     const authenticator = new CommonEventAuthenticator(this.kv);
     await authenticator.verify(
       {

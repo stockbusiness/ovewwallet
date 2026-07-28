@@ -48,7 +48,7 @@ describe("戦国経済圏代理店システム外部連携 (仕様書v3.6.71 / �
     process.env.SENGOKU_AI_SSO_ISSUER = ISSUER;
     process.env.ENABLE_AGENCY_REFERRAL_SYNC = "true";
 
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

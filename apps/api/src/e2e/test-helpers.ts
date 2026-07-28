@@ -90,7 +90,13 @@ export async function createTestCommonEventSigningKey(
   return { keyId, secret };
 }
 
-/** 共通実装契約6.1章のX-SenNoKuni-*ヘッダーを組み立てる (次期改修指示書P0-2の署名対象に対応)。 */
+/**
+ * 共通実装契約v1.1 FINAL §8〜9のX-SenNoKuni-*ヘッダーを組み立てる。canonical stringは
+ * `key_id + "\n" + timestamp + "\n" + nonce + "\n" + METHOD + "\n" + path + "\n" + raw_body`
+ * (千ノ国Step1共通仕様確認・02_HMAC_SIGNATURE_TEST_VECTOR_V1.mdの固定テストベクトルで
+ * 一致確認済み)。`bodyJson`はsupertestの`.send(body)`が同じオブジェクトへ内部的に行う
+ * `JSON.stringify`と一致する前提 (どちらもNode.jsの決定的なキー順序に依存)。
+ */
 export function commonEventSignedHeaders(
   key: TestCommonEventSigningKey,
   body: unknown,
@@ -100,7 +106,8 @@ export function commonEventSignedHeaders(
   const bodyJson = JSON.stringify(body);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const nonce = generateId();
-  const signature = hmacSign(key.secret, `${timestamp}.${nonce}.${key.keyId}.${method}:${path}:${bodyJson}`);
+  const canonicalString = [key.keyId, timestamp, nonce, method.toUpperCase(), path.split("?")[0], bodyJson].join("\n");
+  const signature = hmacSign(key.secret, canonicalString);
 
   return {
     "X-SenNoKuni-Key-Id": key.keyId,

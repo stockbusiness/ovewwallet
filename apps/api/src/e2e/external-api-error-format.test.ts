@@ -25,7 +25,7 @@ describe("外部連携APIのエラー形式 (ExternalApiExceptionFilter)", () =>
   beforeAll(async () => {
     process.env.ENABLE_AGENCY_REFERRAL_SYNC = "true";
 
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

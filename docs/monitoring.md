@@ -24,6 +24,15 @@ Logging/Tracing/Profiling/Application Metricsは無効のまま) 完了。`.gith
 発生させるテスト) にリクエストを送り、SentryのIssue一覧に「invalid LINE id token」の
 Issueが表示されることを確認済み。データを変更しない安全なテスト方法。
 
+**Outbox FAILED / Reconciliation mismatch (不足機能実装指示書PR-W04 §8.4対応)**:
+例外ではなく運用上の異常事態を通知するための `captureMessage()` を追加し、以下の2箇所で
+呼び出す (いずれも`SENTRY_DSN`未設定時はno-op、既存方針と同じ)。
+- `OutboxService.recordFailure`: 再送上限(8回)に到達しDead Letter (`FAILED`) になった
+  時点で通知する。再送予定のある一時的な失敗では送らない。
+- `AdminService.reconcile`: 残高不整合が見つかった時点で通知する。これまでは管理画面
+  (`GET /api/v1/admin/reconciliation`) を誰かが手動で開かない限り気づけなかった。
+  自動修正はしない (指示書17章の方針を維持)。
+
 **残作業 (人手が必要)**:
 1. Sentry側でアラートルール (例: 1分間に5件以上の新規Issueでメール/Slack通知) を設定する。
 2. apps/user-wallet・apps/admin-wallet (Next.js, Vercel) のクライアント/サーバー側エラーは

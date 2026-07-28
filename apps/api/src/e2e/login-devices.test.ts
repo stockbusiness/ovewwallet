@@ -12,7 +12,7 @@ describe("ログインデバイス一覧", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

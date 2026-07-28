@@ -17,7 +17,7 @@ describe("POST /api/v1/auth/sso/sengoku/dev-issue (次期改修指示書P0-7)", 
   const originalNodeEnv = process.env.NODE_ENV;
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

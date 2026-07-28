@@ -14,7 +14,7 @@ describe("管理画面MFA (指示書13章)", () => {
   const password = "e2e-test-password-123";
 
   beforeAll(async () => {
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

@@ -27,7 +27,7 @@ beforeAll(async () => {
   // このファイルの前提を決定的にするため、開始時に一度だけ全件クリアする。
   await prisma.integrationOutbox.deleteMany({});
 
-  app = await NestFactory.create(AppModule, { logger: false });
+  app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
   app.use(cookieParser());
   app.useGlobalFilters(new LedgerExceptionFilter());
   await app.init();

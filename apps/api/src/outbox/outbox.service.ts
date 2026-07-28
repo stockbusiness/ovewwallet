@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { generateId, type Prisma, type PrismaClient } from "@ove/database";
+import { captureMessage } from "../common/sentry";
 import { OutboxRepository } from "./outbox.repository";
 
 export interface OutboxEnqueueParams {
@@ -99,6 +100,13 @@ export class OutboxService {
     const exhausted = attemptCount >= MAX_ATTEMPTS;
     const backoffSeconds = Math.min(BASE_BACKOFF_SECONDS * 2 ** (attemptCount - 1), MAX_BACKOFF_SECONDS);
     this.logger.warn(`outbox event ${id} failed (attempt ${attemptCount}): ${message}`);
+
+    // 不足機能実装指示書PR-W04 §8.4「Outbox FAILED」。Dead Letter (再送上限到達) は
+    // 人手による調査・手動再送が必要な状態のため、Sentryへ通知する (SENTRY_DSN未設定時は
+    // no-op)。再送中の一時的な失敗 (exhausted=false) はログのみで十分なため送らない。
+    if (exhausted) {
+      captureMessage(`Outbox event ${id} reached FAILED after ${attemptCount} attempts: ${message}`, "error");
+    }
 
     await this.repository.recordFailure(id, {
       status: exhausted ? "FAILED" : "PENDING",
