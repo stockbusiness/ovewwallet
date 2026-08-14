@@ -27,6 +27,9 @@ type ScreenState =
   /** 契約v2指示書12章。COMMON_USER_MISMATCH専用状態。 */
   | { kind: "account_mismatch" }
   | { kind: "expired" }
+  /** 契約v2指示書26〜28章。Market側entitlementの期限切れ(`expired`)とは別に、
+   * Wallet側Claim Session(24時間)の期限切れを専用状態・専用文言で示す。 */
+  | { kind: "claim_session_expired" }
   | { kind: "revoked" }
   | { kind: "network_error" }
   | { kind: "error"; message: string };
@@ -37,6 +40,9 @@ type ScreenState =
  * ここには含めない)。
  */
 function mapConfirmErrorToState(err: ApiError): ScreenState {
+  // 契約v2指示書26〜28章。同じ410でもWallet側Session期限切れとMarket側expiredは
+  // 別の状態・別の文言で案内する。
+  if (err.code === "claim_session_expired") return { kind: "claim_session_expired" };
   if (err.status === 410) return { kind: "expired" };
   // 契約v2指示書12章。アカウント不一致は専用状態・専用文言で「次に取るべき行動」を示す。
   if (err.code === "common_user_mismatch") return { kind: "account_mismatch" };
@@ -70,6 +76,12 @@ export default function ClaimPage() {
       } catch (err) {
         if (err instanceof ApiError && err.status === 404) {
           setState({ kind: "error", message: "受取用のURLが正しくありません。戦国マーケットのマイページからやり直してください。" });
+          return;
+        }
+        // 契約v2指示書26〜28章。同じ410でもWallet側Session期限切れとMarket側expiredは
+        // 別の状態・別の文言で案内する。
+        if (err instanceof ApiError && err.code === "claim_session_expired") {
+          setState({ kind: "claim_session_expired" });
           return;
         }
         if (err instanceof ApiError && err.status === 410) {
@@ -228,6 +240,12 @@ export default function ClaimPage() {
       {state.kind === "expired" && (
         <p className="text-sm leading-relaxed text-sengoku-muted">
           受取期限が切れています。戦国マーケットのマイページから再発行してください。
+        </p>
+      )}
+
+      {state.kind === "claim_session_expired" && (
+        <p className="text-sm leading-relaxed text-sengoku-muted">
+          受取用セッションの有効期限が切れています。千ノ国NFTマーケットから再度受取手続きを行ってください。
         </p>
       )}
 

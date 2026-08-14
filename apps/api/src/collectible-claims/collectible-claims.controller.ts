@@ -48,6 +48,13 @@ export class CollectibleClaimsController {
     const correlationId = randomUUID();
     const result = await this.overview.execute(token, correlationId);
 
+    // 契約v2指示書26〜28章。Wallet側Session ID自体が期限切れの場合はClaim Session行が
+    // 存在しないため、Cookieは発行せずここで返す。
+    if (result.outcome === "claim_session_expired") {
+      res.status(410);
+      return { error: "claim_session_expired" };
+    }
+
     if (result.claimSessionId) {
       res.cookie(CLAIM_SESSION_COOKIE_NAME, result.claimSessionId, {
         ...CLAIM_SESSION_COOKIE_OPTIONS,
@@ -131,6 +138,9 @@ export class CollectibleClaimsController {
       case "idempotency_conflict":
         res.status(409);
         return { ok: false, error: "idempotency_conflict" };
+      case "claim_session_expired":
+        res.status(410);
+        return { ok: false, error: "claim_session_expired" };
       case "disabled":
       case "timeout":
       case "network_error":

@@ -152,6 +152,35 @@ describe("NFTカードClaim導線 (実装指示書)", () => {
         .expect(200);
       expect(bySessionId.body.claim_session_id).toBe(first.body.claim_session_id);
     });
+
+    it("期限切れのclaim_session_idでアクセスすると自動延長せず410 claim_session_expiredになる (契約v2指示書26〜28章)", async () => {
+      const token = `pending-token-${generateId()}`;
+      const first = await request(app.getHttpServer()).get(`/api/v1/collectible-claims/${token}`).expect(200);
+      await prisma.claimSession.update({
+        where: { id: first.body.claim_session_id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/collectible-claims/${first.body.claim_session_id}`)
+        .expect(410);
+      expect(res.body.error).toBe("claim_session_expired");
+    });
+
+    it("期限切れ後に同じ生Tokenで再訪問すると、同じclaim_session_idのまま延長して使える (契約v2指示書28章)", async () => {
+      const token = `pending-token-${generateId()}`;
+      const first = await request(app.getHttpServer()).get(`/api/v1/collectible-claims/${token}`).expect(200);
+      await prisma.claimSession.update({
+        where: { id: first.body.claim_session_id },
+        data: { expiresAt: new Date(Date.now() - 1000) },
+      });
+
+      const res = await request(app.getHttpServer()).get(`/api/v1/collectible-claims/${token}`).expect(200);
+      expect(res.body.claim_session_id).toBe(first.body.claim_session_id);
+
+      const renewed = await prisma.claimSession.findUniqueOrThrow({ where: { id: first.body.claim_session_id } });
+      expect(renewed.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
   });
 
   describe("POST /api/v1/collectible-claims/:token/confirm (指示書9・11章)", () => {

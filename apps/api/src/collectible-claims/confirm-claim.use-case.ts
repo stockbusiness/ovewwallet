@@ -15,6 +15,8 @@ export type ConfirmClaimResult =
   | { outcome: "common_user_mismatch" }
   | { outcome: "processing" }
   | { outcome: "idempotency_conflict" }
+  /** 契約v2指示書26〜28章。Wallet側のSession IDが期限切れ (Market側expiredとは別)。 */
+  | { outcome: "claim_session_expired" }
   | { outcome: "disabled" }
   | { outcome: "timeout" }
   | { outcome: "network_error" }
@@ -49,7 +51,11 @@ export class ConfirmClaimUseCase {
       return { outcome: "disabled" };
     }
 
-    const { session, rawToken } = await this.resolver.resolve(params.tokenOrSessionId);
+    const resolved = await this.resolver.resolve(params.tokenOrSessionId);
+    if (resolved.outcome === "session_expired") {
+      return { outcome: "claim_session_expired" };
+    }
+    const { session, rawToken } = resolved;
 
     if (!params.commonUserId) {
       await this.audit({

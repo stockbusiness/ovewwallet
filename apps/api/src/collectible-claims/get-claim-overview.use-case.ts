@@ -9,6 +9,9 @@ export type ClaimOverviewResult =
   | { outcome: "ok"; claimSessionId: string; status: MarketClaimStatus; cardName: string | null; expiresAt: string | null }
   | { outcome: "not_found"; claimSessionId: string }
   | { outcome: "expired"; claimSessionId: string }
+  /** 契約v2指示書26〜28章。Market側のentitlementではなく、Wallet側のSession IDが
+   * 期限切れ (区別が必要なため`expired`とは別のoutcomeにする)。 */
+  | { outcome: "claim_session_expired" }
   | { outcome: "disabled"; claimSessionId: string | null };
 
 /**
@@ -32,7 +35,11 @@ export class GetClaimOverviewUseCase {
       return { outcome: "disabled", claimSessionId: null };
     }
 
-    const { session, rawToken } = await this.resolver.resolve(tokenOrSessionId);
+    const resolved = await this.resolver.resolve(tokenOrSessionId);
+    if (resolved.outcome === "session_expired") {
+      return { outcome: "claim_session_expired" };
+    }
+    const { session, rawToken } = resolved;
 
     await this.db.auditLog.create({
       data: {
