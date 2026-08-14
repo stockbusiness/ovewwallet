@@ -60,7 +60,7 @@ describe("NFT結合試験: Claim確定 → entitlement.granted → Holding ACTIV
     process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-integration-claim-key";
     process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-integration-claim-secret";
 
-    app = await NestFactory.create(AppModule, { logger: false });
+    app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();

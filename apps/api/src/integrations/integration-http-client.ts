@@ -24,6 +24,14 @@ export interface IntegrationRequestParams<T = void> {
   path: string;
   method?: "GET" | "POST";
   body?: unknown;
+  /**
+   * 千ノ国NFTマーケット契約v2指示書8章。署名対象として計算した生ボディ文字列。
+   * 指定時はこれをそのまま送信バイト列として使い、`body`から改めて`JSON.stringify`
+   * しない (署名計算側とHTTP送信側で別々に`JSON.stringify`すると、同じオブジェクトでも
+   * 契約上「同一バイト列」を保証できないため)。呼び出し元は署名対象文字列と
+   * `rawBody`に必ず同じ値を渡すこと。
+   */
+  rawBody?: string;
   /** 省略時は`apiKeyHeader`を付与しない (HMAC等、単一APIキーヘッダー以外の認証方式を使う呼び出し元向け)。 */
   apiKey?: string;
   apiKeyHeader?: string;
@@ -42,6 +50,13 @@ const DEFAULT_API_KEY_HEADER = "x-api-key";
 function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return "****";
   return `****${apiKey.slice(-4)}`;
+}
+
+/** `rawBody`優先、なければ`body`を`JSON.stringify`する (`request()`の複雑度を増やさないよう分離)。 */
+function resolveRequestBody(params: Pick<IntegrationRequestParams, "rawBody" | "body">): string | undefined {
+  if (params.rawBody !== undefined) return params.rawBody;
+  if (params.body !== undefined) return JSON.stringify(params.body);
+  return undefined;
 }
 
 function classifyRetryable(kind: IntegrationErrorKind): boolean {
@@ -92,7 +107,7 @@ export class IntegrationHttpClient {
           "x-request-id": requestId,
           "x-correlation-id": correlationId,
         },
-        body: params.body !== undefined ? JSON.stringify(params.body) : undefined,
+        body: resolveRequestBody(params),
         signal: controller.signal,
       });
 

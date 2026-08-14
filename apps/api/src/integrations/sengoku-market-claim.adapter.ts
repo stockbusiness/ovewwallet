@@ -55,23 +55,59 @@ function resolveMarketClaimConfig(): MarketClaimConfig | null {
 }
 
 /**
- * 指示書7章のHMAC Header一式を組み立てる。既存の`ExternalApiAuthenticator`(受信側検証)
- * と同じ正準化方式 (`timestamp.nonce.method:path:body`) を outbound 側に適用する。
- * GETの署名対象bodyは指示書通り空文字とする。
+ * 千ノ国NFTマーケット契約v2指示書6〜7章のcanonical string。
+ * `key_id + "\n" + timestamp + "\n" + nonce + "\n" + METHOD + "\n" + path(query除く) + "\n" + raw_body`
+ * (LF区切り)。共通イベント受信側の`CommonEventAuthenticator`と同じ形式 (契約v1.1 FINAL §9)
+ * だが、あちらは受信検証用でこちらは送信署名用のため別実装として持つ。
+ */
+export function buildSenNoKuniCanonicalString(params: {
+  keyId: string;
+  timestamp: string;
+  nonce: string;
+  /** 呼び出し元がどちらの大文字小文字で渡しても内部で大文字化するため`string`で受ける。 */
+  method: string;
+  path: string;
+  rawBody: string;
+}): string {
+  const pathWithoutQuery = params.path.split("?")[0]!;
+  return [params.keyId, params.timestamp, params.nonce, params.method.toUpperCase(), pathWithoutQuery, params.rawBody].join(
+    "\n",
+  );
+}
+
+/**
+ * 指示書7章。署名値は`sha256=<hex>`形式で送る。既存`hmacSign()`は生hexのみを返す
+ * ため、他用途を破壊しないようここでprefixを付与する。
+ */
+export function signSenNoKuniRequest(secret: string, canonical: string): string {
+  return `sha256=${hmacSign(secret, canonical)}`;
+}
+
+/**
+ * 指示書6〜9章のHMAC Header一式を組み立てる。`rawBody`は実際に送信するバイト列と
+ * 完全に同じ文字列を渡すこと (呼び出し元が`IntegrationHttpClient`へも同じ`rawBody`を
+ * 渡す)。GETの署名対象bodyは指示書通り空文字とする。
  */
 function buildSignedHeaders(params: {
   keyId: string;
   secret: string;
   method: "GET" | "POST";
   path: string;
-  body: string;
+  rawBody: string;
   correlationId: string;
   idempotencyKey?: string;
 }): Record<string, string> {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomUUID();
-  const canonicalPayload = `${params.method}:${params.path}:${params.body}`;
-  const signature = hmacSign(params.secret, `${timestamp}.${nonce}.${canonicalPayload}`);
+  const canonical = buildSenNoKuniCanonicalString({
+    keyId: params.keyId,
+    timestamp,
+    nonce,
+    method: params.method,
+    path: params.path,
+    rawBody: params.rawBody,
+  });
+  const signature = signSenNoKuniRequest(params.secret, canonical);
   return {
     "X-SenNoKuni-Key-Id": params.keyId,
     "X-SenNoKuni-Timestamp": timestamp,
@@ -104,7 +140,7 @@ export class SengokuMarketClaimAdapter {
       secret: config.hmacSecret,
       method: "GET",
       path,
-      body: "",
+      rawBody: "",
       correlationId,
     });
 
@@ -142,12 +178,14 @@ export class SengokuMarketClaimAdapter {
     const correlationId = params.correlationId ?? randomUUID();
     const path = `/api/collectible-claims/${encodeURIComponent(params.rawToken)}/confirm`;
     const body = { common_user_id: params.commonUserId };
+    // 署名対象とHTTP送信は必ずこの同じ文字列を使う (指示書8章、二重JSON.stringify禁止)。
+    const rawBody = JSON.stringify(body);
     const headers = buildSignedHeaders({
       keyId: config.keyId,
       secret: config.hmacSecret,
       method: "POST",
       path,
-      body: JSON.stringify(body),
+      rawBody,
       correlationId,
       idempotencyKey: params.idempotencyKey,
     });
@@ -156,7 +194,7 @@ export class SengokuMarketClaimAdapter {
       baseUrl: config.baseUrl,
       path,
       method: "POST",
-      body,
+      rawBody,
       extraHeaders: headers,
       correlationId,
       timeoutMs: 5000,
