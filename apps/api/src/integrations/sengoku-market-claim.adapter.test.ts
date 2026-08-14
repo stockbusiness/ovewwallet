@@ -11,13 +11,10 @@ import {
 /**
  * 千ノ国NFTマーケット契約v2指示書 PR-WN01 (6〜9章) の回帰テスト。
  *
- * 注記: 指示書9章に記載された「NFTマーケット正式vector」の期待署名値
- * (`sha256=5d5dff59...`/`sha256=2b059e01...`) は、それを再現するための
- * 入力値 (key_id/secret/timestamp/nonce/method/path/raw_body) が指示書に
- * 含まれていなかったため、この回帰テストでは検証できていない。ここでは
- * 実装したcanonical string組み立て・署名関数が仕様通りの「形」であることを
- * 自己完結的なテストベクトルで確認する。公式vectorの入力値が判明次第、
- * このファイルへ追加すること。
+ * 指示書9章の「NFTマーケット正式vector」は、開発者確認により入力値
+ * (key_id/secret/timestamp/nonce/method/path/raw_body) が判明したため、
+ * 下記「NFTマーケット正式固定vector (指示書9章)」ブロックで完全一致を検証する。
+ * `test-secret`は固定テスト専用値であり、staging/productionのHMAC Secretとは別。
  */
 describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-WN01)", () => {
   describe("buildSenNoKuniCanonicalString", () => {
@@ -66,6 +63,39 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
 
       expect(signature).toMatch(/^sha256=[0-9a-f]{64}$/);
       expect(signature).toBe(`sha256=${hmacSign(secret, canonical)}`);
+    });
+  });
+
+  /** 千ノ国NFTマーケット正式固定vector (指示書9章、開発者確認済みの入力値)。 */
+  describe("NFTマーケット正式固定vector (指示書9章)", () => {
+    it("matches the official POST vector", () => {
+      const canonical = buildSenNoKuniCanonicalString({
+        keyId: "test-key-001",
+        timestamp: "1786660000",
+        nonce: "nonce-fixed-001",
+        method: "POST",
+        path: "/api/collectible-claims/test-token/confirm",
+        rawBody: '{"common_user_id":"cu_0123456789abcdef0123456789abcdef"}',
+      });
+
+      expect(signSenNoKuniRequest("test-secret", canonical)).toBe(
+        "sha256=5d5dff59f51f7de3df54b541eb636e47b91cde8a0a79ccaccfcf34c0c28f9fe1",
+      );
+    });
+
+    it("matches the official GET vector", () => {
+      const canonical = buildSenNoKuniCanonicalString({
+        keyId: "test-key-001",
+        timestamp: "1786660000",
+        nonce: "nonce-fixed-002",
+        method: "GET",
+        path: "/api/collectible-claims/test-token",
+        rawBody: "",
+      });
+
+      expect(signSenNoKuniRequest("test-secret", canonical)).toBe(
+        "sha256=2b059e010615116377299b3526bf20e33161ad9c1cbce4ee552eb38a55e269ec",
+      );
     });
   });
 
