@@ -1133,3 +1133,21 @@ model ClaimSession {
 
   @@map("claim_sessions")
 }
+
+/// 千ノ国NFTマーケット契約v2指示書23〜24章。at-least-once配送・順序保証なしの契約下では
+/// `entitlement.revoked`が対応する`entitlement.granted`より先に届くことがある。その場合
+/// CollectibleHoldingを作成できない(所有者・Asset情報が未着のため)ため、代わりにこの行を
+/// 記録し、後から届く`entitlement.granted`がACTIVE Holdingを作らないようにする
+/// (指示書25章「revoked → granted → ACTIVEにならない」)。
+model CollectibleEntitlementTombstone {
+  id              String   @id
+  /// 同じentitlement_idの重複作成を防ぐ (revoke再送時は既存行をそのまま使う)。
+  entitlementId   String   @unique @map("entitlement_id")
+  sourceSystemKey String   @map("source_system_key")
+  eventId         String   @map("event_id")
+  reason          String
+  revokedAt       DateTime @map("revoked_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("collectible_entitlement_tombstones")
+}

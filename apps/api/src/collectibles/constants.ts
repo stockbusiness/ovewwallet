@@ -14,3 +14,14 @@ export const NFT_MARKET_SOURCE_SYSTEM_KEYS = new Set([
   SENGOKU_MARKET_SOURCE_SYSTEM_KEY,
 ]);
 export const DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE = "digital_collectible";
+
+/**
+ * 契約v2指示書23章。`entitlement.granted`/`entitlement.revoked`はat-least-once・順序保証
+ * なしで届くため、同じentitlement_idの処理(Holding作成 / Tombstone作成)が同時に走ると
+ * 「revoke先行→tombstone」と「grant」が競合しうる。`collectible_holdings`への行ロック
+ * (`FOR UPDATE`)は対象行が存在しない間は何も守らないため、PostgreSQL advisory lockで
+ * entitlement_id単位に直列化する (PR#2最終修正 P1-1のasset_code単位ロックと同じ手法)。
+ */
+export function entitlementAdvisoryLockKey(entitlementId: string): string {
+  return `collectible_entitlement:${entitlementId}`;
+}

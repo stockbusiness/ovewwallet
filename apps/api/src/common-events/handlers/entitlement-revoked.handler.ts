@@ -41,6 +41,11 @@ export class EntitlementRevokedHandler implements CommonEventHandler {
     if (result.status === "not_found") {
       return { action: "not_found", entitlement_id: entitlementId };
     }
+    // 契約v2指示書23〜24章。revoke先行 (対応するentitlement.grantedがまだ届いていない)。
+    // Tombstoneを記録済みなので2xxで応答する。
+    if (result.status === "tombstoned") {
+      return { action: "tombstoned", entitlement_id: entitlementId };
+    }
     // PR#2最終修正 P0-1: AuditLogはUseCase内のtransactionで既にcommit済みなので、
     // ここで例外を投げてもAuditLogはロールバックされない。
     if (result.status === "source_conflict") {

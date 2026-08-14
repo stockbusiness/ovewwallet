@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { CollectibleAssetsRepository } from "./collectible-assets.repository";
+import { CollectibleEntitlementTombstonesRepository } from "./collectible-entitlement-tombstones.repository";
 import { CollectibleHoldingsRepository } from "./collectible-holdings.repository";
 import { CollectiblesQueryService } from "./collectibles-query.service";
 import { GrantCollectibleUseCase } from "./grant-collectible.use-case";
@@ -14,6 +15,7 @@ import { RevokeCollectibleUseCase } from "./revoke-collectible.use-case";
   providers: [
     CollectibleAssetsRepository,
     CollectibleHoldingsRepository,
+    CollectibleEntitlementTombstonesRepository,
     CollectiblesQueryService,
     GrantCollectibleUseCase,
     RevokeCollectibleUseCase,
@@ -21,6 +23,7 @@ import { RevokeCollectibleUseCase } from "./revoke-collectible.use-case";
   exports: [
     CollectibleAssetsRepository,
     CollectibleHoldingsRepository,
+    CollectibleEntitlementTombstonesRepository,
     CollectiblesQueryService,
     GrantCollectibleUseCase,
     RevokeCollectibleUseCase,

@@ -252,21 +252,23 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       expect(count).toBe(1);
     });
 
-    it("10. common_user_id競合: 2件以上のOveAccountがヒットすると要レビュー扱いになる", async () => {
+    it("10. common_user_id競合: 2件以上のOveAccountがヒットすると要レビュー扱いになり、409(non-2xx)を返す (契約v2指示書22章)", async () => {
       const commonUserId = `cu_${generateId()}`;
       await createAccountWithCommonUserId(commonUserId);
       await createAccountWithCommonUserId(commonUserId);
 
       const body = grantedBody({ common_user_id: commonUserId });
-      const res = await postEvent(body).expect(201);
-      expect(res.body.result.action).toBe("common_user_id_conflict_requires_review");
-      expect(res.body.result.account_ids).toHaveLength(2);
+      // 契約v2指示書22章: common_user_id競合時に2xxを返すとMarketが配送成功と誤判定するため、
+      // 409(non-2xx)を返す。Marketがリトライしても解決しない状態のため、Inbound Eventは
+      // 内部的にはリトライ対象(FAILED)として記録されるが、レスポンス自体は非2xxになる。
+      await postEvent(body).expect(409);
 
       const log = await prisma.auditLog.findFirst({
         where: { actionType: "COLLECTIBLE_GRANT_CONFLICT" },
         orderBy: { createdAt: "desc" },
       });
       expect(log).not.toBeNull();
+      expect((log?.afterData as { accountIds?: string[] } | null)?.accountIds).toHaveLength(2);
 
       const count = await prisma.collectibleHolding.count({ where: { entitlementId: body.entitlement_id } });
       expect(count).toBe(0);
@@ -418,11 +420,39 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       expect(logs).toHaveLength(1);
     });
 
-    it("3. 未存在entitlement_id: 該当Holdingが無ければnot_foundを返す", async () => {
-      const body = revokedBody(`ent_unknown_${generateId()}`);
+    it("3. 未存在entitlement_id (revoke先行): Tombstoneを記録し2xxを返す (契約v2指示書23〜24章)", async () => {
+      const entitlementId = `ent_unknown_${generateId()}`;
+      const body = revokedBody(entitlementId);
 
       const res = await postEvent(body).expect(201);
-      expect(res.body.result.action).toBe("not_found");
+      expect(res.body.result.action).toBe("tombstoned");
+
+      const tombstone = await prisma.collectibleEntitlementTombstone.findUniqueOrThrow({
+        where: { entitlementId },
+      });
+      expect(tombstone.sourceSystemKey).toBe(SENGOKU_MARKET);
+
+      // 同じrevokeの再送 (Market側のat-least-once再送) はTombstoneを重複作成せず、
+      // 引き続き2xxで冪等に応答する。
+      const retryBody = revokedBody(entitlementId);
+      const retryRes = await postEvent(retryBody).expect(201);
+      expect(retryRes.body.result.action).toBe("tombstoned");
+      expect(await prisma.collectibleEntitlementTombstone.count({ where: { entitlementId } })).toBe(1);
+    });
+
+    it("3b. revoke先行 → 後からgrantedが届いてもACTIVE Holdingにならない (契約v2指示書25章)", async () => {
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const entitlementId = `ent_${generateId()}`;
+
+      // 先にrevokeが届く (at-least-once・順序保証なしの契約下で起こりうる)。
+      await postEvent(revokedBody(entitlementId)).expect(201);
+
+      // 後からgrantedが届いても、ACTIVE Holdingを作ってはいけない。
+      const grantRes = await postEvent(grantedBody({ common_user_id: commonUserId, entitlement_id: entitlementId })).expect(201);
+      expect(grantRes.body.result.action).toBe("skipped_revoked_before_grant");
+
+      const holding = await prisma.collectibleHolding.findUnique({ where: { entitlementId } });
+      expect(holding).toBeNull();
     });
 
     it("4. 他source: sengoku-market以外の送信元からの取消は拒否される (PR#2最終修正P0-1)", async () => {

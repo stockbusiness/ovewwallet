@@ -162,7 +162,11 @@ export class AdminCollectiblesService {
       actorType: "ADMIN",
       eventId: `admin-revoke:${generateId()}`,
     });
-    if (result.status === "not_found") throw new NotFoundException("collectible holding not found");
+    // "tombstoned"はactorType==="ADMIN"では発生しない(revoke-collectible.use-case参照)が、
+    // 型としては存在するため念のため同じくnot_found扱いにする。
+    if (result.status === "not_found" || result.status === "tombstoned") {
+      throw new NotFoundException("collectible holding not found");
+    }
     return result.holding;
   }
 }

@@ -2,7 +2,9 @@ import { Inject, Injectable } from "@nestjs/common";
 import { generateId, Prisma, type CollectibleHolding, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CollectibleAssetsRepository } from "./collectible-assets.repository";
+import { CollectibleEntitlementTombstonesRepository } from "./collectible-entitlement-tombstones.repository";
 import { CollectibleHoldingsRepository, type CollectibleHoldingWithAsset } from "./collectible-holdings.repository";
+import { entitlementAdvisoryLockKey } from "./constants";
 
 export interface GrantCollectibleParams {
   oveAccountId: string;
@@ -27,7 +29,10 @@ export interface GrantCollectibleParams {
 export type GrantCollectibleResult =
   | { status: "granted"; holding: CollectibleHolding; assetCreated: boolean }
   /** PR#2最終修正 P0-2: 再送だがowner/order/asset_codeのいずれかが既存Holdingと一致しない。 */
-  | { status: "conflict"; existingHolding: CollectibleHoldingWithAsset };
+  | { status: "conflict"; existingHolding: CollectibleHoldingWithAsset }
+  /** 契約v2指示書23〜25章。対応するentitlement.revokedが先に届きTombstone済み
+   * (revoke先行)。ACTIVE Holdingを作らず、権利は取消済みのまま維持する。 */
+  | { status: "tombstoned" };
 
 /** PR#2最終修正 P1-1: asset_code単位のPostgreSQL advisory transaction lock用キー。 */
 function assetLockKey(assetCode: string): string {
@@ -70,6 +75,7 @@ export class GrantCollectibleUseCase {
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly assets: CollectibleAssetsRepository,
     private readonly holdings: CollectibleHoldingsRepository,
+    private readonly tombstones: CollectibleEntitlementTombstonesRepository,
   ) {}
 
   async execute(params: GrantCollectibleParams): Promise<GrantCollectibleResult> {
@@ -78,8 +84,32 @@ export class GrantCollectibleUseCase {
 
     try {
       return await this.db.$transaction(async (tx) => {
+        // 契約v2指示書23章。revoke-collectible.use-caseの同名キーと衝突させ、
+        // Tombstone作成とHolding作成を同じentitlement_idについて排他する。
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(params.entitlementId)}))`;
+
         const existingInTx = await this.holdings.findByEntitlementIdWithAsset(params.entitlementId, tx);
         if (existingInTx) return this.handleExisting(tx, existingInTx, params);
+
+        // 契約v2指示書24〜25章。revoke先行でTombstone済みなら、ACTIVE Holdingを作らない
+        // (「revoked → granted → ACTIVEにならない」)。
+        const tombstone = await this.tombstones.findByEntitlementId(params.entitlementId, tx);
+        if (tombstone) {
+          await tx.auditLog.create({
+            data: {
+              id: generateId(),
+              actorType: "EXTERNAL_SERVICE",
+              actorId: params.sourceSystemKey,
+              actionType: "COLLECTIBLE_GRANT_SKIPPED_TOMBSTONED",
+              targetType: "collectible_entitlement_tombstone",
+              targetId: tombstone.id,
+              result: "SUCCESS",
+              reason: `entitlement_id "${params.entitlementId}" was already revoked before this entitlement.granted arrived (revoke先行); no Holding was created`,
+              afterData: { eventId: params.eventId, oveAccountId: params.oveAccountId } as unknown as Prisma.InputJsonValue,
+            },
+          });
+          return { status: "tombstoned" };
+        }
 
         // PR#2最終修正 P1-1: 同じasset_codeで異なるentitlement_idの同時付与が
         // CollectibleAsset.assetCodeのUNIQUE制約に競合しないよう、Asset解決全体を

@@ -1,8 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { generateId, type CollectibleHolding, type CreatedByType, type Prisma, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
-import { NFT_MARKET_SOURCE_SYSTEM_KEYS } from "./constants";
+import { CollectibleEntitlementTombstonesRepository } from "./collectible-entitlement-tombstones.repository";
 import { CollectibleHoldingsRepository } from "./collectible-holdings.repository";
+import { NFT_MARKET_SOURCE_SYSTEM_KEYS, entitlementAdvisoryLockKey } from "./constants";
 
 export interface RevokeCollectibleParams {
   entitlementId: string;
@@ -16,6 +17,11 @@ export interface RevokeCollectibleParams {
 
 export type RevokeCollectibleResult =
   | { status: "not_found" }
+  /** 契約v2指示書23〜24章。Holding未作成のままentitlement.revokedが先着した (revoke先行)。
+   * Tombstoneを記録し、後続のentitlement.grantedがACTIVE Holdingを作らないようにする。
+   * 管理画面からの手動取消(actorType==="ADMIN")では作らない (誤入力のentitlement_idを
+   * 将来にわたって塞いでしまう事故を避けるため、自動イベント起点のみ対象とする)。 */
+  | { status: "tombstoned" }
   | { status: "already_revoked"; holding: CollectibleHolding }
   | { status: "revoked"; holding: CollectibleHolding }
   /** PR#2最終修正 P0-1: 送信元がsengoku-market以外、またはHolding作成時の送信元と不一致。 */
@@ -41,17 +47,40 @@ export class RevokeCollectibleUseCase {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly holdings: CollectibleHoldingsRepository,
+    private readonly tombstones: CollectibleEntitlementTombstonesRepository,
   ) {}
 
   async execute(params: RevokeCollectibleParams): Promise<RevokeCollectibleResult> {
+    const actorType = params.actorType ?? "EXTERNAL_SERVICE";
+    const isAutomated = actorType !== "ADMIN";
+
     return this.db.$transaction(async (tx) => {
+      // 契約v2指示書23章。`collectible_holdings`への行ロックは対象行が無ければ何も守らないため、
+      // Holding未作成のままentitlement_idを直列化するadvisory lockを別途取る
+      // (grant-collectible.use-caseの同名キーと衝突させ、tombstone作成とHolding作成を排他する)。
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(params.entitlementId)}))`;
       await this.holdings.lockByEntitlementId(params.entitlementId, tx);
       const holding = await this.holdings.findByEntitlementId(params.entitlementId, tx);
-      if (!holding) return { status: "not_found" };
-      if (holding.status === "REVOKED") return { status: "already_revoked", holding };
+      if (!holding) {
+        if (!isAutomated) return { status: "not_found" };
 
-      const actorType = params.actorType ?? "EXTERNAL_SERVICE";
-      const isAutomated = actorType !== "ADMIN";
+        const existingTombstone = await this.tombstones.findByEntitlementId(params.entitlementId, tx);
+        if (!existingTombstone) {
+          await this.tombstones.create(
+            {
+              id: generateId(),
+              entitlementId: params.entitlementId,
+              sourceSystemKey: params.sourceSystemKey,
+              eventId: params.eventId,
+              reason: params.reason,
+              revokedAt: new Date(),
+            },
+            tx,
+          );
+        }
+        return { status: "tombstoned" };
+      }
+      if (holding.status === "REVOKED") return { status: "already_revoked", holding };
 
       if (isAutomated) {
         const sourceMismatch =

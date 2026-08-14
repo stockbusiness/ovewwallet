@@ -148,7 +148,11 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
           },
         },
       });
-      return { action: "common_user_id_conflict_requires_review", account_ids: resolved.accountIds };
+      // 契約v2指示書22章。common_user_id競合時に2xxを返すと、Marketがこのイベントの
+      // 配送を成功と誤判定してしまう (Wallet側はHoldingを作っていないため矛盾する)。
+      throw new ConflictException(
+        `common_user_id "${envelope.common_user_id}" is linked to multiple OVE accounts (${resolved.accountIds.join(", ")}); refusing to grant until reviewed`,
+      );
     }
 
     const result = await this.grantCollectible.execute({
@@ -176,6 +180,12 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
       throw new ConflictException(
         `entitlement_id "${envelope.entitlement_id}" was already granted with different details`,
       );
+    }
+
+    // 契約v2指示書24〜25章。対応するentitlement.revokedが先に届いていた (revoke先行)。
+    // ACTIVEにはせず、Marketには2xxで応答する (Wallet側の正しい最終状態であるため)。
+    if (result.status === "tombstoned") {
+      return { action: "skipped_revoked_before_grant", entitlement_id: envelope.entitlement_id };
     }
 
     return {
