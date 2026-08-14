@@ -8,11 +8,13 @@ import { ClaimSessionResolver } from "./claim-session-resolver.service";
 export type ConfirmClaimResult =
   | { outcome: "accepted"; status: string }
   | { outcome: "common_user_unresolved" }
+  | { outcome: "market_common_user_pending" }
   | { outcome: "not_found" }
   | { outcome: "expired" }
   | { outcome: "revoked" }
   | { outcome: "common_user_mismatch" }
   | { outcome: "processing" }
+  | { outcome: "idempotency_conflict" }
   | { outcome: "disabled" }
   | { outcome: "timeout" }
   | { outcome: "network_error" }
@@ -88,7 +90,13 @@ export class ConfirmClaimUseCase {
       return { outcome: "disabled" };
     }
 
-    // not_found/expired/revoked/common_user_mismatch/processing/timeout/network_error/invalid_response
+    // 契約v2指示書13章。「拒否」ではなく一時的な保留状態のため、REJECTED監査ログは残さない。
+    if (marketResult.outcome === "market_common_user_pending") {
+      return { outcome: "market_common_user_pending" };
+    }
+
+    // not_found/expired/revoked/common_user_mismatch/processing/idempotency_conflict/
+    // timeout/network_error/invalid_response
     await this.audit({
       actorId: params.oveAccountId,
       actionType: "COLLECTIBLE_CLAIM_REJECTED",

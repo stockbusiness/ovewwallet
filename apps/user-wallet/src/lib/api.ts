@@ -2,6 +2,8 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /** APIが`{ok:false, error: "..."}`で返す機械可読コード (例: Claim確定APIの`common_user_mismatch`)。 */
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -26,7 +28,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const body = isJson ? await res.json() : undefined;
 
   if (!res.ok) {
-    throw new ApiError(res.status, body?.message ?? res.statusText);
+    throw new ApiError(res.status, body?.message ?? res.statusText, typeof body?.error === "string" ? body.error : undefined);
   }
   return body as T;
 }

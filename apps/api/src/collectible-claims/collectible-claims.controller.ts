@@ -108,6 +108,11 @@ export class CollectibleClaimsController {
         res.status(202);
         // 指示書v2「common_user_id未解決」レスポンス契約: { ok: true, action: "common_user_unresolved" }
         return { ok: true, action: "common_user_unresolved" };
+      case "market_common_user_pending":
+        res.status(202);
+        // 契約v2指示書11・13章。Wallet自身のcommon_user_id未解決とは別状態のため、
+        // actionを分けてUI側で区別できるようにする。
+        return { ok: true, action: "market_common_user_pending" };
       case "not_found":
         res.status(404);
         return { ok: false, error: "not_found" };
@@ -123,6 +128,9 @@ export class CollectibleClaimsController {
       case "processing":
         res.status(409);
         return { ok: false, error: "processing" };
+      case "idempotency_conflict":
+        res.status(409);
+        return { ok: false, error: "idempotency_conflict" };
       case "disabled":
       case "timeout":
       case "network_error":

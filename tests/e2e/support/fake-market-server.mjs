@@ -28,6 +28,14 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === "POST" && isConfirm) {
+    // 千ノ国NFTマーケット契約v2指示書PR-WN02のUI回帰用。tokenの接頭辞でシナリオを切り替える
+    // (apps/api/src/e2e/collectible-claims.test.tsと同じ「tokenにシナリオを埋め込む」方式)。
+    if (token.startsWith("mismatch-")) {
+      return json(res, 409, { error: { code: "COMMON_USER_MISMATCH", message: "account mismatch" } });
+    }
+    if (token.startsWith("pending-")) {
+      return json(res, 202, { status: "PENDING", reason: "common_user_pending" });
+    }
     store.set(token, { confirmed: true, pollCount: 0 });
     return json(res, 202, { status: "DELIVERY_PENDING" });
   }

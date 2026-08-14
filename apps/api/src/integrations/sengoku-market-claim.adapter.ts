@@ -23,11 +23,18 @@ export type GetClaimStatusResult =
 
 export type ConfirmClaimResult =
   | { outcome: "accepted"; status: string }
+  /** 契約v2指示書11章。Market側の購入者ID(common_user_id相当)がまだ解決していない。
+   * Wallet自身のcommon_user_id未解決(`common_user_unresolved`)とは別の状態であり、
+   * `delivery_pending`へ進めてはいけない。 */
+  | { outcome: "market_common_user_pending" }
   | { outcome: "not_found" }
   | { outcome: "expired" }
   | { outcome: "revoked" }
   | { outcome: "common_user_mismatch" }
   | { outcome: "processing" }
+  /** 契約v2指示書10.1章 IDEMPOTENCY_CONFLICT。同じIdempotency-Keyで異なる内容の
+   * リクエストが送られており、再試行では解決しない (processingとは異なる)。 */
+  | { outcome: "idempotency_conflict" }
   | { outcome: "disabled" }
   | { outcome: "timeout" }
   | { outcome: "network_error" }
@@ -203,15 +210,30 @@ export class SengokuMarketClaimAdapter {
     });
 
     if (result.ok) {
+      // 契約v2指示書11章。202でも`reason:"common_user_pending"`ならMarket側の
+      // 購入者ID未解決であり、配送は進んでいない。acceptedとして扱ってはいけない。
+      if (result.data.status === "PENDING" && result.data.reason === "common_user_pending") {
+        return { outcome: "market_common_user_pending" };
+      }
       return { outcome: "accepted", status: result.data.status ?? "DELIVERY_PENDING" };
     }
     return this.classifyConfirmError(result.error);
+  }
+
+  /** 契約v2指示書10.1章。本文の`error.code`(新Market標準Error Envelope)をHTTP
+   * ステータスより優先して分類する。本文がない/パース不可の場合はステータスのみで判定する。 */
+  private parseMarketErrorCode(error: IntegrationErrorResult): string | undefined {
+    const parsed = MarketClaimErrorBodySchema.safeParse(error.body);
+    return parsed.success ? parsed.data.error?.code : undefined;
   }
 
   private classifyStatusError(error: IntegrationErrorResult): GetClaimStatusResult {
     if (error.kind === "timeout") return { outcome: "timeout" };
     if (error.kind === "network" || error.kind === "http_5xx") return { outcome: "network_error" };
     if (error.kind === "invalid_response") return { outcome: "invalid_response" };
+    const code = this.parseMarketErrorCode(error);
+    if (code === "CLAIM_NOT_FOUND") return { outcome: "not_found" };
+    if (code === "CLAIM_EXPIRED") return { outcome: "expired" };
     if (error.status === 404) return { outcome: "not_found" };
     if (error.status === 410) return { outcome: "expired" };
     return { outcome: "network_error" };
@@ -221,15 +243,16 @@ export class SengokuMarketClaimAdapter {
     if (error.kind === "timeout") return { outcome: "timeout" };
     if (error.kind === "network" || error.kind === "http_5xx") return { outcome: "network_error" };
     if (error.kind === "invalid_response") return { outcome: "invalid_response" };
+    const code = this.parseMarketErrorCode(error);
+    if (code === "COMMON_USER_MISMATCH") return { outcome: "common_user_mismatch" };
+    if (code === "CLAIM_REVOKED") return { outcome: "revoked" };
+    if (code === "CLAIM_EXPIRED") return { outcome: "expired" };
+    if (code === "CLAIM_NOT_FOUND") return { outcome: "not_found" };
+    if (code === "IDEMPOTENCY_IN_PROGRESS") return { outcome: "processing" };
+    if (code === "IDEMPOTENCY_CONFLICT") return { outcome: "idempotency_conflict" };
     if (error.status === 404) return { outcome: "not_found" };
     if (error.status === 410) return { outcome: "expired" };
-    if (error.status === 409) {
-      const parsed = MarketClaimErrorBodySchema.safeParse(error.body);
-      const code = parsed.success ? parsed.data.code : undefined;
-      if (code === "revoked") return { outcome: "revoked" };
-      if (code === "common_user_mismatch") return { outcome: "common_user_mismatch" };
-      return { outcome: "processing" };
-    }
+    if (error.status === 409) return { outcome: "processing" };
     return { outcome: "network_error" };
   }
 }

@@ -30,18 +30,18 @@ describe("NFTカードClaim導線 (実装指示書)", () => {
         const url = req.url ?? "";
 
         if (req.method === "GET") {
-          if (url.includes("notfound-token")) return json(res, 404, { code: "not_found" });
-          if (url.includes("expired-token")) return json(res, 410, { code: "expired" });
+          if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_NOT_FOUND" } });
+          if (url.includes("expired-token")) return json(res, 410, { error: { code: "CLAIM_EXPIRED" } });
           if (url.includes("delivered-token")) return json(res, 200, { status: "DELIVERED", card_name: "織田信長 SSR" });
           if (url.includes("pending-token")) return json(res, 200, { status: "PENDING", card_name: "織田信長 SSR" });
           return json(res, 200, { status: "PENDING", card_name: "テストカード" });
         }
 
-        // POST .../confirm
-        if (url.includes("revoked-token")) return json(res, 409, { code: "revoked" });
-        if (url.includes("mismatch-token")) return json(res, 409, { code: "common_user_mismatch" });
-        if (url.includes("processing-token")) return json(res, 409, { code: "processing" });
-        if (url.includes("notfound-token")) return json(res, 404, { code: "not_found" });
+        // POST .../confirm (千ノ国NFTマーケット契約v2指示書10.1章の新Error Envelope形式)
+        if (url.includes("revoked-token")) return json(res, 409, { error: { code: "CLAIM_REVOKED" } });
+        if (url.includes("mismatch-token")) return json(res, 409, { error: { code: "COMMON_USER_MISMATCH" } });
+        if (url.includes("processing-token")) return json(res, 409, { error: { code: "IDEMPOTENCY_IN_PROGRESS" } });
+        if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_NOT_FOUND" } });
         return json(res, 202, { status: "DELIVERY_PENDING" });
       });
     });

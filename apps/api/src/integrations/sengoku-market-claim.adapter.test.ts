@@ -171,6 +171,50 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
       expect(signature).toBe(signSenNoKuniRequest("test-claim-secret", expectedCanonical));
     });
 
+    it("treats a 202 with reason=common_user_pending as market_common_user_pending, not accepted (契約v2指示書11章)", async () => {
+      const baseUrl = await startServer(202, { status: "PENDING", reason: "common_user_pending" });
+      process.env.ENABLE_COLLECTIBLE_CLAIM_FLOW = "true";
+      process.env.SENGOKU_MARKET_CLAIM_BASE_URL = baseUrl;
+      process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
+      process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
+
+      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+      const result = await adapter.confirmClaim({
+        rawToken: "tok123",
+        commonUserId: "cu_1",
+        idempotencyKey: "idem-1",
+      });
+
+      expect(result.outcome).toBe("market_common_user_pending");
+    });
+
+    it.each([
+      ["COMMON_USER_MISMATCH", "common_user_mismatch"],
+      ["CLAIM_REVOKED", "revoked"],
+      ["CLAIM_EXPIRED", "expired"],
+      ["CLAIM_NOT_FOUND", "not_found"],
+      ["IDEMPOTENCY_IN_PROGRESS", "processing"],
+      ["IDEMPOTENCY_CONFLICT", "idempotency_conflict"],
+    ] as const)(
+      "classifies the new Market standard error envelope {error:{code:%s}} as outcome=%s (契約v2指示書10.1章)",
+      async (marketCode, expectedOutcome) => {
+        const baseUrl = await startServer(409, { error: { code: marketCode, message: "test" } });
+        process.env.ENABLE_COLLECTIBLE_CLAIM_FLOW = "true";
+        process.env.SENGOKU_MARKET_CLAIM_BASE_URL = baseUrl;
+        process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
+        process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
+
+        const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+        const result = await adapter.confirmClaim({
+          rawToken: "tok123",
+          commonUserId: "cu_1",
+          idempotencyKey: "idem-1",
+        });
+
+        expect(result.outcome).toBe(expectedOutcome);
+      },
+    );
+
     it("signs getClaimStatus() (GET) with an empty raw body", async () => {
       const baseUrl = await startServer(200, { status: "PENDING" });
       process.env.ENABLE_COLLECTIBLE_CLAIM_FLOW = "true";

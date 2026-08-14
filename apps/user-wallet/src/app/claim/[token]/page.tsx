@@ -10,20 +10,44 @@ const POLL_INTERVAL_MS = 5000;
 const MAX_POLL_ATTEMPTS = 60; // 5秒間隔で最大5分
 
 /**
- * NFTカードClaim導線実装指示書10章。表示状態:
- * Claim確認中 / ログインが必要 / 受取可能 / common_user_id解決待ち / 送付処理中 /
- * 受取完了 / 期限切れ / 返金・取消済み / エラー。
+ * NFTカードClaim導線実装指示書10章 + 千ノ国NFTマーケット契約v2指示書12・13章。表示状態:
+ * Claim確認中 / ログインが必要 / 受取可能 / Wallet側common_user_id解決待ち /
+ * Market側購入者ID解決待ち / 送付処理中 / 受取完了 / アカウント不一致 / 期限切れ /
+ * 返金・取消済み / ネットワークエラー / エラー。
  */
 type ScreenState =
   | { kind: "loading" }
   | { kind: "requires_login"; claimSessionId: string }
   | { kind: "ready"; claimSessionId: string; cardName: string | null }
   | { kind: "common_user_unresolved"; claimSessionId: string; cardName: string | null }
+  /** 契約v2指示書13章。Wallet側とは別の、Market側の購入者ID未解決。 */
+  | { kind: "market_common_user_pending"; claimSessionId: string; cardName: string | null }
   | { kind: "delivery_pending"; claimSessionId: string; cardName: string | null }
   | { kind: "delivered"; cardName: string | null }
+  /** 契約v2指示書12章。COMMON_USER_MISMATCH専用状態。 */
+  | { kind: "account_mismatch" }
   | { kind: "expired" }
   | { kind: "revoked" }
+  | { kind: "network_error" }
   | { kind: "error"; message: string };
+
+/**
+ * confirmClaim()の失敗を画面状態へ分類する。`confirmClaim`自体の複雑度を抑えるため
+ * コンポーネント外の純粋関数として分離 (401は呼び出し元でログイン画面へ遷移するため
+ * ここには含めない)。
+ */
+function mapConfirmErrorToState(err: ApiError): ScreenState {
+  if (err.status === 410) return { kind: "expired" };
+  // 契約v2指示書12章。アカウント不一致は専用状態・専用文言で「次に取るべき行動」を示す。
+  if (err.code === "common_user_mismatch") return { kind: "account_mismatch" };
+  if (err.code === "revoked") return { kind: "revoked" };
+  if (err.status === 503) return { kind: "network_error" };
+  if (err.code === "processing") return { kind: "error", message: "処理中です。しばらくしてから再度お試しください。" };
+  if (err.status === 409 || err.status === 404) {
+    return { kind: "error", message: "受取処理に失敗しました。しばらくしてから再度お試しください。" };
+  }
+  return { kind: "error", message: "受取処理に失敗しました。" };
+}
 
 export default function ClaimPage() {
   const params = useParams<{ token: string }>();
@@ -53,7 +77,7 @@ export default function ClaimPage() {
           return;
         }
         if (err instanceof ApiError && err.status === 503) {
-          setState({ kind: "error", message: "現在ご利用いただけません。しばらくしてから再度お試しください。" });
+          setState({ kind: "network_error" });
           return;
         }
         setState({ kind: "error", message: "読み込みに失敗しました。" });
@@ -133,21 +157,17 @@ export default function ClaimPage() {
         setState({ kind: "common_user_unresolved", claimSessionId, cardName: null });
         return;
       }
+      if (result.action === "market_common_user_pending") {
+        setState({ kind: "market_common_user_pending", claimSessionId, cardName: null });
+        return;
+      }
       setState({ kind: "delivery_pending", claimSessionId, cardName: null });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.push(`/login?return_to=${encodeURIComponent(`/claim/${claimSessionId}`)}`);
         return;
       }
-      if (err instanceof ApiError && err.status === 410) {
-        setState({ kind: "expired" });
-        return;
-      }
-      if (err instanceof ApiError && (err.status === 409 || err.status === 404 || err.status === 503)) {
-        setState({ kind: "error", message: "受取処理に失敗しました。しばらくしてから再度お試しください。" });
-        return;
-      }
-      setState({ kind: "error", message: "受取処理に失敗しました。" });
+      setState(err instanceof ApiError ? mapConfirmErrorToState(err) : { kind: "error", message: "受取処理に失敗しました。" });
     } finally {
       setConfirming(false);
     }
@@ -184,6 +204,10 @@ export default function ClaimPage() {
         <p className="text-sm leading-relaxed text-sengoku-muted">アカウント情報を確認しています。しばらくしてから再度お試しください。</p>
       )}
 
+      {state.kind === "market_common_user_pending" && (
+        <p className="text-sm leading-relaxed text-sengoku-muted">購入情報を確認しています。しばらくしてから再度お試しください。</p>
+      )}
+
       {state.kind === "delivery_pending" && (
         <>
           {state.cardName && <p className="text-base font-bold text-sengoku-text">{state.cardName}</p>}
@@ -209,6 +233,14 @@ export default function ClaimPage() {
 
       {state.kind === "revoked" && (
         <p className="text-sm leading-relaxed text-sengoku-muted">この受取は返金・取消済みのため利用できません。</p>
+      )}
+
+      {state.kind === "account_mismatch" && (
+        <p className="text-sm leading-relaxed text-sengoku-gold-soft">この商品を購入したアカウントでログインしてください。</p>
+      )}
+
+      {state.kind === "network_error" && (
+        <p className="text-sm leading-relaxed text-sengoku-muted">現在ご利用いただけません。しばらくしてから再度お試しください。</p>
       )}
 
       {state.kind === "error" && <p className="text-sm leading-relaxed text-sengoku-gold-soft">{state.message}</p>}

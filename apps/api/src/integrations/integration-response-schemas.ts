@@ -38,16 +38,36 @@ export const MarketClaimStatusResponseSchema = z.object({
   expires_at: z.string().nullable().optional(),
 });
 
+/**
+ * 千ノ国NFTマーケット契約v2指示書11章。202成功応答でも`reason:"common_user_pending"`
+ * の場合は「配送処理が進んでいない」ことを意味し、`delivery_pending`へ進めてはいけない。
+ */
 export const MarketClaimConfirmResponseSchema = z.object({
   status: z.string().optional(),
+  reason: z.string().optional(),
 });
 
 /**
- * 409応答本文の機械可読な種別。同じHTTPステータスでも
- * revoked/common_user_mismatch/processingを区別する必要があるため
- * (指示書7章「エラー分類」)、ステータスコードだけでなく本文もパースする。
+ * 千ノ国NFTマーケット契約v2指示書10.1章。新Market標準Error Envelope
+ * (`{"error":{"code":"COMMON_USER_MISMATCH","message":"..."}}`)。同じHTTPステータスでも
+ * revoked/common_user_mismatch/processing等を区別する必要があるため、ステータスコード
+ * だけでなく本文もパースする。旧フラット形式(`{"code":"common_user_mismatch"}`)は
+ * 本番未接続のため互換対応せず、新形式のみ受理する。
  */
+export const MARKET_CLAIM_ERROR_CODE_VALUES = [
+  "COMMON_USER_MISMATCH",
+  "CLAIM_REVOKED",
+  "CLAIM_EXPIRED",
+  "CLAIM_NOT_FOUND",
+  "IDEMPOTENCY_CONFLICT",
+  "IDEMPOTENCY_IN_PROGRESS",
+] as const;
+
 export const MarketClaimErrorBodySchema = z.object({
-  code: z.enum(["revoked", "common_user_mismatch", "processing", "not_found", "expired"]).optional(),
-  message: z.string().optional(),
+  error: z
+    .object({
+      code: z.enum(MARKET_CLAIM_ERROR_CODE_VALUES).optional(),
+      message: z.string().optional(),
+    })
+    .optional(),
 });
