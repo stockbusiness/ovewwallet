@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { generateId, type CollectibleHolding, type CreatedByType, type Prisma, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
-import { SENGOKU_MARKET_SOURCE_SYSTEM_KEY } from "./constants";
+import { NFT_MARKET_SOURCE_SYSTEM_KEYS } from "./constants";
 import { CollectibleHoldingsRepository } from "./collectible-holdings.repository";
 
 export interface RevokeCollectibleParams {
@@ -55,7 +55,7 @@ export class RevokeCollectibleUseCase {
 
       if (isAutomated) {
         const sourceMismatch =
-          params.sourceSystemKey !== SENGOKU_MARKET_SOURCE_SYSTEM_KEY || holding.sourceSystemKey !== params.sourceSystemKey;
+          !NFT_MARKET_SOURCE_SYSTEM_KEYS.has(params.sourceSystemKey) || holding.sourceSystemKey !== params.sourceSystemKey;
         if (sourceMismatch) {
           await this.recordFailure(tx, holding, {
             actorType,

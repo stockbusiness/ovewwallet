@@ -31,6 +31,19 @@ export interface CommonEventSigningCredentials {
   secret: string;
 }
 
+const SHA256_PREFIX = "sha256=";
+
+/**
+ * 千ノ国NFTマーケット契約v2指示書20章。新NFTマーケットは`X-SenNoKuni-Signature`を
+ * `sha256=<hex>`形式で送る。既存の代理店システム等 (千ノ国 全体統合 共通実装契約
+ * v1.1 FINALの固定テストベクトルで確認済み) はprefixなしの生hexを送るため、
+ * 両方を受理できるようprefixがあれば取り除く (どちらの送信元も同じ受信エンドポイントを
+ * 共有するため、厳格な新形式への一本化はできない)。
+ */
+function stripSha256Prefix(signature: string): string {
+  return signature.startsWith(SHA256_PREFIX) ? signature.slice(SHA256_PREFIX.length) : signature;
+}
+
 /**
  * 千ノ国 全体統合 共通実装契約 v1.1 FINAL §8〜9の`X-SenNoKuni-*`ヘッダー検証。
  *
@@ -66,7 +79,7 @@ export class CommonEventAuthenticator {
       pathWithoutQuery,
       ctx.rawBody,
     ].join("\n");
-    if (!hmacVerify(credentials.secret, signaturePayload, ctx.signature)) {
+    if (!hmacVerify(credentials.secret, signaturePayload, stripSha256Prefix(ctx.signature))) {
       throw new CommonEventAuthError("invalid HMAC signature");
     }
 

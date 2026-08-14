@@ -42,6 +42,24 @@ describe("CommonEventAuthenticator (共通実装契約6.1章、次期改修指�
     await expect(auth.verify(ctx, { keyId: "key-1", secret })).resolves.toBeUndefined();
   });
 
+  it("accepts a signature with a sha256= prefix, as sent by the new 千ノ国NFTマーケット契約v2 (指示書20章)", async () => {
+    const auth = new CommonEventAuthenticator(new InMemoryKeyValueStore());
+    const { ctx, secret } = buildContext();
+
+    await expect(
+      auth.verify({ ...ctx, signature: `sha256=${ctx.signature}` }, { keyId: "key-1", secret }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects a sha256=-prefixed signature whose hex part is wrong", async () => {
+    const auth = new CommonEventAuthenticator(new InMemoryKeyValueStore());
+    const { ctx, secret } = buildContext();
+
+    await expect(
+      auth.verify({ ...ctx, signature: `sha256=${"0".repeat(64)}` }, { keyId: "key-1", secret }),
+    ).rejects.toBeInstanceOf(CommonEventAuthError);
+  });
+
   it("rejects a replayed nonce", async () => {
     const auth = new CommonEventAuthenticator(new InMemoryKeyValueStore());
     const { ctx, secret } = buildContext();

@@ -161,6 +161,10 @@ export const CommonEventBodySchema = z
     previous_common_user_id: z.string().max(255).nullable().optional(),
     original_event_id: z.string().max(255).nullable().optional(),
     metadata: z.record(z.unknown()).nullable().optional(),
+    /** 千ノ国NFTマーケット契約v2指示書16〜17章。業務項目のネスト先 (旧フラット契約との併存)。 */
+    data: z.record(z.unknown()).nullable().optional(),
+    /** 同19章。送信先サービスの識別子。 */
+    target_site_key: z.string().nullable().optional(),
   })
   .passthrough();
 export type CommonEventBody = z.infer<typeof CommonEventBodySchema>;
@@ -180,6 +184,11 @@ const BaseCommonEventSchema = z.object({
   source_system_key: z.string().min(1).max(100),
   correlation_id: z.string().max(255).nullable().optional(),
   metadata: z.record(z.unknown()).nullable().optional(),
+  /** 千ノ国NFTマーケット契約v2指示書16〜17章。業務項目のネスト先。旧フラット契約との
+   * 併存期間中は各ハンドラのNormalizerが`data.field`とトップレベルfieldを突き合わせる。 */
+  data: z.record(z.unknown()).nullable().optional(),
+  /** 同19章。送信先サービスの識別子。誤配送防止のため一致検証する。 */
+  target_site_key: z.string().nullable().optional(),
 });
 
 /**

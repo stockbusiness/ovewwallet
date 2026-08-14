@@ -2,13 +2,17 @@ import { BadRequestException, ConflictException, Inject, Injectable, NotFoundExc
 import { generateId, type PrismaClient } from "@ove/database";
 import { EntitlementGrantedEventSchema, type CommonEventBody } from "@ove/shared-types";
 import { GrantCollectibleUseCase } from "../../collectibles/grant-collectible.use-case";
-import { DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE, SENGOKU_MARKET_SOURCE_SYSTEM_KEY } from "../../collectibles/constants";
+import { DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE, NFT_MARKET_SOURCE_SYSTEM_KEYS } from "../../collectibles/constants";
 import { assertValidCollectibleImageUrl, InvalidCollectibleImageUrlError } from "../../common/image-url-validator";
 import { PRISMA } from "../../common/prisma.module";
 import { CommonEventAccountResolver } from "../common-event-account-resolver";
 import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
+import {
+  assertTargetSiteKeyMatchesWallet,
+  normalizeEntitlementEnvelope,
+  normalizeEntitlementType,
+} from "../nft-market-event-normalizer";
 
-const EXPECTED_SOURCE_SYSTEM_KEY = SENGOKU_MARKET_SOURCE_SYSTEM_KEY;
 const EXPECTED_ENTITLEMENT_TYPE = DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE;
 
 interface CardMetadata {
@@ -40,8 +44,10 @@ function requireValidImageUrl(url: string, field: string): void {
 
 function extractCardMetadata(body: CommonEventBody): CardMetadata {
   const metadata = (body.metadata as Record<string, unknown> | null | undefined) ?? {};
-  if (metadata["entitlement_type"] !== EXPECTED_ENTITLEMENT_TYPE) {
-    throw new BadRequestException(`metadata.entitlement_type must be "${EXPECTED_ENTITLEMENT_TYPE}"`);
+  // 契約v2指示書18章。新Market`DIGITAL_COLLECTIBLE`と旧`digital_collectible`の両方を受理し
+  // 内部正式値へ正規化する。未知のtypeは拒否する (勝手にlowercaseして受理しない)。
+  if (normalizeEntitlementType(metadata["entitlement_type"]) !== EXPECTED_ENTITLEMENT_TYPE) {
+    throw new BadRequestException(`metadata.entitlement_type must be "DIGITAL_COLLECTIBLE" or "${EXPECTED_ENTITLEMENT_TYPE}"`);
   }
 
   const assetCode = optionalString(metadata["asset_code"]);
@@ -91,14 +97,19 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
   ) {}
 
   async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
-    if (context.authenticatedSourceSystemKey !== EXPECTED_SOURCE_SYSTEM_KEY) {
+    if (!NFT_MARKET_SOURCE_SYSTEM_KEYS.has(context.authenticatedSourceSystemKey)) {
       throw new BadRequestException(
-        `entitlement.granted must originate from "${EXPECTED_SOURCE_SYSTEM_KEY}" (authenticated source: "${context.authenticatedSourceSystemKey}")`,
+        `entitlement.granted must originate from a known NFT market source_system_key (authenticated source: "${context.authenticatedSourceSystemKey}")`,
       );
     }
+    // 契約v2指示書19章。target_site_keyが付与されていれば、このWallet宛てかを検証する。
+    assertTargetSiteKeyMatchesWallet(body);
 
-    if (!body.common_user_id) throw new BadRequestException("common_user_id is required");
-    if (!body.entitlement_id) throw new BadRequestException("entitlement_id is required");
+    // 契約v2指示書16〜17章。新data{} Envelopeと旧フラット契約を突き合わせて正規化する。
+    const envelope = normalizeEntitlementEnvelope(body);
+
+    if (!envelope.common_user_id) throw new BadRequestException("common_user_id is required");
+    if (!envelope.entitlement_id) throw new BadRequestException("entitlement_id is required");
 
     const quantity = body.quantity ?? 1;
     if (quantity !== 1) {
@@ -108,12 +119,12 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
     const { assetCode, name, description, imageUrl, thumbnailUrl, imageHash, rarity, serialNumber } = extractCardMetadata(body);
 
     const resolved = await this.accountResolver.resolveByCommonUserId(
-      body.common_user_id,
+      envelope.common_user_id,
       "COLLECTIBLE_GRANTED",
       context.authenticatedSourceSystemKey,
     );
     if (resolved.status === "not_found") {
-      throw new NotFoundException(`no OVE account linked to common_user_id "${body.common_user_id}"`);
+      throw new NotFoundException(`no OVE account linked to common_user_id "${envelope.common_user_id}"`);
     }
     if (resolved.status === "conflict") {
       await this.db.auditLog.create({
@@ -125,13 +136,13 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
           targetType: "collectible_holding",
           targetId: null,
           result: "FAILURE",
-          reason: `common_user_id "${body.common_user_id}" is linked to multiple OVE accounts; refusing to grant until reviewed`,
+          reason: `common_user_id "${envelope.common_user_id}" is linked to multiple OVE accounts; refusing to grant until reviewed`,
           afterData: {
             eventId: body.event_id,
-            entitlementId: body.entitlement_id,
-            commonUserId: body.common_user_id,
-            orderId: body.order_id ?? null,
-            productCode: body.product_code ?? null,
+            entitlementId: envelope.entitlement_id,
+            commonUserId: envelope.common_user_id,
+            orderId: envelope.order_id ?? null,
+            productCode: envelope.product_code ?? null,
             sourceSystemKey: context.authenticatedSourceSystemKey,
             accountIds: resolved.accountIds,
           },
@@ -142,7 +153,7 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
 
     const result = await this.grantCollectible.execute({
       oveAccountId: resolved.account.id,
-      entitlementId: body.entitlement_id,
+      entitlementId: envelope.entitlement_id,
       assetCode,
       name,
       description,
@@ -151,10 +162,10 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
       imageHash,
       rarity,
       serialNumber,
-      productCode: body.product_code,
+      productCode: envelope.product_code,
       sourceSystemKey: context.authenticatedSourceSystemKey,
-      orderId: body.order_id,
-      orderItemId: body.order_item_id,
+      orderId: envelope.order_id,
+      orderItemId: envelope.order_item_id,
       acquiredAt: new Date(body.occurred_at),
       eventId: body.event_id,
     });
@@ -163,7 +174,7 @@ export class EntitlementGrantedHandler implements CommonEventHandler {
     // UseCase内のtransactionで既にcommit済みなので、ここで例外を投げてもロールバックされない。
     if (result.status === "conflict") {
       throw new ConflictException(
-        `entitlement_id "${body.entitlement_id}" was already granted with different details`,
+        `entitlement_id "${envelope.entitlement_id}" was already granted with different details`,
       );
     }
 
