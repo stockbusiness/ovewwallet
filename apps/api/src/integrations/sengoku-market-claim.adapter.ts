@@ -232,7 +232,7 @@ export class SengokuMarketClaimAdapter {
     if (error.kind === "network" || error.kind === "http_5xx") return { outcome: "network_error" };
     if (error.kind === "invalid_response") return { outcome: "invalid_response" };
     const code = this.parseMarketErrorCode(error);
-    if (code === "CLAIM_NOT_FOUND") return { outcome: "not_found" };
+    if (code === "CLAIM_TOKEN_INVALID") return { outcome: "not_found" };
     if (code === "CLAIM_EXPIRED") return { outcome: "expired" };
     if (error.status === 404) return { outcome: "not_found" };
     if (error.status === 410) return { outcome: "expired" };
@@ -247,7 +247,7 @@ export class SengokuMarketClaimAdapter {
     if (code === "COMMON_USER_MISMATCH") return { outcome: "common_user_mismatch" };
     if (code === "CLAIM_REVOKED") return { outcome: "revoked" };
     if (code === "CLAIM_EXPIRED") return { outcome: "expired" };
-    if (code === "CLAIM_NOT_FOUND") return { outcome: "not_found" };
+    if (code === "CLAIM_TOKEN_INVALID") return { outcome: "not_found" };
     if (code === "IDEMPOTENCY_IN_PROGRESS") return { outcome: "processing" };
     if (code === "IDEMPOTENCY_CONFLICT") return { outcome: "idempotency_conflict" };
     if (error.status === 404) return { outcome: "not_found" };

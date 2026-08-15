@@ -30,7 +30,7 @@ describe("NFTカードClaim導線 (実装指示書)", () => {
         const url = req.url ?? "";
 
         if (req.method === "GET") {
-          if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_NOT_FOUND" } });
+          if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_TOKEN_INVALID" } });
           if (url.includes("expired-token")) return json(res, 410, { error: { code: "CLAIM_EXPIRED" } });
           if (url.includes("delivered-token")) return json(res, 200, { status: "DELIVERED", card_name: "織田信長 SSR" });
           if (url.includes("pending-token")) return json(res, 200, { status: "PENDING", card_name: "織田信長 SSR" });
@@ -41,7 +41,7 @@ describe("NFTカードClaim導線 (実装指示書)", () => {
         if (url.includes("revoked-token")) return json(res, 409, { error: { code: "CLAIM_REVOKED" } });
         if (url.includes("mismatch-token")) return json(res, 409, { error: { code: "COMMON_USER_MISMATCH" } });
         if (url.includes("processing-token")) return json(res, 409, { error: { code: "IDEMPOTENCY_IN_PROGRESS" } });
-        if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_NOT_FOUND" } });
+        if (url.includes("notfound-token")) return json(res, 404, { error: { code: "CLAIM_TOKEN_INVALID" } });
         return json(res, 202, { status: "DELIVERY_PENDING" });
       });
     });

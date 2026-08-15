@@ -192,7 +192,7 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
       ["COMMON_USER_MISMATCH", "common_user_mismatch"],
       ["CLAIM_REVOKED", "revoked"],
       ["CLAIM_EXPIRED", "expired"],
-      ["CLAIM_NOT_FOUND", "not_found"],
+      ["CLAIM_TOKEN_INVALID", "not_found"],
       ["IDEMPOTENCY_IN_PROGRESS", "processing"],
       ["IDEMPOTENCY_CONFLICT", "idempotency_conflict"],
     ] as const)(
