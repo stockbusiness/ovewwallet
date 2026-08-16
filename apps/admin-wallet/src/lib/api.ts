@@ -318,8 +318,10 @@ export type FeatureFlags = Record<
   | "ENABLE_WALLET_REGISTRATION_BONUS"
   | "ENABLE_EXTERNAL_REWARD_TYPES"
   | "ENABLE_ONCHAIN_MIGRATION"
+  | "ENABLE_COMMON_EVENT_INBOX"
   | "ENABLE_DIGITAL_COLLECTION"
-  | "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX",
+  | "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX"
+  | "ENABLE_COLLECTIBLE_CLAIM_FLOW",
   boolean
 >;
 
@@ -331,9 +333,33 @@ export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   ENABLE_WALLET_REGISTRATION_BONUS: "登録ボーナス連携",
   ENABLE_EXTERNAL_REWARD_TYPES: "外部サービス起点の付与種別",
   ENABLE_ONCHAIN_MIGRATION: "オンチェーン移行",
+  ENABLE_COMMON_EVENT_INBOX: "共通イベント受信口",
   ENABLE_DIGITAL_COLLECTION: "NFTコレクション機能",
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: "NFTコレクション entitlement受信",
+  ENABLE_COLLECTIBLE_CLAIM_FLOW: "NFTカードClaim導線",
 };
+
+/** 共通イベント契約6.2章の必須イベントのうち、Signing Key発行時に選択可能な種別 (`apps/api/src/common-events/`の`COMMON_EVENT_HANDLED_TYPES`と対応)。 */
+export const COMMON_EVENT_SIGNING_KEY_EVENT_TYPES = [
+  "common_user.resolved",
+  "common_user.merged",
+  "customer.assignment.changed",
+  "referral.confirmed",
+  "reward.granted",
+  "reward.reversed",
+  "entitlement.granted",
+  "entitlement.revoked",
+] as const;
+
+export interface CommonEventSigningKeyItem {
+  id: string;
+  keyId: string;
+  sourceSystemKey: string;
+  allowedEventTypes: string[];
+  status: string;
+  createdAt: string;
+  revokedAt: string | null;
+}
 
 export interface CollectibleAssetItem {
   id: string;
