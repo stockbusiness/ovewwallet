@@ -1,6 +1,6 @@
+import { THEME_INIT_SCRIPT } from "@ove/shared-ui";
 import type { Metadata } from "next";
 import { Noto_Sans_JP, Noto_Serif_JP } from "next/font/google";
-import { THEME_INIT_SCRIPT } from "@ove/shared-ui";
 import "./globals.css";
 
 const notoSansJp = Noto_Sans_JP({

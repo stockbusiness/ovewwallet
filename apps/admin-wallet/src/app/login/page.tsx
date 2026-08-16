@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 
 export default function AdminLoginPage() {
@@ -59,11 +59,11 @@ export default function AdminLoginPage() {
 
   if (mfaToken) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-        <form onSubmit={submitMfa} className="w-full max-w-sm rounded-xl bg-white p-8 shadow">
-          <h1 className="mb-1 text-lg font-bold text-brand-700">二要素認証</h1>
-          <p className="mb-6 text-sm text-neutral-500">認証アプリに表示されている6桁のコードを入力してください。</p>
-          <label className="mb-4 block text-sm font-medium">
+      <main className="flex min-h-screen items-center justify-center bg-sengoku-bg">
+        <form onSubmit={submitMfa} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-8 shadow">
+          <h1 className="mb-1 font-heading text-lg font-bold text-sengoku-gold">二要素認証</h1>
+          <p className="mb-6 text-sm text-sengoku-muted">認証アプリに表示されている6桁のコードを入力してください。</p>
+          <label className="mb-4 block text-sm font-medium text-sengoku-text">
             認証コード
             <input
               type="text"
@@ -73,15 +73,15 @@ export default function AdminLoginPage() {
               autoFocus
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-center text-lg tracking-[0.4em]"
+              className="mt-1 w-full rounded-md border border-sengoku-border bg-sengoku-bg px-3 py-2 text-center text-lg tracking-[0.4em] text-sengoku-text"
               placeholder="000000"
             />
           </label>
-          {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="w-full rounded-md bg-sengoku-gold px-4 py-2 text-sm font-semibold text-sengoku-navy-deep disabled:opacity-50"
           >
             確認してログイン
           </button>
@@ -92,7 +92,7 @@ export default function AdminLoginPage() {
               setCode("");
               setError(null);
             }}
-            className="mt-3 w-full text-xs text-neutral-500 underline"
+            className="mt-3 w-full text-xs text-sengoku-muted underline"
           >
             メールアドレス・パスワードの入力からやり直す
           </button>
@@ -102,35 +102,35 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-xl bg-white p-8 shadow">
-        <h1 className="mb-1 text-lg font-bold text-brand-700">千ノ国ウォレット管理画面</h1>
-        <p className="mb-6 text-sm text-neutral-500">管理者アカウントでログインしてください。</p>
-        <label className="mb-3 block text-sm font-medium">
+    <main className="flex min-h-screen items-center justify-center bg-sengoku-bg">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-8 shadow">
+        <h1 className="mb-1 font-heading text-lg font-bold text-sengoku-gold">千ノ国ウォレット管理画面</h1>
+        <p className="mb-6 text-sm text-sengoku-muted">管理者アカウントでログインしてください。</p>
+        <label className="mb-3 block text-sm font-medium text-sengoku-text">
           メールアドレス
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-sengoku-border bg-sengoku-bg px-3 py-2 text-sm text-sengoku-text"
           />
         </label>
-        <label className="mb-4 block text-sm font-medium">
+        <label className="mb-4 block text-sm font-medium text-sengoku-text">
           パスワード
           <input
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-md border border-sengoku-border bg-sengoku-bg px-3 py-2 text-sm text-sengoku-text"
           />
         </label>
-        {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="w-full rounded-md bg-sengoku-gold px-4 py-2 text-sm font-semibold text-sengoku-navy-deep disabled:opacity-50"
         >
           ログイン
         </button>
