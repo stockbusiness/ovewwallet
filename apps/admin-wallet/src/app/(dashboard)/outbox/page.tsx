@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import HelpPanel from "@/components/HelpPanel";
 import {
   apiFetch,
   ApiError,
@@ -90,6 +91,31 @@ export default function OutboxPage() {
           代理店システム等への連携イベントの送信状況。開発ガイドライン10章 (Transactional Outbox) に基づき、
           送信失敗時は指数バックオフで自動再送し、上限到達後は「失敗」として手動再送が必要になる。
         </p>
+        <HelpPanel storageKey="outbox" title="このページについて・使い方">
+          <div>
+            <p className="font-semibold text-sengoku-text">Feature Flag一覧(画面下部)について</p>
+            <p>
+              システムの各機能が現在ON/OFFのどちらかを確認できます。この一覧は<strong className="text-sengoku-text">確認専用</strong>で、
+              この画面からON/OFFを切り替えることはできません。切り替えはサーバー側の設定変更・再起動が必要なため、
+              エンジニアへ依頼してください。「ある機能が動かない」と聞いたら、まずここで該当のFlagがONになっているか確認するとよいです。
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-sengoku-text">外部連携キュー(画面下部の一覧)について</p>
+            <p>
+              代理店システムなど外部サービスへ送るはずだった通知(イベント)のうち、送信できていないものを確認する画面です。
+              通常は自動的に間隔を空けながら再送されますが、一定回数失敗すると「失敗(上限到達)」となり自動再送が止まります。
+            </p>
+            <ol className="ml-4 list-decimal">
+              <li>「失敗(上限到達)」の行を見つけたら、右端の「手動再送」を押すと再送キューへ戻せます</li>
+              <li>「再送期日到来分をまとめて処理」を押すと、再送予定時刻が来ている分をまとめて即座に処理します(通常は自動実行されるため、急ぎで反映したい時だけ使用)</li>
+            </ol>
+          </div>
+          <p className="text-sengoku-gold-soft">
+            「最終エラー」欄にエラーメッセージが出ている場合、繰り返し失敗するようであれば原因調査が必要な場合があるため、エンジニアへ共有してください。
+          </p>
+        </HelpPanel>
+
         {error && <p className="mb-4 text-sm text-sengoku-red">{error}</p>}
 
         <section className="mb-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-4">

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, COMMON_EVENT_SIGNING_KEY_EVENT_TYPES, type CommonEventSigningKeyItem } from "@/lib/api";
 
 /** ブラウザのWeb Crypto APIで32byteのランダムHMAC secretを16進文字列として生成する。 */
@@ -90,6 +91,42 @@ export default function CommonEventSigningKeysPage() {
           を送る際のHMAC署名鍵を発行・失効します。secretは発行直後のこの画面でのみ表示され、以後は再表示できません。
           発行後、secret値を連携先システムの担当者へ安全な方法で共有してください。
         </p>
+
+        <HelpPanel storageKey="common-event-signing-keys" title="このページについて・設定手順">
+          <p>
+            千ノ国NFTマーケットなど外部システムから送られてくる「イベント通知」(例:
+            NFTカードの受け渡し完了)を、正しい送信元からのものだと確認するための鍵(secret)を発行する画面です。
+            鍵が正しく登録されていないと、外部システムからの通知が全て拒否されます。
+          </p>
+          <div>
+            <p className="font-semibold text-sengoku-text">事前に必要なもの</p>
+            <p>連携先(外部システム)の担当者から、以下を確認しておいてください。</p>
+            <ul className="ml-4 list-disc">
+              <li>その連携先が使う <code>source_system_key</code>(例: 千ノ国NFTマーケットなら <code>sennokuni-nft-market</code>)</li>
+              <li>どのイベント種別を送ってくる予定か(例: 商品の受け渡し関連なら entitlement.granted / entitlement.revoked)</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-semibold text-sengoku-text">発行手順</p>
+            <ol className="ml-4 list-decimal">
+              <li>key_id に、連携先が実際にヘッダーへ入れてくる値をそのまま入力(担当者に確認した値)</li>
+              <li>source_system_key に、連携先を識別する値を入力(担当者に確認した値と完全に一致させる。1文字でも違うと通知は届いても処理が拒否されます)</li>
+              <li>secret は「ランダム生成」ボタンで作るのが安全。手入力する場合も他で使っていない値にする</li>
+              <li>許可するevent_type は、その連携先から実際に送られてくる種類だけにチェック(不要な種類は許可しないのが安全)</li>
+              <li>「発行する」を押す。secretはこの直後の画面にしか表示されないので、必ずこの場でコピーしておく</li>
+              <li>発行したsecretを、安全な方法(パスワード管理ツール等。メール本文への直書き等は避ける)で連携先の担当者へ共有する</li>
+            </ol>
+          </div>
+          <div>
+            <p className="font-semibold text-sengoku-text">鍵を切り替える(ローテーション)ときの手順</p>
+            <p>
+              古い鍵をいきなり失効させず、まず新しい鍵を発行 →
+              連携先が新しい鍵に切り替えたことを確認 → その後で古い鍵を「失効」してください。
+              先に失効すると、連携先が切り替え終わるまでの間、通知が届かなくなります。
+            </p>
+          </div>
+        </HelpPanel>
+
         {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
 
         <div className="mb-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-4">

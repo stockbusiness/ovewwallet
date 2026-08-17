@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, type AdminMe } from "@/lib/api";
 
 export default function SecuritySettingsPage() {
@@ -88,6 +89,28 @@ export default function SecuritySettingsPage() {
         <p className="mb-6 text-sm text-sengoku-muted">
           {me.displayName} ({me.email})
         </p>
+
+        <HelpPanel storageKey="security" title="このページについて・使い方">
+          <p>
+            この画面は<strong className="text-sengoku-text">あなた自身のログインアカウント</strong>の二要素認証(MFA)を設定するためのものです。
+            他の管理者のセキュリティ設定や、システム全体のセキュリティポリシーを変更する画面ではありません。
+          </p>
+          <div>
+            <p className="font-semibold text-sengoku-text">設定手順</p>
+            <ol className="ml-4 list-decimal">
+              <li>「MFAを設定する」を押すと、シークレットキーと登録用URLが表示されます</li>
+              <li>スマートフォンにGoogle Authenticator等の認証アプリを入れ、表示されたシークレットキーを手入力(またはQR対応アプリならURLから登録)</li>
+              <li>認証アプリに表示された6桁のコードを入力し、「確認して有効化」を押す</li>
+              <li>これ以降、ログイン時にパスワードに加えて認証アプリのコードが必要になります</li>
+            </ol>
+          </div>
+          <p className="text-sengoku-gold-soft">
+            重要: MFAを有効化した後、認証アプリを入れたスマートフォンを紛失・機種変更等でなくすと、
+            この画面から自分で無効化することはできません(パスワードと現在のコードの両方が必要なため)。
+            その場合は他の管理者・エンジニアに依頼してデータベース上で復旧してもらう必要があります。
+            機種変更の際は、先に新しい端末で認証アプリの引き継ぎを済ませてから古い端末を手放してください。
+          </p>
+        </HelpPanel>
 
         {message && <p className="mb-4 rounded-md bg-sengoku-green/10 p-3 text-sm text-sengoku-green">{message}</p>}
         {error && <p className="mb-4 rounded-md bg-sengoku-red/10 p-3 text-sm text-sengoku-red">{error}</p>}

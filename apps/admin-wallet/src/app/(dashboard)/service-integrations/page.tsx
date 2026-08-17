@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, type ServiceIntegrationItem } from "@/lib/api";
 
 export default function ServiceIntegrationsPage() {
@@ -62,6 +63,33 @@ export default function ServiceIntegrationsPage() {
         <p className="mb-4 text-xs text-sengoku-muted">
           緊急停止すると、当該サービスのAPIキーによる外部APIリクエストは即座に拒否されます。
         </p>
+
+        <HelpPanel storageKey="service-integrations" title="このページについて・使い方">
+          <p>
+            OVEウォレットへAPI経由でアクセスしている外部サービス(代理店システム等)の一覧と、
+            緊急停止・再開を行う画面です。新しい外部サービスをここから追加することはできません(追加はエンジニアの作業が必要です)。
+          </p>
+          <div>
+            <p className="font-semibold text-sengoku-text">いつ使うか</p>
+            <p>
+              ある外部サービスのAPIキーが漏えいした疑いがある、または想定外の大量アクセス・不審な動作があるなど、
+              「今すぐそのサービスからのアクセスを止めたい」ときに使います。
+            </p>
+          </div>
+          <div>
+            <p className="font-semibold text-sengoku-text">操作手順</p>
+            <ol className="ml-4 list-decimal">
+              <li>止めたいサービスコードの行にある「緊急停止」を押す</li>
+              <li>理由を入力(必須。後から誰が何のために止めたか監査ログに残ります)</li>
+              <li>状態が即座に反映され、それ以降そのサービスからのAPIリクエストは全て拒否されます(遅延なし)</li>
+              <li>問題が解決したら、同じ行の「再開」を押して理由を入力すると即座に復旧します</li>
+            </ol>
+          </div>
+          <p className="text-sengoku-gold-soft">
+            注意: サービスコードを間違えて停止すると、そのサービスの本番トラフィックが即座に止まります。停止前に対象のサービスコードをよく確認してください。
+          </p>
+        </HelpPanel>
+
         {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
         <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
           <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">

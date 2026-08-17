@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, type WalletReferralItem } from "@/lib/api";
 
 const STATUS_LABEL: Record<WalletReferralItem["status"], string> = {
@@ -55,6 +56,26 @@ export default function WalletReferralsPage() {
           代理店紹介URL (<code>/invite/&#123;token&#125;</code>) 経由の受付・新規登録時の紐付け・
           初回登録特典3,000 OVEの状態を確認する画面 (Phase 1: 確認のみ。手動確定・取消はPhase 3で追加)。
         </p>
+
+        <HelpPanel storageKey="wallet-referrals" title="このページについて・使い方">
+          <p>
+            代理店の紹介URL(<code>/invite/&#123;token&#125;</code>)経由でOVEウォレットに登録した人が、
+            紹介関係として正しく成立し、初回登録特典(3,000 OVE)が付与されたかを確認する画面です。
+          </p>
+          <div>
+            <p className="font-semibold text-sengoku-text">状態の意味</p>
+            <ul className="ml-4 list-disc">
+              <li>受付済み(登録前): 紹介URLはクリックされたが、まだOVEウォレットへの登録が完了していない</li>
+              <li>登録済み・確認待ち: 登録は完了したが、紹介関係の最終確認が済んでいない</li>
+              <li>紹介関係確定: 正常に成立し、特典も処理された状態</li>
+              <li>否認/エラー/期限切れ/取消: 何らかの理由で成立しなかった状態</li>
+            </ul>
+          </div>
+          <p className="text-sengoku-gold-soft">
+            重要: このページは確認専用です。「手動確定」「取消」のボタンはまだ実装されていません(今後追加予定)。
+            紹介が正しく成立していないケースへの個別対応は、現時点ではエンジニアへの依頼が必要です。
+          </p>
+        </HelpPanel>
 
         {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
 
