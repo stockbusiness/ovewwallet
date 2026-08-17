@@ -3,6 +3,7 @@
 import { ThemeToggle } from "@ove/shared-ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 interface NavLink {
@@ -74,17 +75,58 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const COLLAPSE_STORAGE_KEY = "ove-admin-sidebar-collapsed-groups";
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      className={`h-3 w-3 shrink-0 transition-transform ${expanded ? "rotate-90" : ""}`}
+    >
+      <path d="M7 5l6 5-6 5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
+  function isActive(href: string): boolean {
+    return pathname === href || (href !== "/dashboard" && (pathname?.startsWith(`${href}/`) ?? false));
+  }
+
+  const activeGroupTitle = NAV_GROUPS.find((group) => group.links.some((link) => isActive(link.href)))?.title;
+
+  // 初期状態: 現在地を含むグループだけ開く。localStorageに保存された折りたたみ状態があればそれを尊重する。
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const raw = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      // localStorage未対応・壊れたJSON等は無視してデフォルト挙動にフォールバックする。
+    }
+    return new Set(NAV_GROUPS.filter((g) => g.title !== activeGroupTitle).map((g) => g.title));
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(Array.from(collapsed)));
+  }, [collapsed]);
+
+  function toggleGroup(title: string): void {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      return next;
+    });
+  }
+
   async function logout() {
     await apiFetch("/api/v1/admin/logout", { method: "POST" });
     router.push("/login");
-  }
-
-  function isActive(href: string): boolean {
-    return pathname === href || (href !== "/dashboard" && (pathname?.startsWith(`${href}/`) ?? false));
   }
 
   return (
@@ -95,32 +137,42 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-2 py-3">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.title} className="mb-4">
-            <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wide text-sengoku-faint">
-              {group.title}
-            </p>
-            <ul>
-              {group.links.map((link) => {
-                const active = isActive(link.href);
-                return (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className={
-                        active
-                          ? "block rounded-md bg-sengoku-gold/15 px-2 py-1.5 text-sm font-semibold text-sengoku-gold"
-                          : "block rounded-md px-2 py-1.5 text-sm text-sengoku-muted hover:bg-sengoku-navy hover:text-sengoku-text"
-                      }
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        {NAV_GROUPS.map((group) => {
+          const expanded = !collapsed.has(group.title);
+          return (
+            <div key={group.title} className="mb-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.title)}
+                className="flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-sengoku-faint hover:text-sengoku-muted"
+              >
+                <ChevronIcon expanded={expanded} />
+                {group.title}
+              </button>
+              {expanded && (
+                <ul className="mb-2">
+                  {group.links.map((link) => {
+                    const active = isActive(link.href);
+                    return (
+                      <li key={link.href}>
+                        <Link
+                          href={link.href}
+                          className={
+                            active
+                              ? "block rounded-md bg-sengoku-gold/15 px-2 py-1.5 pl-6 text-sm font-semibold text-sengoku-gold"
+                              : "block rounded-md px-2 py-1.5 pl-6 text-sm text-sengoku-muted hover:bg-sengoku-navy hover:text-sengoku-text"
+                          }
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="flex items-center justify-between border-t border-sengoku-border px-3 py-3">
