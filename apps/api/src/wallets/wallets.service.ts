@@ -1,16 +1,29 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { generateId, type PrismaClient } from "@ove/database";
 import { getWalletBalance, listWalletTransactions } from "@ove/ledger";
-import { PRISMA } from "../common/prisma.module";
 import { toCsv } from "../common/csv";
+import { PRISMA } from "../common/prisma.module";
+import { CommonEventAccountResolver } from "../common-events/common-event-account-resolver";
+import { CLOCK, type Clock } from "./clock";
+import { buildCommonUserBalanceResponse } from "./service-balance-response";
 
 @Injectable()
 export class WalletsService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly accountResolver: CommonEventAccountResolver,
+    @Inject(CLOCK) private readonly clock: Clock,
+  ) {}
 
   private async requireWalletForAccount(oveAccountId: string) {
     const wallet = await this.db.wallet.findUnique({ where: { oveAccountId } });
-    if (!wallet) throw new NotFoundException("wallet not found for this account");
+    if (!wallet)
+      throw new NotFoundException("wallet not found for this account");
     return wallet;
   }
 
@@ -30,7 +43,11 @@ export class WalletsService {
     };
   }
 
-  async listTransactions(oveAccountId: string, limit?: number, before?: string) {
+  async listTransactions(
+    oveAccountId: string,
+    limit?: number,
+    before?: string,
+  ) {
     const wallet = await this.requireWalletForAccount(oveAccountId);
     const rows = await listWalletTransactions(
       wallet.id,
@@ -55,12 +72,66 @@ export class WalletsService {
    * 認証済みの連携先 (serviceIntegrationId) に紐づく external_user_id だけを起点に解決する
    * ことで、他サービスの利用者を横断的に照会できないようにする。
    */
-  async getBalanceForServiceLink(serviceIntegrationId: string, externalUserId: string) {
+  async getBalanceForServiceLink(
+    serviceIntegrationId: string,
+    externalUserId: string,
+  ) {
     const link = await this.db.accountLink.findUnique({
-      where: { serviceIntegrationId_externalUserId: { serviceIntegrationId, externalUserId } },
+      where: {
+        serviceIntegrationId_externalUserId: {
+          serviceIntegrationId,
+          externalUserId,
+        },
+      },
     });
-    if (!link || !link.oveAccountId) throw new NotFoundException("no OVE account linked to this external_user_id");
+    if (!link || !link.oveAccountId)
+      throw new NotFoundException(
+        "no OVE account linked to this external_user_id",
+      );
     return this.getBalance(link.oveAccountId);
+  }
+
+  /**
+   * PR-W2: common_user_id起点の外部向け残高照会
+   * (`POST /api/v1/service/accounts/by-common-user-id/balance`)。
+   * `CommonEventAccountResolver`(共通イベントHandler群と同一インスタンス、
+   * `AccountResolutionModule`経由)の0件/1件/2件以上判定をそのまま使い、解決後は
+   * `account.id`だけを使って残高を取得する(common_user_idでの再検索は行わない)。
+   * レスポンスは既存の`getBalance()`/`getBalanceForServiceLink()`とは独立した
+   * 専用の組み立て(`buildCommonUserBalanceResponse`)を使い、内部識別子
+   * (common_user_id/account_id/wallet_id等)を一切含めない。
+   * エラーメッセージにもcommon_user_idを含めない(監査ログ・access logへの漏洩防止)。
+   */
+  async getBalanceForCommonUserId(
+    commonUserId: string,
+    requesterServiceCode: string,
+  ) {
+    const result = await this.accountResolver.resolveByCommonUserId(
+      commonUserId,
+      "SERVICE_BALANCE_QUERY",
+      requesterServiceCode,
+      { redactCommonUserId: true, omitAccountIds: true },
+    );
+
+    if (result.status === "not_found") {
+      throw new NotFoundException("Account could not be resolved.");
+    }
+    if (result.status === "conflict") {
+      throw new ConflictException("Account could not be resolved uniquely.");
+    }
+
+    const balance = await this.getBalance(result.account.id);
+    return buildCommonUserBalanceResponse(
+      {
+        status: balance.status,
+        availableBalance: balance.available_balance,
+        pendingBalance: balance.pending_balance,
+        heldBalance: balance.held_balance,
+        lifetimeCredited: balance.lifetime_credited,
+        lifetimeDebited: balance.lifetime_debited,
+      },
+      this.clock.now(),
+    );
   }
 
   /**
@@ -77,7 +148,9 @@ export class WalletsService {
         where: { oveAccountId, status: "ACTIVE" },
       }),
     ]);
-    const linkByServiceId = new Map(links.map((l) => [l.serviceIntegrationId, l]));
+    const linkByServiceId = new Map(
+      links.map((l) => [l.serviceIntegrationId, l]),
+    );
     return integrations.map((s) => {
       const link = linkByServiceId.get(s.id);
       return {
@@ -170,7 +243,10 @@ export class WalletsService {
       orderBy: { expiresAt: "asc" },
     });
 
-    const totalAmount = lots.reduce((sum, lot) => sum + lot.remainingAmount, 0n);
+    const totalAmount = lots.reduce(
+      (sum, lot) => sum + lot.remainingAmount,
+      0n,
+    );
     return {
       within_days: withinDays,
       total_amount: totalAmount.toString(),
@@ -191,7 +267,16 @@ export class WalletsService {
       take: 10000,
     });
 
-    const header = ["取引コード", "日時", "種別", "方向", "金額", "状態", "取引後残高", "内容"];
+    const header = [
+      "取引コード",
+      "日時",
+      "種別",
+      "方向",
+      "金額",
+      "状態",
+      "取引後残高",
+      "内容",
+    ];
     const rows = transactions.map((t) => [
       t.transactionCode,
       t.occurredAt.toISOString(),

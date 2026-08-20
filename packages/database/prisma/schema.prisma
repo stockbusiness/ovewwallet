@@ -325,6 +325,10 @@ model ServiceIntegration {
   dailyAmountLimit       BigInt                   @map("daily_amount_limit")
   perRequestAmountLimit  BigInt                   @map("per_request_amount_limit")
   status                 ServiceIntegrationStatus @default(ACTIVE)
+  /// PR-W2: このサービスが利用できる拡張API操作の一覧 (例: "wallet.balance.read.common-user")。
+  /// 既定は空配列=何も許可しない (secure-by-default、common_event_signing_keys.allowed_event_types
+  /// と同じパターン)。付与は管理者が個別に行う (docs/runbooks/grant-service-scope.md参照)。
+  allowedScopes          String[]                 @default([]) @map("allowed_scopes")
   lastAccessedAt         DateTime?                @map("last_accessed_at")
   createdAt              DateTime                 @default(now()) @map("created_at")
   updatedAt              DateTime                 @updatedAt @map("updated_at")

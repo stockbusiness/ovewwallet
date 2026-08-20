@@ -1,12 +1,45 @@
-import { Controller, Get, Param, Post, Query, Req, Res, ServiceUnavailableException, UseGuards, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+  ServiceUnavailableException,
+  UseFilters,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import {
+  CommonUserIdBalanceRequestSchema,
+  type CommonUserIdBalanceRequest,
+} from "@ove/shared-types";
 import type { Response } from "express";
 import { CollectiblesQueryService } from "../collectibles/collectibles-query.service";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
-import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
+import {
+  ExternalApiAuthGuard,
+  type AuthenticatedServiceRequest,
+} from "../common/external-api-auth.guard";
+import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 import { isFeatureEnabled } from "../common/feature-flags";
-import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
+import {
+  RequireServiceScope,
+  ServiceScopeGuard,
+} from "../common/service-scope.guard";
+import {
+  SessionAuthGuard,
+  type AuthenticatedUserRequest,
+} from "../common/session-auth.guard";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ReferralsService } from "../referrals/referrals.service";
+import { WALLET_SERVICE_SCOPES } from "./wallet-service-scopes";
 import { WalletsService } from "./wallets.service";
 
 /**
@@ -36,7 +69,11 @@ export class MeController {
     @Query("limit") limit?: string,
     @Query("before") before?: string,
   ) {
-    return this.wallets.listTransactions(req.account.id, limit ? Number(limit) : undefined, before);
+    return this.wallets.listTransactions(
+      req.account.id,
+      limit ? Number(limit) : undefined,
+      before,
+    );
   }
 
   /**
@@ -46,16 +83,25 @@ export class MeController {
    */
   @Get("transactions/export")
   @UseGuards(SessionAuthGuard)
-  async exportTransactions(@Req() req: AuthenticatedUserRequest, @Res() res: Response) {
+  async exportTransactions(
+    @Req() req: AuthenticatedUserRequest,
+    @Res() res: Response,
+  ) {
     const csv = await this.wallets.exportTransactionsCsv(req.account.id);
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="transactions.csv"');
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="transactions.csv"',
+    );
     res.send(csv);
   }
 
   @Get("transactions/:transactionId")
   @UseGuards(SessionAuthGuard)
-  async transactionDetail(@Req() req: AuthenticatedUserRequest, @Param("transactionId") transactionId: string) {
+  async transactionDetail(
+    @Req() req: AuthenticatedUserRequest,
+    @Param("transactionId") transactionId: string,
+  ) {
     return this.wallets.getTransaction(req.account.id, transactionId);
   }
 
@@ -73,7 +119,10 @@ export class MeController {
 
   @Post("notices/:noticeId/read")
   @UseGuards(SessionAuthGuard)
-  async markNoticeRead(@Req() req: AuthenticatedUserRequest, @Param("noticeId") noticeId: string) {
+  async markNoticeRead(
+    @Req() req: AuthenticatedUserRequest,
+    @Param("noticeId") noticeId: string,
+  ) {
     return this.wallets.markNoticeRead(req.account.id, noticeId);
   }
 
@@ -99,7 +148,9 @@ export class MeController {
   @Get("feature-flags")
   @UseGuards(SessionAuthGuard)
   async myFeatureFlags() {
-    return { digital_collection_enabled: isFeatureEnabled("ENABLE_DIGITAL_COLLECTION") };
+    return {
+      digital_collection_enabled: isFeatureEnabled("ENABLE_DIGITAL_COLLECTION"),
+    };
   }
 
   /** NFTコレクション一覧 (指示書12章)。動的セグメント`:holdingId`より前に登録する必要はない
@@ -113,7 +164,9 @@ export class MeController {
     @Query("cursor") cursor?: string,
   ) {
     if (!isFeatureEnabled("ENABLE_DIGITAL_COLLECTION")) {
-      throw new ServiceUnavailableException("digital collection is not enabled yet");
+      throw new ServiceUnavailableException(
+        "digital collection is not enabled yet",
+      );
     }
     return this.collectibles.listMyCollectibles(req.account.id, {
       includeRevoked: includeRevoked === "true",
@@ -124,9 +177,14 @@ export class MeController {
 
   @Get("collectibles/:holdingId")
   @UseGuards(SessionAuthGuard)
-  async myCollectibleDetail(@Req() req: AuthenticatedUserRequest, @Param("holdingId") holdingId: string) {
+  async myCollectibleDetail(
+    @Req() req: AuthenticatedUserRequest,
+    @Param("holdingId") holdingId: string,
+  ) {
     if (!isFeatureEnabled("ENABLE_DIGITAL_COLLECTION")) {
-      throw new ServiceUnavailableException("digital collection is not enabled yet");
+      throw new ServiceUnavailableException(
+        "digital collection is not enabled yet",
+      );
     }
     return this.collectibles.getMyCollectibleDetail(req.account.id, holdingId);
   }
@@ -144,7 +202,42 @@ export class ServiceAccountsController {
   @Get(":externalUserId/balance")
   @UseGuards(ExternalApiAuthGuard)
   @UseInterceptors(ApiAccessLogInterceptor)
-  async balance(@Req() req: AuthenticatedServiceRequest, @Param("externalUserId") externalUserId: string) {
-    return this.wallets.getBalanceForServiceLink(req.serviceIntegration.id, externalUserId);
+  async balance(
+    @Req() req: AuthenticatedServiceRequest,
+    @Param("externalUserId") externalUserId: string,
+  ) {
+    return this.wallets.getBalanceForServiceLink(
+      req.serviceIntegration.id,
+      externalUserId,
+    );
+  }
+
+  /**
+   * PR-W2: common_user_id起点の残高照会。指示書レビュー指摘2により、common_user_idを
+   * URLへ含めず(プロキシ・アクセスログ・監視サービスへの残留を避ける)認証済みPOST bodyで
+   * 受け取る。既存の`GET :externalUserId/balance`は無変更のまま維持する(このメソッドのみに
+   * `ServiceScopeGuard`・`ExternalApiExceptionFilter`を適用し、上のメソッドには影響させない)。
+   */
+  @Post("by-common-user-id/balance")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ExternalApiAuthGuard, ServiceScopeGuard)
+  @RequireServiceScope(WALLET_SERVICE_SCOPES.BALANCE_READ_COMMON_USER)
+  @UseInterceptors(ApiAccessLogInterceptor)
+  @UseFilters(ExternalApiExceptionFilter)
+  @Header("Cache-Control", "no-store")
+  async balanceByCommonUserId(
+    @Req() req: AuthenticatedServiceRequest,
+    @Body(new ZodValidationPipe(CommonUserIdBalanceRequestSchema))
+    body: CommonUserIdBalanceRequest,
+  ) {
+    if (!isFeatureEnabled("ENABLE_COMMON_USER_BALANCE_API")) {
+      throw new ServiceUnavailableException(
+        "common_user_id balance API is not enabled yet",
+      );
+    }
+    return this.wallets.getBalanceForCommonUserId(
+      body.common_user_id,
+      req.serviceIntegration.serviceCode,
+    );
   }
 }

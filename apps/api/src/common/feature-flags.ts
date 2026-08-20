@@ -27,17 +27,28 @@ export const FEATURE_FLAG_KEYS = [
    * (`AttachReferralToAccountUseCase.attachToNewAccount`参照)。
    */
   "ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS",
+  /**
+   * 千ノ国5システム改修 PR-W2: POST /api/v1/service/accounts/by-common-user-id/balance を
+   * 有効化する。Flagが有効でも、呼び出し元ServiceIntegrationに
+   * `wallet.balance.read.common-user` scope (ServiceIntegration.allowedScopes) が
+   * 付与されていなければ403になる (Flagとscopeの両方が必要、`ServiceScopeGuard`参照)。
+   */
+  "ENABLE_COMMON_USER_BALANCE_API",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
 
-export function isFeatureEnabled(key: FeatureFlagKey, env: NodeJS.ProcessEnv = process.env): boolean {
+export function isFeatureEnabled(
+  key: FeatureFlagKey,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
   return env[key] === "true";
 }
 
-export function getAllFeatureFlags(env: NodeJS.ProcessEnv = process.env): Record<FeatureFlagKey, boolean> {
-  return Object.fromEntries(FEATURE_FLAG_KEYS.map((key) => [key, isFeatureEnabled(key, env)])) as Record<
-    FeatureFlagKey,
-    boolean
-  >;
+export function getAllFeatureFlags(
+  env: NodeJS.ProcessEnv = process.env,
+): Record<FeatureFlagKey, boolean> {
+  return Object.fromEntries(
+    FEATURE_FLAG_KEYS.map((key) => [key, isFeatureEnabled(key, env)]),
+  ) as Record<FeatureFlagKey, boolean>;
 }

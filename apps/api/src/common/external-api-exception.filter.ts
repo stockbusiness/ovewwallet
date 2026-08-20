@@ -2,6 +2,7 @@ import {
   type ArgumentsHost,
   BadRequestException,
   Catch,
+  ConflictException,
   type ExceptionFilter,
   ForbiddenException,
   HttpException,
@@ -12,8 +13,12 @@ import {
   UnauthorizedException,
   UnprocessableEntityException,
 } from "@nestjs/common";
+import {
+  ExternalApiAuthError,
+  AgencySsoVerificationError,
+  CommonEventAuthError,
+} from "@ove/auth";
 import type { Response } from "express";
-import { ExternalApiAuthError, AgencySsoVerificationError, CommonEventAuthError } from "@ove/auth";
 import { LEDGER_ERROR_CLASSIFICATION } from "./ledger-error-classification";
 import type { RequestWithId } from "./request-id.middleware";
 import { captureException } from "./sentry";
@@ -39,7 +44,9 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
 
     const { status, code, message } = this.classify(exception);
     if (status >= 500) {
-      this.logger.error(exception instanceof Error ? exception.stack : exception);
+      this.logger.error(
+        exception instanceof Error ? exception.stack : exception,
+      );
       captureException(exception);
     }
 
@@ -50,16 +57,29 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
     });
   }
 
-  private classify(exception: unknown): { status: number; code: string; message: string } {
+  private classify(exception: unknown): {
+    status: number;
+    code: string;
+    message: string;
+  } {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const message = extractMessage(exception.getResponse(), exception.message);
+      const message = extractMessage(
+        exception.getResponse(),
+        exception.message,
+      );
 
       if (exception instanceof BadRequestException) {
         return { status, code: "VALIDATION_ERROR", message };
       }
       if (exception instanceof UnauthorizedException) {
-        return { status, code: /missing/i.test(message) ? "API_KEY_REQUIRED" : "INVALID_API_KEY", message };
+        return {
+          status,
+          code: /missing/i.test(message)
+            ? "API_KEY_REQUIRED"
+            : "INVALID_API_KEY",
+          message,
+        };
       }
       if (exception instanceof ServiceUnavailableException) {
         return { status, code: "FEATURE_DISABLED", message };
@@ -70,36 +90,67 @@ export class ExternalApiExceptionFilter implements ExceptionFilter {
       if (exception instanceof ForbiddenException) {
         return { status, code: "FORBIDDEN", message };
       }
+      // PR-W2: common_user_idが複数OveAccountへ紐づき一意に解決できない場合。
+      if (exception instanceof ConflictException) {
+        return { status, code: "COMMON_USER_ACCOUNT_CONFLICT", message };
+      }
       if (exception instanceof UnprocessableEntityException) {
         return { status, code: "UNSUPPORTED_EVENT_VERSION", message };
       }
       return { status, code: exception.constructor.name, message };
     }
 
-    if (exception instanceof ExternalApiAuthError || exception instanceof AgencySsoVerificationError) {
-      return { status: HttpStatus.UNAUTHORIZED, code: "INVALID_API_KEY", message: exception.message };
+    if (
+      exception instanceof ExternalApiAuthError ||
+      exception instanceof AgencySsoVerificationError
+    ) {
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        code: "INVALID_API_KEY",
+        message: exception.message,
+      };
     }
     if (exception instanceof CommonEventAuthError) {
-      return { status: HttpStatus.UNAUTHORIZED, code: "INVALID_SIGNATURE", message: exception.message };
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        code: "INVALID_SIGNATURE",
+        message: exception.message,
+      };
     }
 
     for (const ErrorClass of LEDGER_ERROR_CLASSIFICATION.notFound) {
       if (exception instanceof ErrorClass) {
-        return { status: HttpStatus.NOT_FOUND, code: exception.name, message: exception.message };
+        return {
+          status: HttpStatus.NOT_FOUND,
+          code: exception.name,
+          message: exception.message,
+        };
       }
     }
     for (const ErrorClass of LEDGER_ERROR_CLASSIFICATION.conflict) {
       if (exception instanceof ErrorClass) {
-        return { status: HttpStatus.CONFLICT, code: exception.name, message: exception.message };
+        return {
+          status: HttpStatus.CONFLICT,
+          code: exception.name,
+          message: exception.message,
+        };
       }
     }
     for (const ErrorClass of LEDGER_ERROR_CLASSIFICATION.badRequest) {
       if (exception instanceof ErrorClass) {
-        return { status: HttpStatus.BAD_REQUEST, code: exception.name, message: exception.message };
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          code: exception.name,
+          message: exception.message,
+        };
       }
     }
 
-    return { status: HttpStatus.INTERNAL_SERVER_ERROR, code: "INTERNAL_ERROR", message: "unexpected error" };
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      code: "INTERNAL_ERROR",
+      message: "unexpected error",
+    };
   }
 }
 

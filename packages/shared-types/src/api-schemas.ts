@@ -2,7 +2,10 @@ import { z } from "zod";
 import { ServiceCode, TransactionType } from "./enums";
 
 const serviceCodeValues = Object.values(ServiceCode) as [string, ...string[]];
-const transactionTypeValues = Object.values(TransactionType) as [string, ...string[]];
+const transactionTypeValues = Object.values(TransactionType) as [
+  string,
+  ...string[],
+];
 
 /** POST /api/v1/rewards/grant */
 export const RewardGrantRequestSchema = z.object({
@@ -11,19 +14,38 @@ export const RewardGrantRequestSchema = z.object({
   event_type: z.string().min(1).max(100),
   event_id: z.string().min(1).max(255),
   amount: z.number().int().positive(),
-  transaction_type: z.enum(transactionTypeValues).default(TransactionType.EVENT_REWARD),
+  transaction_type: z
+    .enum(transactionTypeValues)
+    .default(TransactionType.EVENT_REWARD),
   display_name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
   idempotency_key: z.string().min(1).max(255),
 });
 export type RewardGrantRequest = z.infer<typeof RewardGrantRequestSchema>;
 
+/**
+ * POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)。
+ * 千ノ国 全体統合 共通実装契約のcommon_user_id発行形式(`cu_`+32桁16進数)に厳密に一致する
+ * 値のみを許可する。trim・大文字小文字変換は行わない(前後空白・大文字混入はそのまま拒否する)。
+ * 形式不正はResolver・DB検索を実行する前に400で弾く。
+ */
+export const CommonUserIdBalanceRequestSchema = z.object({
+  common_user_id: z
+    .string()
+    .regex(/^cu_[0-9a-f]{32}$/, "Invalid common_user_id format"),
+});
+export type CommonUserIdBalanceRequest = z.infer<
+  typeof CommonUserIdBalanceRequestSchema
+>;
+
 /** POST /api/v1/transactions/debit */
 export const DebitRequestSchema = z.object({
   service_code: z.enum(serviceCodeValues),
   external_user_id: z.string().min(1).max(255),
   amount: z.number().int().positive(),
-  transaction_type: z.enum(transactionTypeValues).default(TransactionType.ITEM_EXCHANGE),
+  transaction_type: z
+    .enum(transactionTypeValues)
+    .default(TransactionType.ITEM_EXCHANGE),
   display_name: z.string().min(1).max(255),
   description: z.string().max(1000).optional(),
   source_reference_id: z.string().max(255).optional(),
@@ -111,7 +133,10 @@ export const AGENCY_HUB_EVENT_TYPES = [
 ] as const;
 
 /** 代理店リンクの解除を意味するイベント (ガイド11.1章)。account_linkをREVOKEDへ遷移させる。 */
-export const AGENCY_DEACTIVATION_EVENT_TYPES = ["deactivated", "deleted"] as const;
+export const AGENCY_DEACTIVATION_EVENT_TYPES = [
+  "deactivated",
+  "deleted",
+] as const;
 
 /** POST /api/v1/auth/sso/agency (仕様書12章)。sengoku-ai.com発行のSSO用JWTでログインする。 */
 export const AgencySsoLoginRequestSchema = z.object({
@@ -209,12 +234,13 @@ export const CommonUserMergedEventSchema = BaseCommonEventSchema.extend({
   previous_common_user_id: z.string().max(255).nullable().optional(),
 }).passthrough();
 
-export const CustomerAssignmentChangedEventSchema = BaseCommonEventSchema.extend({
-  event_type: z.literal("customer.assignment.changed"),
-  common_user_id: z.string().max(255).nullable().optional(),
-  assigned_agency_id: z.string().max(255).nullable().optional(),
-  registration_referrer_agency_id: z.string().max(255).nullable().optional(),
-}).passthrough();
+export const CustomerAssignmentChangedEventSchema =
+  BaseCommonEventSchema.extend({
+    event_type: z.literal("customer.assignment.changed"),
+    common_user_id: z.string().max(255).nullable().optional(),
+    assigned_agency_id: z.string().max(255).nullable().optional(),
+    registration_referrer_agency_id: z.string().max(255).nullable().optional(),
+  }).passthrough();
 
 export const ReferralConfirmedEventSchema = BaseCommonEventSchema.extend({
   event_type: z.literal("referral.confirmed"),

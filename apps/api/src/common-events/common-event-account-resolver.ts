@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { generateId, type OveAccount, type PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
 import { AccountRepository } from "../accounts/account.repository";
+import { PRISMA } from "../common/prisma.module";
 
 export type AccountLookupResult =
   | { status: "not_found" }
@@ -24,16 +24,31 @@ export class CommonEventAccountResolver {
     private readonly accountRepository: AccountRepository,
   ) {}
 
+  /**
+   * PR-W2レビュー指摘2: `wallet.balance.read.common-user`のような外部読み取り専用API経路では、
+   * 監査ログに生のcommon_user_id・候補account_id一覧を残さない(件数のみ)。既存の
+   * 共通イベントHandler群(内部の書込み系イベント、要レビュー時に運用者が実データを追う
+   * 必要がある)は`auditRedaction`省略時の従来どおりの挙動を維持する(デフォルト値により
+   * 呼び出し元を変更する必要はない)。
+   */
   async resolveByCommonUserId(
     commonUserId: string,
     actionType: string,
     authenticatedSourceSystemKey: string,
+    auditRedaction: {
+      redactCommonUserId?: boolean;
+      omitAccountIds?: boolean;
+    } = {},
   ): Promise<AccountLookupResult> {
-    const accounts = await this.accountRepository.findManyByCommonUserId(commonUserId);
+    const accounts =
+      await this.accountRepository.findManyByCommonUserId(commonUserId);
     if (accounts.length === 0) return { status: "not_found" };
     if (accounts.length === 1) return { status: "ok", account: accounts[0]! };
 
     const accountIds = accounts.map((a) => a.id);
+    const commonUserIdLabel = auditRedaction.redactCommonUserId
+      ? "(redacted)"
+      : `"${commonUserId}"`;
     await this.db.auditLog.create({
       data: {
         id: generateId(),
@@ -43,8 +58,14 @@ export class CommonEventAccountResolver {
         targetType: "ove_account",
         targetId: null,
         result: "FAILURE",
-        reason: `common_user_id "${commonUserId}" に紐づくOVEアカウントが${accounts.length}件存在するため自動処理を中止 (要レビュー)`,
-        afterData: { commonUserId, accountIds },
+        reason: `common_user_id ${commonUserIdLabel} に紐づくOVEアカウントが${accounts.length}件存在するため自動処理を中止 (要レビュー)`,
+        afterData: {
+          commonUserId: auditRedaction.redactCommonUserId
+            ? undefined
+            : commonUserId,
+          candidateCount: accounts.length,
+          accountIds: auditRedaction.omitAccountIds ? undefined : accountIds,
+        },
       },
     });
     return { status: "conflict", accountIds };
