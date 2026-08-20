@@ -1,4 +1,5 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export class ApiError extends Error {
   constructor(
@@ -10,7 +11,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     credentials: "include",
@@ -129,7 +133,12 @@ export interface AccountDetailItem {
   verificationLevel: number;
   createdAt: string;
   closedAt: string | null;
-  wallet: { id: string; walletCode: string; availableBalance: string; status: string } | null;
+  wallet: {
+    id: string;
+    walletCode: string;
+    availableBalance: string;
+    status: string;
+  } | null;
   identities: Array<{
     id: string;
     identityType: string;
@@ -211,7 +220,12 @@ export interface ApprovalRequestItem {
   decidedAt: string | null;
   rejectionReason: string | null;
   payload:
-    | { kind: "HIGH_VALUE_GRANT" | "HIGH_VALUE_DEDUCTION"; walletId: string; amount: string; reason: string }
+    | {
+        kind: "HIGH_VALUE_GRANT" | "HIGH_VALUE_DEDUCTION";
+        walletId: string;
+        amount: string;
+        reason: string;
+      }
     | {
         kind: "ACCOUNT_MERGE";
         sourceAccountCode: string;
@@ -233,7 +247,12 @@ export interface MigrationSummary {
   successCount: number;
   reviewingCount: number;
   errorCount: number;
-  results: Array<{ row: number; oldUserId: string; status: "SUCCESS" | "REVIEWING" | "ERROR"; message?: string }>;
+  results: Array<{
+    row: number;
+    oldUserId: string;
+    status: "SUCCESS" | "REVIEWING" | "ERROR";
+    message?: string;
+  }>;
 }
 
 export interface ReconciliationResult {
@@ -273,7 +292,11 @@ export interface AgencyLinkItem {
   verifiedAt: string | null;
   revokedAt: string | null;
   metadata: Record<string, unknown> | null;
-  account: { id: string; accountCode: string; displayName: string | null } | null;
+  account: {
+    id: string;
+    accountCode: string;
+    displayName: string | null;
+  } | null;
 }
 
 /** 代理店紹介トークン受け入れ (実装指示書 v1.0)。/invite/{token} 受付〜登録特典の確認用。 */
@@ -293,7 +316,15 @@ export interface WalletReferralItem {
   walletUserId: string | null;
   commonUserId: string | null;
   agencyId: string | null;
-  status: "CAPTURED" | "PENDING" | "CONFIRMED" | "REJECTED" | "MANUALLY_CONFIRMED" | "CANCELLED" | "ERROR" | "EXPIRED";
+  status:
+    | "CAPTURED"
+    | "PENDING"
+    | "CONFIRMED"
+    | "REJECTED"
+    | "MANUALLY_CONFIRMED"
+    | "CANCELLED"
+    | "ERROR"
+    | "EXPIRED";
   source: string;
   capturedAt: string;
   expiresAt: string;
@@ -306,7 +337,11 @@ export interface WalletReferralItem {
   lastErrorMessage: string | null;
   reason: string | null;
   createdAt: string;
-  account: { id: string; accountCode: string; displayName: string | null } | null;
+  account: {
+    id: string;
+    accountCode: string;
+    displayName: string | null;
+  } | null;
   benefits: WalletReferralBenefitItem[];
 }
 
@@ -322,7 +357,8 @@ export type FeatureFlags = Record<
   | "ENABLE_DIGITAL_COLLECTION"
   | "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX"
   | "ENABLE_COLLECTIBLE_CLAIM_FLOW"
-  | "ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS",
+  | "ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS"
+  | "ENABLE_COMMON_USER_BALANCE_API",
   boolean
 >;
 
@@ -338,7 +374,10 @@ export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   ENABLE_DIGITAL_COLLECTION: "NFTコレクション機能",
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: "NFTコレクション entitlement受信",
   ENABLE_COLLECTIBLE_CLAIM_FLOW: "NFTカードClaim導線",
-  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: "旧登録特典(3,000 OVE)の新規発生(true=旧挙動維持)",
+  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS:
+    "旧登録特典(3,000 OVE)の新規発生(true=旧挙動維持)",
+  ENABLE_COMMON_USER_BALANCE_API:
+    "common_user_id起点の残高照会API(要scope付与)",
 };
 
 /** 共通イベント契約6.2章の必須イベントのうち、Signing Key発行時に選択可能な種別 (`apps/api/src/common-events/`の`COMMON_EVENT_HANDLED_TYPES`と対応)。 */
@@ -412,5 +451,9 @@ export interface CollectibleHoldingItem {
   createdAt: string;
   updatedAt: string;
   asset: CollectibleAssetItem;
-  account?: { id: string; accountCode: string; commonUserId: string | null } | null;
+  account?: {
+    id: string;
+    accountCode: string;
+    commonUserId: string | null;
+  } | null;
 }

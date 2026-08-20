@@ -52,7 +52,10 @@ async function loginAsNewAdmin(displayName: string): Promise<string[]> {
       displayName,
     },
   });
-  const loginRes = await request(app.getHttpServer()).post("/api/v1/admin/login").send({ email, password }).expect(201);
+  const loginRes = await request(app.getHttpServer())
+    .post("/api/v1/admin/login")
+    .send({ email, password })
+    .expect(201);
   return loginRes.headers["set-cookie"] as unknown as string[];
 }
 
@@ -76,7 +79,9 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
     await outbox.enqueue(prisma, params);
     await outbox.enqueue(prisma, params); // 再送・リトライ相当の二重呼び出し
 
-    const rows = await prisma.integrationOutbox.findMany({ where: { idempotencyKey } });
+    const rows = await prisma.integrationOutbox.findMany({
+      where: { idempotencyKey },
+    });
     expect(rows).toHaveLength(1);
   });
 
@@ -104,7 +109,9 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
     expect(received).toHaveLength(1);
     expect(received[0]!.payload).toEqual({ amount: 100 });
 
-    const row = await prisma.integrationOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
+    const row = await prisma.integrationOutbox.findUniqueOrThrow({
+      where: { idempotencyKey },
+    });
     expect(row.status).toBe("SENT");
     expect(row.processedAt).not.toBeNull();
   });
@@ -133,11 +140,15 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
     expect(firstAttempt.failed).toBeGreaterThanOrEqual(1);
     expect(callCount).toBe(1);
 
-    const afterFirstFailure = await prisma.integrationOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
+    const afterFirstFailure = await prisma.integrationOutbox.findUniqueOrThrow({
+      where: { idempotencyKey },
+    });
     expect(afterFirstFailure.status).toBe("PENDING"); // 再送待ち
     expect(afterFirstFailure.attemptCount).toBe(1);
     expect(afterFirstFailure.availableAt.getTime()).toBeGreaterThan(Date.now()); // バックオフで未来にずれている
-    expect(afterFirstFailure.lastErrorMessage).toContain("simulated destination failure");
+    expect(afterFirstFailure.lastErrorMessage).toContain(
+      "simulated destination failure",
+    );
 
     // まだ再送期日前なので、この時点では処理対象にならない
     const tooEarly = await outbox.processPendingEvents();
@@ -146,13 +157,20 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
 
     // 再送期日を強制的に前倒しして、上限に達するまで処理を繰り返す
     for (let i = 0; i < 10; i++) {
-      const row = await prisma.integrationOutbox.findUnique({ where: { idempotencyKey } });
+      const row = await prisma.integrationOutbox.findUnique({
+        where: { idempotencyKey },
+      });
       if (!row || row.status === "FAILED") break;
-      await prisma.integrationOutbox.update({ where: { idempotencyKey }, data: { availableAt: new Date() } });
+      await prisma.integrationOutbox.update({
+        where: { idempotencyKey },
+        data: { availableAt: new Date() },
+      });
       await outbox.processPendingEvents();
     }
 
-    const final = await prisma.integrationOutbox.findUniqueOrThrow({ where: { idempotencyKey } });
+    const final = await prisma.integrationOutbox.findUniqueOrThrow({
+      where: { idempotencyKey },
+    });
     expect(final.status).toBe("FAILED");
     expect(final.attemptCount).toBeGreaterThanOrEqual(8);
   });
@@ -172,9 +190,14 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
       data: { status: "FAILED", attemptCount: 8, lastErrorMessage: "dead" },
     });
 
-    await request(app.getHttpServer()).post(`/api/v1/admin/outbox/${created.id}/retry`).set("Cookie", adminCookie).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/admin/outbox/${created.id}/retry`)
+      .set("Cookie", adminCookie)
+      .expect(201);
 
-    const row = await prisma.integrationOutbox.findUniqueOrThrow({ where: { id: created.id } });
+    const row = await prisma.integrationOutbox.findUniqueOrThrow({
+      where: { id: created.id },
+    });
     expect(row.status).toBe("PENDING");
     expect(row.attemptCount).toBe(0);
   });
@@ -199,13 +222,18 @@ describe("Transactional Outbox (開発ガイドライン10章)", () => {
     expect(listRes.body).toHaveLength(1);
     expect(listRes.body[0].idempotencyKey).toBe(idempotencyKey);
 
-    const dispatchRes = await request(app.getHttpServer()).post("/api/v1/admin/outbox/dispatch").set("Cookie", adminCookie).expect(201);
+    const dispatchRes = await request(app.getHttpServer())
+      .post("/api/v1/admin/outbox/dispatch")
+      .set("Cookie", adminCookie)
+      .expect(201);
     expect(dispatchRes.body.processed).toBeGreaterThanOrEqual(1);
   });
 
   it("rejects unauthenticated access to admin outbox endpoints", async () => {
     await request(app.getHttpServer()).get("/api/v1/admin/outbox").expect(401);
-    await request(app.getHttpServer()).post("/api/v1/admin/outbox/dispatch").expect(401);
+    await request(app.getHttpServer())
+      .post("/api/v1/admin/outbox/dispatch")
+      .expect(401);
   });
 });
 
@@ -216,8 +244,11 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
     adminCookie = await loginAsNewAdmin("E2E FeatureFlags Admin");
   });
 
-  it("all flags default to false unless explicitly set to \"true\"", async () => {
-    const res = await request(app.getHttpServer()).get("/api/v1/admin/feature-flags").set("Cookie", adminCookie).expect(200);
+  it('all flags default to false unless explicitly set to "true"', async () => {
+    const res = await request(app.getHttpServer())
+      .get("/api/v1/admin/feature-flags")
+      .set("Cookie", adminCookie)
+      .expect(200);
     expect(res.body).toEqual({
       ENABLE_PLATFORM_USER_ID: false,
       ENABLE_WALLET_REFERRAL_TOKEN: false,
@@ -231,10 +262,13 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: false,
       ENABLE_COLLECTIBLE_CLAIM_FLOW: false,
       ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: false,
+      ENABLE_COMMON_USER_BALANCE_API: false,
     });
   });
 
   it("rejects unauthenticated access", async () => {
-    await request(app.getHttpServer()).get("/api/v1/admin/feature-flags").expect(401);
+    await request(app.getHttpServer())
+      .get("/api/v1/admin/feature-flags")
+      .expect(401);
   });
 });

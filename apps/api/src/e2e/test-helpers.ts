@@ -1,7 +1,8 @@
 import { hashSecret, encryptSecret, hmacSign } from "@ove/auth";
 import { generateId, prisma } from "@ove/database";
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "test-only-insecure-encryption-key";
+const ENCRYPTION_KEY =
+  process.env.ENCRYPTION_KEY || "test-only-insecure-encryption-key";
 
 export interface TestServiceIntegration {
   id: string;
@@ -11,13 +12,18 @@ export interface TestServiceIntegration {
 
 export async function createTestServiceIntegration(
   serviceCode: string,
-  overrides: Partial<{ perRequestAmountLimit: number; dailyAmountLimit: number }> = {},
+  overrides: Partial<{
+    perRequestAmountLimit: number;
+    dailyAmountLimit: number;
+    allowedScopes: string[];
+  }> = {},
 ): Promise<TestServiceIntegration> {
   const apiKey = `ovk_test_${generateId()}`;
   const signingSecret = `secret_test_${generateId()}`;
 
   // 同じ service_code のテストが複数回走っても衝突しないよう upsert する
-  // (service_code に一意制約があるため)。
+  // (service_code に一意制約があるため)。allowedScopesも他フィールドと同様、テストごとに
+  // 明示指定した値だけを持たせる (指定なしなら既定の空配列=無権限にリセットする)。
   const integration = await prisma.serviceIntegration.upsert({
     where: { serviceCode: serviceCode as never },
     update: {
@@ -25,6 +31,7 @@ export async function createTestServiceIntegration(
       signingSecretEncrypted: encryptSecret(signingSecret, ENCRYPTION_KEY),
       dailyAmountLimit: overrides.dailyAmountLimit ?? 1_000_000,
       perRequestAmountLimit: overrides.perRequestAmountLimit ?? 50_000,
+      allowedScopes: overrides.allowedScopes ?? [],
       status: "ACTIVE",
     },
     create: {
@@ -36,6 +43,7 @@ export async function createTestServiceIntegration(
       allowedIps: [],
       dailyAmountLimit: overrides.dailyAmountLimit ?? 1_000_000,
       perRequestAmountLimit: overrides.perRequestAmountLimit ?? 50_000,
+      allowedScopes: overrides.allowedScopes ?? [],
     },
   });
 
@@ -52,7 +60,10 @@ export function signedHeaders(
   const timestamp = String(Date.now());
   const nonce = generateId();
   const canonicalPayload = `${method}:${path}:${bodyJson}`;
-  const signature = hmacSign(integration.signingSecret, `${timestamp}.${nonce}.${canonicalPayload}`);
+  const signature = hmacSign(
+    integration.signingSecret,
+    `${timestamp}.${nonce}.${canonicalPayload}`,
+  );
 
   return {
     "X-OVE-Api-Key": integration.apiKey,
@@ -106,7 +117,14 @@ export function commonEventSignedHeaders(
   const bodyJson = JSON.stringify(body);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const nonce = generateId();
-  const canonicalString = [key.keyId, timestamp, nonce, method.toUpperCase(), path.split("?")[0], bodyJson].join("\n");
+  const canonicalString = [
+    key.keyId,
+    timestamp,
+    nonce,
+    method.toUpperCase(),
+    path.split("?")[0],
+    bodyJson,
+  ].join("\n");
   const signature = hmacSign(key.secret, canonicalString);
 
   return {
@@ -115,6 +133,7 @@ export function commonEventSignedHeaders(
     "X-SenNoKuni-Nonce": nonce,
     "X-SenNoKuni-Signature": signature,
     "Idempotency-Key": (body as { event_id?: string })?.event_id ?? "",
-    "X-Event-Version": (body as { event_version?: string })?.event_version ?? "1.0",
+    "X-Event-Version":
+      (body as { event_version?: string })?.event_version ?? "1.0",
   };
 }

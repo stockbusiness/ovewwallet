@@ -12,7 +12,9 @@ const envSchema = z.object({
   API_URL: z.string().url(),
   ADMIN_URL: z.string().url(),
 
-  SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 chars"),
+  SESSION_SECRET: z
+    .string()
+    .min(32, "SESSION_SECRET must be at least 32 chars"),
   COOKIE_DOMAIN: z.string().min(1),
 
   LINE_CHANNEL_ID: z.string().optional().default(""),
@@ -36,7 +38,9 @@ const envSchema = z.object({
   // エラートラッキング (Sentry, docs/monitoring.md)。未設定時は初期化しない。
   SENTRY_DSN: z.string().optional().default(""),
 
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   // 開発ガイドライン12.2章: LINE/戦国パスポートSSOの本番実装が未接続の間、
   // NODE_ENV=production では AUTH_MODE=production の明示指定を必須とする
   // (apps/api/src/common/assert-auth-mode.ts が起動時に検証する)。
@@ -57,10 +61,17 @@ const envSchema = z.object({
   // NFTコレクション実装指示書: ユーザー向けコレクションAPI・画面導線。
   ENABLE_DIGITAL_COLLECTION: z.enum(["true", "false"]).default("false"),
   // 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandler。
-  ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: z.enum(["true", "false"]).default("false"),
+  ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: z
+    .enum(["true", "false"])
+    .default("false"),
   // 千ノ国5システム改修 PR-W1: 旧登録時3,000 OVE紹介特典の新規PENDING作成を許可する
   // (true以外・未設定はすべて「新規作成しない」側。既存履歴・残高には影響しない)。
-  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: z.enum(["true", "false"]).default("false"),
+  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: z
+    .enum(["true", "false"])
+    .default("false"),
+  // 千ノ国5システム改修 PR-W2: POST /api/v1/service/accounts/by-common-user-id/balance。
+  // Flag有効に加え、呼び出し元にwallet.balance.read.common-user scopeの付与が必要。
+  ENABLE_COMMON_USER_BALANCE_API: z.enum(["true", "false"]).default("false"),
   // PR#2最終修正 P1-2: カード画像URLの許可ホスト (カンマ区切り)。未設定時はHTTPS/
   // SVG拒否/private-IP拒否のみで判定し、ホスト許可リストは適用しない (opt-in)。
   // apps/user-wallet・apps/admin-wallet の next.config.mjs もビルド時に同じ値を読み、
