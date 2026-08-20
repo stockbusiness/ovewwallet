@@ -70,6 +70,9 @@ export default defineConfig({
       // 許可するようapps/api・apps/user-wallet・apps/admin-walletの3プロセス全てに揃える。
       env: {
         ENABLE_WALLET_REFERRAL_TOKEN: "true",
+        // PR-W1: wallet-referrals.spec.tsが旧登録特典(3,000 OVE PENDING)の管理画面表示を
+        // 検証しているため、既存挙動の回帰確認として明示的にONにする。
+        ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: "true",
         ENABLE_DIGITAL_COLLECTION: "true",
         COLLECTIBLE_IMAGE_ALLOWED_HOSTS: "picsum.photos",
         // NFTカードClaim導線実装指示書。fake-market-server.mjs (下のwebServerで起動) を

@@ -230,6 +230,7 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_DIGITAL_COLLECTION: false,
       ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: false,
       ENABLE_COLLECTIBLE_CLAIM_FLOW: false,
+      ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: false,
     });
   });
 

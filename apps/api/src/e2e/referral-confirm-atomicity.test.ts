@@ -48,6 +48,8 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
 
   it("同一の紹介関係を並行してconfirmしても、CREDIT取引は1件だけ作られる", async () => {
     process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+    // PR-W1: このテストは旧特典(3,000 OVE)の確定/自己修復を検証するため明示的にONにする。
+    process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "true";
     const server = app.getHttpServer();
 
     const referralToken = `referral-atomic-${generateId()}`;
@@ -106,6 +108,8 @@ describe("紹介特典確定の原子性 (confirmBenefitFromEvent)", () => {
 
   it("モジュール化後レビュー対応 P1-5回帰: 旧実装由来のCREDIT既存+PENDING状態を、二重付与せず自己修復する", async () => {
     process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+    // PR-W1: このテストは旧特典(3,000 OVE)の確定/自己修復を検証するため明示的にONにする。
+    process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "true";
     const server = app.getHttpServer();
 
     const referralToken = `referral-selfheal-${generateId()}`;

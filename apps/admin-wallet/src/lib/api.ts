@@ -321,7 +321,8 @@ export type FeatureFlags = Record<
   | "ENABLE_COMMON_EVENT_INBOX"
   | "ENABLE_DIGITAL_COLLECTION"
   | "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX"
-  | "ENABLE_COLLECTIBLE_CLAIM_FLOW",
+  | "ENABLE_COLLECTIBLE_CLAIM_FLOW"
+  | "ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS",
   boolean
 >;
 
@@ -337,6 +338,7 @@ export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   ENABLE_DIGITAL_COLLECTION: "NFTコレクション機能",
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: "NFTコレクション entitlement受信",
   ENABLE_COLLECTIBLE_CLAIM_FLOW: "NFTカードClaim導線",
+  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: "旧登録特典(3,000 OVE)の新規発生(true=旧挙動維持)",
 };
 
 /** 共通イベント契約6.2章の必須イベントのうち、Signing Key発行時に選択可能な種別 (`apps/api/src/common-events/`の`COMMON_EVENT_HANDLED_TYPES`と対応)。 */

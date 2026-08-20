@@ -88,6 +88,8 @@ describe("agency referral token acceptance (実装指示書 v1.0, Phase 1)", () 
   describe("POST /api/v1/auth/line/login と紐付け", () => {
     beforeEach(() => {
       process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+      // PR-W1: このdescribe内の既存テストは旧特典が作成される前提のため、明示的にONにする。
+      process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "true";
     });
 
     it("links the referral, creates a PENDING benefit, and enqueues an outbox event on new registration", async () => {
@@ -137,6 +139,59 @@ describe("agency referral token acceptance (実装指示書 v1.0, Phase 1)", () 
       // 台帳の残高はまだ動かない (Phase 1では確定付与しない)。
       const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId } });
       expect(wallet.availableBalance.toString()).toBe("0");
+    });
+
+    it("PR-W1: links the referral and sends the outbox event, but does NOT create the legacy 3,000 OVE benefit when ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS is unset (default)", async () => {
+      delete process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS;
+
+      const referralToken = `referral-line-legacy-off-${generateId()}`;
+      const { cookieValue } = await captureReferral(referralToken);
+      expect(cookieValue).toBeDefined();
+
+      const lineUserId = `e2e-line-legacy-off-${generateId()}`;
+      const loginRes = await request(app.getHttpServer())
+        .post("/api/v1/auth/line/login")
+        .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${cookieValue}`])
+        .send({ idToken: `mock.${lineUserId}`, termsAccepted: true })
+        .expect(201);
+
+      const oveAccountId = loginRes.body.ove_account_id as string;
+      expect(oveAccountId).toBeTruthy();
+
+      const referral = await prisma.walletReferral.findFirstOrThrow({
+        where: { walletUserId: oveAccountId },
+      });
+      expect(referral.status).toBe("PENDING");
+
+      const benefit = await prisma.walletReferralBenefit.findUnique({
+        where: { idempotencyKey: `REFERRAL_SIGNUP_BONUS:${oveAccountId}` },
+      });
+      expect(benefit).toBeNull();
+
+      const outboxEvent = await prisma.integrationOutbox.findUniqueOrThrow({
+        where: { idempotencyKey: `WALLET_REFERRAL_REGISTERED:${referral.id}` },
+      });
+      expect(outboxEvent.destinationService).toBe("AGENCY_SYSTEM");
+    });
+
+    it("PR-W1: does NOT create the legacy 3,000 OVE benefit when ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS=false", async () => {
+      process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "false";
+
+      const referralToken = `referral-line-legacy-false-${generateId()}`;
+      const { cookieValue } = await captureReferral(referralToken);
+
+      const lineUserId = `e2e-line-legacy-false-${generateId()}`;
+      const loginRes = await request(app.getHttpServer())
+        .post("/api/v1/auth/line/login")
+        .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${cookieValue}`])
+        .send({ idToken: `mock.${lineUserId}`, termsAccepted: true })
+        .expect(201);
+
+      const oveAccountId = loginRes.body.ove_account_id as string;
+      const benefit = await prisma.walletReferralBenefit.findUnique({
+        where: { idempotencyKey: `REFERRAL_SIGNUP_BONUS:${oveAccountId}` },
+      });
+      expect(benefit).toBeNull();
     });
 
     it("does not create any referral record when logging in without a referral cookie", async () => {

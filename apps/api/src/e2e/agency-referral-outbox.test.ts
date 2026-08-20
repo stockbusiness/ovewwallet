@@ -148,6 +148,8 @@ describe("AGENCY_SYSTEM宛Outboxイベントの実送信 (wallet.referral.regist
     process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
     process.env.ENABLE_AGENCY_REFERRAL_SYNC = "true";
     process.env.ENABLE_PLATFORM_USER_ID = "true";
+    // PR-W1: このスイートは旧特典(3,000 OVE)の確定・CREDITを検証するため明示的にONにする。
+    process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "true";
   });
 
   afterEach(async () => {
@@ -156,6 +158,7 @@ describe("AGENCY_SYSTEM宛Outboxイベントの実送信 (wallet.referral.regist
     delete process.env.ENABLE_WALLET_REFERRAL_TOKEN;
     delete process.env.ENABLE_AGENCY_REFERRAL_SYNC;
     delete process.env.ENABLE_PLATFORM_USER_ID;
+    delete process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS;
     await prisma.commonUserHubConfig.deleteMany({ where: { id: CONFIG_ID } });
   });
 
