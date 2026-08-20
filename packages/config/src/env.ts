@@ -58,6 +58,9 @@ const envSchema = z.object({
   ENABLE_DIGITAL_COLLECTION: z.enum(["true", "false"]).default("false"),
   // 同指示書: entitlement.granted/entitlement.revokedの共通イベントHandler。
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: z.enum(["true", "false"]).default("false"),
+  // 千ノ国5システム改修 PR-W1: 旧登録時3,000 OVE紹介特典の新規PENDING作成を許可する
+  // (true以外・未設定はすべて「新規作成しない」側。既存履歴・残高には影響しない)。
+  ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: z.enum(["true", "false"]).default("false"),
   // PR#2最終修正 P1-2: カード画像URLの許可ホスト (カンマ区切り)。未設定時はHTTPS/
   // SVG拒否/private-IP拒否のみで判定し、ホスト許可リストは適用しない (opt-in)。
   // apps/user-wallet・apps/admin-wallet の next.config.mjs もビルド時に同じ値を読み、

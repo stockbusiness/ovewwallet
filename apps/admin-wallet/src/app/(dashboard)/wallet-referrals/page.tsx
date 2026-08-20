@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import HelpPanel from "@/components/HelpPanel";
-import { apiFetch, ApiError, type WalletReferralItem } from "@/lib/api";
+import { apiFetch, ApiError, type FeatureFlags, type WalletReferralItem } from "@/lib/api";
 
 const STATUS_LABEL: Record<WalletReferralItem["status"], string> = {
   CAPTURED: "受付済み(登録前)",
@@ -33,6 +33,7 @@ export default function WalletReferralsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [legacyBonusFlag, setLegacyBonusFlag] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -49,6 +50,12 @@ export default function WalletReferralsPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    apiFetch<FeatureFlags>("/api/v1/admin/feature-flags")
+      .then((flags) => setLegacyBonusFlag(flags.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS ?? false))
+      .catch(() => setLegacyBonusFlag(null));
+  }, []);
+
   return (
     <>
         <h1 className="mb-1 text-xl font-bold">代理店紹介トークン受け入れ</h1>
@@ -56,6 +63,29 @@ export default function WalletReferralsPage() {
           代理店紹介URL (<code>/invite/&#123;token&#125;</code>) 経由の受付・新規登録時の紐付け・
           初回登録特典3,000 OVEの状態を確認する画面 (Phase 1: 確認のみ。手動確定・取消はPhase 3で追加)。
         </p>
+
+        <div className="mb-4 rounded-lg border border-sengoku-gold-soft bg-sengoku-navy-deep p-3 text-xs text-sengoku-muted">
+          <p className="font-semibold text-sengoku-gold-soft">
+            旧制度について: 初回登録特典(3,000 OVE)は旧制度です。千ノ国5システム改修 PR-W1
+            (新規発生停止日: 2026-08-20)により、新規のPENDING作成を停止しています。
+          </p>
+          <p className="mt-1">
+            現在の状態:{" "}
+            {legacyBonusFlag === null ? (
+              "取得中/取得失敗"
+            ) : legacyBonusFlag ? (
+              <span className="text-sengoku-red">
+                旧挙動を維持中(ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS=true、新規PENDINGが作成されます)
+              </span>
+            ) : (
+              <span className="text-sengoku-green">停止中(新規PENDINGは作成されません)</span>
+            )}
+          </p>
+          <p className="mt-1">
+            この画面に表示されている既存のPENDING/CONFIRMED/REJECTEDの特典履歴・OVE残高は、
+            この停止によって削除・変更されることはありません。
+          </p>
+        </div>
 
         <HelpPanel storageKey="wallet-referrals" title="このページについて・使い方">
           <p>

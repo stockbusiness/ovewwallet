@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { generateId, type OveAccount, type Prisma, type WalletReferral } from "@ove/database";
 import { decryptSecret, sha256Hex } from "@ove/auth";
 import { getEncryptionKey } from "../common/encryption-key";
+import { isFeatureEnabled } from "../common/feature-flags";
 import { OutboxService } from "../outbox/outbox.service";
 import { ReferralRepository } from "./referral.repository";
 
@@ -46,19 +47,29 @@ export class AttachReferralToAccountUseCase {
       return;
     }
 
-    await this.referrals.createBenefit(
-      {
-        id: generateId(),
-        walletUserId: account.id,
-        lineUserIdHash: sha256Hex(lineUserId),
-        referralId: referral.id,
-        benefitType: "REFERRAL_SIGNUP_BONUS",
-        amount: REFERRAL_SIGNUP_BONUS_AMOUNT,
-        status: "PENDING",
-        idempotencyKey: `REFERRAL_SIGNUP_BONUS:${account.id}`,
-      },
-      tx,
-    );
+    // 千ノ国5システム改修 PR-W1: 旧登録時3,000 OVE特典は新規作成を停止する
+    // (ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS=trueの場合のみ旧挙動を維持)。紹介関係の記録・
+    // Agencyへのoutbox通知(下記)は報酬計算ではなくAgencyが正本を持つ紹介成立情報のため、
+    // Flagの影響を受けず従来どおり継続する。
+    if (isFeatureEnabled("ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS")) {
+      await this.referrals.createBenefit(
+        {
+          id: generateId(),
+          walletUserId: account.id,
+          lineUserIdHash: sha256Hex(lineUserId),
+          referralId: referral.id,
+          benefitType: "REFERRAL_SIGNUP_BONUS",
+          amount: REFERRAL_SIGNUP_BONUS_AMOUNT,
+          status: "PENDING",
+          idempotencyKey: `REFERRAL_SIGNUP_BONUS:${account.id}`,
+        },
+        tx,
+      );
+    } else {
+      this.logger.log(
+        "referral attach: legacy 3,000 OVE signup bonus creation skipped (ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS is not true)",
+      );
+    }
 
     const referralTokenPlain = decryptSecret(referral.referralTokenEncrypted, getEncryptionKey());
     await this.outbox.enqueue(tx, {

@@ -44,8 +44,11 @@ describe("GET /api/v1/me/referral-status", () => {
     expect(res.body).toEqual({ referred: false });
   });
 
-  it("紹介登録済みユーザーには PENDING の特典状況を返す", async () => {
+  it("紹介登録済みユーザーには PENDING の特典状況を返す (ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS=true)", async () => {
     process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+    // PR-W1: この特典状況カードは旧登録特典(3,000 OVE)の存在を前提にした画面のため、
+    // 旧挙動を維持するFlagを明示的にONにして検証する。
+    process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS = "true";
     const server = app.getHttpServer();
 
     const referralToken = `referral-status-${generateId()}`;
@@ -66,5 +69,37 @@ describe("GET /api/v1/me/referral-status", () => {
 
     const res = await request(server).get("/api/v1/me/referral-status").set("Cookie", userCookie).expect(200);
     expect(res.body).toMatchObject({ referred: true, status: "PENDING", amount: "3000", confirmed_at: null });
+  });
+
+  it("PR-W1: 紹介登録済みでも、旧特典が新規作成されなかった場合は referred: false を返す (デフォルト)", async () => {
+    process.env.ENABLE_WALLET_REFERRAL_TOKEN = "true";
+    delete process.env.ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS;
+    const server = app.getHttpServer();
+
+    const referralToken = `referral-status-legacy-off-${generateId()}`;
+    const captureRes = await request(server).get(`/api/v1/referrals/capture?token=${referralToken}`).expect(302);
+    const referralCookieValue = extractCookie(
+      captureRes.headers["set-cookie"] as unknown as string[],
+      REFERRAL_SESSION_COOKIE_NAME,
+    );
+    expect(referralCookieValue).toBeDefined();
+
+    const lineUserId = `e2e-referral-status-legacy-off-${generateId()}`;
+    const login = await request(server)
+      .post("/api/v1/auth/line/login")
+      .set("Cookie", [`${REFERRAL_SESSION_COOKIE_NAME}=${referralCookieValue}`])
+      .send({ idToken: `mock.${lineUserId}`, termsAccepted: true })
+      .expect(201);
+    const userCookie = login.headers["set-cookie"] as unknown as string[];
+
+    // 紹介関係自体は成立している(Agencyへの通知も送られる)が、旧OVE特典が無いため
+    // ユーザー向けにはreferred: falseを返す(=ウォレット画面に「紹介特典」カードが表示されない)。
+    const referral = await prisma.walletReferral.findUniqueOrThrow({
+      where: { walletUserId: login.body.ove_account_id },
+    });
+    expect(referral.status).toBe("PENDING");
+
+    const res = await request(server).get("/api/v1/me/referral-status").set("Cookie", userCookie).expect(200);
+    expect(res.body).toEqual({ referred: false });
   });
 });

@@ -19,6 +19,14 @@ export const FEATURE_FLAG_KEYS = [
   "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX",
   /** NFTカードClaim導線実装指示書: /claim/{token}画面・Claim概要/確定APIを有効化する。 */
   "ENABLE_COLLECTIBLE_CLAIM_FLOW",
+  /**
+   * 千ノ国5システム改修 PR-W1: 旧登録時3,000 OVE紹介特典の新規PENDING作成を許可する。
+   * 他のFlagと異なり、trueが「旧挙動を維持する」側であることに注意
+   * (デフォルト・未設定・false・不正値はすべて「新規作成しない」側になる、安全側デフォルト)。
+   * 既存のPENDING/CONFIRMED/REJECTED履歴やOVE残高には一切影響しない
+   * (`AttachReferralToAccountUseCase.attachToNewAccount`参照)。
+   */
+  "ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
