@@ -1,6 +1,17 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { generateId, type CollectibleAsset, type CollectibleHolding, type CollectibleHoldingStatus, type Prisma, type PrismaClient } from "@ove/database";
-import { PRISMA } from "../common/prisma.module";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  generateId,
+  type CollectibleAsset,
+  type CollectibleHolding,
+  type CollectibleHoldingStatus,
+  type Prisma,
+  type PrismaClient,
+} from "@ove/database";
 import {
   CollectibleAssetsRepository,
   type CreateCollectibleAssetParams,
@@ -10,6 +21,7 @@ import {
   type CollectibleHoldingWithAssetAndAccount,
 } from "../collectibles/collectible-holdings.repository";
 import { RevokeCollectibleUseCase } from "../collectibles/revoke-collectible.use-case";
+import { PRISMA } from "../common/prisma.module";
 
 export interface UpdateCollectibleAssetParams {
   name?: string;
@@ -64,12 +76,21 @@ export class AdminCollectiblesService {
     return asset;
   }
 
-  async createAsset(params: Omit<CreateCollectibleAssetParams, "id">, adminId: string): Promise<CollectibleAsset> {
+  async createAsset(
+    params: Omit<CreateCollectibleAssetParams, "id">,
+    adminId: string,
+  ): Promise<CollectibleAsset> {
     const existing = await this.assets.findByAssetCode(params.assetCode);
-    if (existing) throw new ConflictException(`collectible asset ${params.assetCode} already exists`);
+    if (existing)
+      throw new ConflictException(
+        `collectible asset ${params.assetCode} already exists`,
+      );
 
     return this.db.$transaction(async (tx) => {
-      const asset = await this.assets.create({ id: generateId(), ...params }, tx);
+      const asset = await this.assets.create(
+        { id: generateId(), ...params },
+        tx,
+      );
       await tx.auditLog.create({
         data: {
           id: generateId(),
@@ -79,14 +100,22 @@ export class AdminCollectiblesService {
           targetType: "collectible_asset",
           targetId: asset.id,
           result: "SUCCESS",
-          afterData: { assetCode: asset.assetCode, name: asset.name, imageUrl: asset.imageUrl } as unknown as Prisma.InputJsonValue,
+          afterData: {
+            assetCode: asset.assetCode,
+            name: asset.name,
+            imageUrl: asset.imageUrl,
+          } as unknown as Prisma.InputJsonValue,
         },
       });
       return asset;
     });
   }
 
-  async updateAsset(id: string, params: UpdateCollectibleAssetParams, adminId: string): Promise<CollectibleAsset> {
+  async updateAsset(
+    id: string,
+    params: UpdateCollectibleAssetParams,
+    adminId: string,
+  ): Promise<CollectibleAsset> {
     const before = await this.getAsset(id);
 
     return this.db.$transaction(async (tx) => {
@@ -126,15 +155,22 @@ export class AdminCollectiblesService {
     });
   }
 
-  private updateActionType(previousStatus: string, nextStatus: string | undefined): string {
+  private updateActionType(
+    previousStatus: string,
+    nextStatus: string | undefined,
+  ): string {
     if (nextStatus && nextStatus !== previousStatus) {
-      return nextStatus === "ARCHIVED" ? "COLLECTIBLE_ASSET_ARCHIVED" : "COLLECTIBLE_ASSET_ACTIVATED";
+      return nextStatus === "ARCHIVED"
+        ? "COLLECTIBLE_ASSET_ARCHIVED"
+        : "COLLECTIBLE_ASSET_ACTIVATED";
     }
     return "COLLECTIBLE_ASSET_UPDATED";
   }
 
-  async searchHoldings(params: AdminSearchHoldingsParams): Promise<CollectibleHoldingWithAssetAndAccount[]> {
-    return this.holdings.adminList({
+  async searchHoldings(
+    params: AdminSearchHoldingsParams,
+  ): Promise<Omit<CollectibleHoldingWithAssetAndAccount, "revokeReason">[]> {
+    const rows = await this.holdings.adminList({
       commonUserId: params.commonUserId,
       accountCode: params.accountCode,
       entitlementId: params.entitlementId,
@@ -144,17 +180,27 @@ export class AdminCollectiblesService {
       tokenId: params.tokenId,
       limit: Math.min(params.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT),
     });
+    return rows.map(redactExternalRevokeReason);
   }
 
-  async getHolding(id: string): Promise<CollectibleHoldingWithAssetAndAccount> {
+  async getHolding(
+    id: string,
+  ): Promise<Omit<CollectibleHoldingWithAssetAndAccount, "revokeReason">> {
     const holding = await this.holdings.findByIdWithAssetAndAccount(id);
     if (!holding) throw new NotFoundException("collectible holding not found");
-    return holding;
+    return redactExternalRevokeReason(holding);
   }
 
   /** 管理画面からの手動取消 (指示書14章)。監査ログの`sourceSystemKey`にはadminIdを記録する。 */
-  async revokeHolding(id: string, adminId: string, reason: string): Promise<CollectibleHolding> {
-    const holding = await this.getHolding(id);
+  async revokeHolding(
+    id: string,
+    adminId: string,
+    reason: string,
+  ): Promise<Omit<CollectibleHolding, "revokeReason">> {
+    // getHolding()は既にrevokeReasonを除いた戻り値のため、entitlementIdの取得だけには
+    // 生のリポジトリ呼び出しを使う (このメソッドは表示用ではなく取消処理の入力に使うため)。
+    const holding = await this.holdings.findByIdWithAssetAndAccount(id);
+    if (!holding) throw new NotFoundException("collectible holding not found");
     const result = await this.revokeCollectible.execute({
       entitlementId: holding.entitlementId,
       reason,
@@ -167,6 +213,18 @@ export class AdminCollectiblesService {
     if (result.status === "not_found" || result.status === "tombstoned") {
       throw new NotFoundException("collectible holding not found");
     }
-    return result.holding;
+    return redactExternalRevokeReason(result.holding);
   }
+}
+
+/**
+ * PR-W3-a レビュー指摘2/3: 外部システム(Market)からの自由記述(revokeReason)は、通常の管理画面
+ * APIからは返さない。DB自体からは削除しない(監査・調査目的で保持)。障害調査で原文参照が
+ * 必要な場合は、専用権限・操作監査・マスキングを備えた別画面を今後検討する(今回は作らない)。
+ */
+function redactExternalRevokeReason<T extends { revokeReason: string | null }>(
+  holding: T,
+): Omit<T, "revokeReason"> {
+  const { revokeReason: _revokeReason, ...rest } = holding;
+  return rest;
 }

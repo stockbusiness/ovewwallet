@@ -31,19 +31,34 @@ export interface InboundEventListParams {
 export class InboundEventRepository {
   constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 
-  async findByEventId(eventId: string, client: Db = this.db): Promise<InboundEvent | null> {
-    return client.inboundEvent.findUnique({ where: { eventId } });
+  /**
+   * PR-W3-a: 一意条件は本来source_system_key + event_id (別Marketが偶然同じevent_id値を
+   * 送る可能性を排除できないため)。DBの実際のUNIQUE制約はPR-W3-a-2で複合化する予定だが、
+   * このメソッドは`findFirst`を使うため、単一UNIQUE制約下・複合UNIQUE制約下のどちらでも
+   * 正しく動作する(Prismaの`findUnique`はDB側に対応する複合UNIQUEインデックスが実在しないと
+   * 型エラーになるため使わない)。
+   */
+  async findBySourceSystemKeyAndEventId(
+    sourceSystemKey: string,
+    eventId: string,
+    client: Db = this.db,
+  ): Promise<InboundEvent | null> {
+    return client.inboundEvent.findFirst({
+      where: { sourceSystemKey, eventId },
+    });
   }
 
-  async findByEventIdOrThrow(eventId: string, client: Db = this.db): Promise<InboundEvent> {
-    return client.inboundEvent.findUniqueOrThrow({ where: { eventId } });
-  }
-
-  async findByIdOrThrow(id: string, client: Db = this.db): Promise<InboundEvent> {
+  async findByIdOrThrow(
+    id: string,
+    client: Db = this.db,
+  ): Promise<InboundEvent> {
     return client.inboundEvent.findUniqueOrThrow({ where: { id } });
   }
 
-  async createPending(params: CreatePendingInboundEventParams, client: Db = this.db): Promise<InboundEvent> {
+  async createPending(
+    params: CreatePendingInboundEventParams,
+    client: Db = this.db,
+  ): Promise<InboundEvent> {
     return client.inboundEvent.create({
       data: {
         id: params.id,
@@ -68,7 +83,11 @@ export class InboundEventRepository {
     return result.count === 1;
   }
 
-  async markSucceeded(id: string, resultPayload: Prisma.InputJsonValue, client: Db = this.db): Promise<InboundEvent> {
+  async markSucceeded(
+    id: string,
+    resultPayload: Prisma.InputJsonValue,
+    client: Db = this.db,
+  ): Promise<InboundEvent> {
     return client.inboundEvent.update({
       where: { id },
       data: { status: "SUCCEEDED", resultPayload, processedAt: new Date() },
@@ -77,16 +96,27 @@ export class InboundEventRepository {
 
   async markFailed(
     id: string,
-    params: { status: "FAILED" | "DEAD"; lastErrorMessage: string; nextRetryAt: Date | null },
+    params: {
+      status: "FAILED" | "DEAD";
+      lastErrorMessage: string;
+      nextRetryAt: Date | null;
+    },
     client: Db = this.db,
   ): Promise<InboundEvent> {
     return client.inboundEvent.update({
       where: { id },
-      data: { status: params.status, lastErrorMessage: params.lastErrorMessage, nextRetryAt: params.nextRetryAt },
+      data: {
+        status: params.status,
+        lastErrorMessage: params.lastErrorMessage,
+        nextRetryAt: params.nextRetryAt,
+      },
     });
   }
 
-  async list(params: InboundEventListParams, client: Db = this.db): Promise<InboundEvent[]> {
+  async list(
+    params: InboundEventListParams,
+    client: Db = this.db,
+  ): Promise<InboundEvent[]> {
     return client.inboundEvent.findMany({
       where: {
         status: params.status ? (params.status as never) : undefined,

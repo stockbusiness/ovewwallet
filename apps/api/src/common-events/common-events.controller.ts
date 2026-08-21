@@ -12,15 +12,22 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { CommonEventBodySchema, COMMON_EVENT_SUPPORTED_VERSIONS, type CommonEventBody } from "@ove/shared-types";
-import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import {
+  CommonEventBodySchema,
+  DEFAULT_SUPPORTED_EVENT_VERSIONS,
+  EVENT_TYPE_SUPPORTED_VERSIONS,
+  type CommonEventBody,
+} from "@ove/shared-types";
 import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 import { isFeatureEnabled } from "../common/feature-flags";
-import { CommonEventAuthGuard, type AuthenticatedCommonEventRequest } from "./common-event-auth.guard";
+import type { RequestWithId } from "../common/request-id.middleware";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import {
+  CommonEventAuthGuard,
+  type AuthenticatedCommonEventRequest,
+} from "./common-event-auth.guard";
 import { matchesAllowedEventType } from "./common-event-signing-keys.service";
 import { InboundEventsService } from "./inbound-events.service";
-
-const SUPPORTED_EVENT_VERSIONS = new Set<string>(COMMON_EVENT_SUPPORTED_VERSIONS);
 
 /**
  * PR#2最終修正 P0-3: `entitlement.granted`/`entitlement.revoked`はNFTコレクション専用の
@@ -29,7 +36,10 @@ const SUPPORTED_EVENT_VERSIONS = new Set<string>(COMMON_EVENT_SUPPORTED_VERSIONS
  * しても同じevent_idが二度と再処理されない。Inbound Event行を作る前 (`receive`呼び出し前)に
  * ここで弾くことで、Flag OFF中は行自体を作らず、ON後の再送で正しく処理できるようにする。
  */
-const COLLECTIBLE_ENTITLEMENT_EVENT_TYPES = new Set(["entitlement.granted", "entitlement.revoked"]);
+const COLLECTIBLE_ENTITLEMENT_EVENT_TYPES = new Set([
+  "entitlement.granted",
+  "entitlement.revoked",
+]);
 
 /**
  * 千ノ国 全体統合 共通実装契約 v1.0 6章 / v1.1 DRAFT。代理店システム等から共通イベントを
@@ -46,12 +56,14 @@ export class CommonEventsController {
   @UseGuards(CommonEventAuthGuard)
   async receive(
     @Body(new ZodValidationPipe(CommonEventBodySchema)) body: CommonEventBody,
-    @Req() req: AuthenticatedCommonEventRequest,
+    @Req() req: AuthenticatedCommonEventRequest & Partial<RequestWithId>,
     @Headers("idempotency-key") idempotencyKeyHeader: string | undefined,
     @Headers("x-event-version") eventVersionHeader: string | undefined,
   ) {
     if (!isFeatureEnabled("ENABLE_COMMON_EVENT_INBOX")) {
-      throw new ServiceUnavailableException("common event inbox is not enabled yet");
+      throw new ServiceUnavailableException(
+        "common event inbox is not enabled yet",
+      );
     }
 
     // 共通契約v1.1 DRAFT 9章: 「HeaderのIdempotency-Keyとbodyのevent_idは一致必須」。
@@ -59,7 +71,9 @@ export class CommonEventsController {
       throw new BadRequestException("missing Idempotency-Key header");
     }
     if (idempotencyKeyHeader !== body.event_id) {
-      throw new BadRequestException("Idempotency-Key header does not match body.event_id");
+      throw new BadRequestException(
+        "Idempotency-Key header does not match body.event_id",
+      );
     }
 
     // 共通契約v1.1 DRAFT 8章: 「Headerとbodyが両方ある場合は一致必須」「サポート外versionは
@@ -70,8 +84,17 @@ export class CommonEventsController {
         `X-Event-Version header ("${eventVersionHeader}") does not match body.event_version ("${body.event_version}")`,
       );
     }
-    if (!SUPPORTED_EVENT_VERSIONS.has(body.event_version)) {
-      throw new UnprocessableEntityException(`unsupported event_version "${body.event_version}"`);
+    // PR-W3-a: event_type別にversionを管理する (共通定数へ追加しただけで全event_typeが
+    // 新versionを受理してしまう設計を避ける)。表に無いevent_type(Walletがハンドラを
+    // 登録していない、契約上は正当な種別)にはDEFAULT_SUPPORTED_EVENT_VERSIONS(="1.0"のみ)を
+    // そのまま適用し、既存動作を変えない。
+    const supportedVersions =
+      EVENT_TYPE_SUPPORTED_VERSIONS[body.event_type] ??
+      DEFAULT_SUPPORTED_EVENT_VERSIONS;
+    if (!supportedVersions.includes(body.event_version)) {
+      throw new UnprocessableEntityException(
+        `unsupported event_version "${body.event_version}" for event_type "${body.event_type}"`,
+      );
     }
 
     // 次期改修指示書P0-1: 認証済みの送信元 (署名鍵から解決、req.commonEventSourceSystemKey)
@@ -84,18 +107,32 @@ export class CommonEventsController {
     }
 
     // 次期改修指示書P0-3: 鍵ごとに送信を許可するevent_typeを制限する。
-    if (!matchesAllowedEventType(req.commonEventAllowedEventTypes, body.event_type)) {
+    if (
+      !matchesAllowedEventType(
+        req.commonEventAllowedEventTypes,
+        body.event_type,
+      )
+    ) {
       throw new ForbiddenException(
         `key_id is not permitted to send event_type "${body.event_type}"`,
       );
     }
 
     // PR#2最終修正 P0-3: Inbound Event行を作る前にNFTコレクション専用Flagを確認する。
-    if (COLLECTIBLE_ENTITLEMENT_EVENT_TYPES.has(body.event_type) && !isFeatureEnabled("ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX")) {
-      throw new ServiceUnavailableException("collectible entitlement inbox is not enabled yet");
+    if (
+      COLLECTIBLE_ENTITLEMENT_EVENT_TYPES.has(body.event_type) &&
+      !isFeatureEnabled("ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX")
+    ) {
+      throw new ServiceUnavailableException(
+        "collectible entitlement inbox is not enabled yet",
+      );
     }
 
-    const { cached, result } = await this.inboundEvents.receive(body, req.commonEventSourceSystemKey);
+    const { cached, result } = await this.inboundEvents.receive(
+      body,
+      req.commonEventSourceSystemKey,
+      req.requestId,
+    );
     return { ok: true, event_id: body.event_id, cached, result };
   }
 }

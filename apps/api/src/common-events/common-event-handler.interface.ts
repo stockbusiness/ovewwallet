@@ -1,5 +1,5 @@
-import type { z } from "zod";
 import type { CommonEventBody } from "@ove/shared-types";
+import type { z } from "zod";
 
 /**
  * リファクタリング指示書 Phase 4 (§10): 共通イベントハンドラの実行コンテキスト。
@@ -25,5 +25,8 @@ export interface CommonEventHandler<TPayload = CommonEventBody> {
   readonly eventType: string;
   readonly schema: z.ZodType<TPayload>;
 
-  handle(context: AuthenticatedEventContext, payload: TPayload): Promise<CommonEventResult>;
+  handle(
+    context: AuthenticatedEventContext,
+    payload: TPayload,
+  ): Promise<CommonEventResult>;
 }

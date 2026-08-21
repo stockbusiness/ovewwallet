@@ -1,8 +1,17 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { generateId, type CommonEventSigningKey, type PrismaClient } from "@ove/database";
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { decryptSecret, encryptSecret } from "@ove/auth";
-import { PRISMA } from "../common/prisma.module";
+import {
+  generateId,
+  type CommonEventSigningKey,
+  type PrismaClient,
+} from "@ove/database";
 import { getEncryptionKey } from "../common/encryption-key";
+import { PRISMA } from "../common/prisma.module";
 
 export interface CommonEventSigningKeyView {
   id: string;
@@ -30,7 +39,10 @@ function toView(key: CommonEventSigningKey): CommonEventSigningKeyView {
  * `allowedEventTypes`のパターン(末尾".*"はprefix一致、例:"order.*"は"order.created"に一致)に
  * event_typeが一致するか判定する (次期改修指示書P0-3)。
  */
-export function matchesAllowedEventType(allowedEventTypes: string[], eventType: string): boolean {
+export function matchesAllowedEventType(
+  allowedEventTypes: string[],
+  eventType: string,
+): boolean {
   return allowedEventTypes.some((pattern) => {
     if (pattern === "*") return true;
     if (pattern.endsWith(".*")) {
@@ -51,7 +63,9 @@ export class CommonEventSigningKeysService {
   constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 
   async list(): Promise<CommonEventSigningKeyView[]> {
-    const keys = await this.db.commonEventSigningKey.findMany({ orderBy: { createdAt: "desc" } });
+    const keys = await this.db.commonEventSigningKey.findMany({
+      orderBy: { createdAt: "desc" },
+    });
     return keys.map(toView);
   }
 
@@ -62,8 +76,11 @@ export class CommonEventSigningKeysService {
     /** 明示的に許可するevent_type (省略/空の場合は何も許可しない、secure-by-default)。 */
     allowedEventTypes?: string[];
   }): Promise<CommonEventSigningKeyView> {
-    const existing = await this.db.commonEventSigningKey.findUnique({ where: { keyId: params.keyId } });
-    if (existing) throw new ConflictException(`key_id "${params.keyId}" already exists`);
+    const existing = await this.db.commonEventSigningKey.findUnique({
+      where: { keyId: params.keyId },
+    });
+    if (existing)
+      throw new ConflictException(`key_id "${params.keyId}" already exists`);
 
     const created = await this.db.commonEventSigningKey.create({
       data: {
@@ -79,7 +96,9 @@ export class CommonEventSigningKeysService {
   }
 
   async revoke(keyId: string): Promise<CommonEventSigningKeyView> {
-    const existing = await this.db.commonEventSigningKey.findUnique({ where: { keyId } });
+    const existing = await this.db.commonEventSigningKey.findUnique({
+      where: { keyId },
+    });
     if (!existing) throw new NotFoundException(`key_id "${keyId}" not found`);
 
     const updated = await this.db.commonEventSigningKey.update({
@@ -92,8 +111,14 @@ export class CommonEventSigningKeysService {
   /** `CommonEventAuthGuard`専用。ACTIVEな鍵のみ返し、復号済みシークレットを含む。 */
   async resolveActiveSecret(
     keyId: string,
-  ): Promise<{ sourceSystemKey: string; secret: string; allowedEventTypes: string[] } | null> {
-    const key = await this.db.commonEventSigningKey.findUnique({ where: { keyId } });
+  ): Promise<{
+    sourceSystemKey: string;
+    secret: string;
+    allowedEventTypes: string[];
+  } | null> {
+    const key = await this.db.commonEventSigningKey.findUnique({
+      where: { keyId },
+    });
     if (!key || key.status !== "ACTIVE") return null;
 
     return {

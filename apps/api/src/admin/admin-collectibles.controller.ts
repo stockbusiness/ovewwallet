@@ -1,9 +1,26 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import type { CollectibleAsset, CollectibleHolding, CollectibleHoldingStatus } from "@ove/database";
+import type {
+  CollectibleAsset,
+  CollectibleHolding,
+  CollectibleHoldingStatus,
+} from "@ove/database";
 import { z } from "zod";
 import type { CollectibleHoldingWithAssetAndAccount } from "../collectibles/collectible-holdings.repository";
-import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
+import {
+  AdminAuthGuard,
+  type AuthenticatedAdminRequest,
+} from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminCollectiblesService } from "./admin-collectibles.service";
@@ -22,7 +39,9 @@ export class AdminCollectiblesController {
   @Get("assets")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
-  async listAssets(@Query("limit") limit?: string): Promise<CollectibleAsset[]> {
+  async listAssets(
+    @Query("limit") limit?: string,
+  ): Promise<CollectibleAsset[]> {
     return this.collectibles.listAssets(limit ? Number(limit) : undefined);
   }
 
@@ -37,7 +56,8 @@ export class AdminCollectiblesController {
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "OVE_OPERATOR")
   async createAsset(
-    @Body(new ZodValidationPipe(CreateCollectibleAssetSchema)) body: z.infer<typeof CreateCollectibleAssetSchema>,
+    @Body(new ZodValidationPipe(CreateCollectibleAssetSchema))
+    body: z.infer<typeof CreateCollectibleAssetSchema>,
     @Req() req: AuthenticatedAdminRequest,
   ): Promise<CollectibleAsset> {
     return this.collectibles.createAsset(body, req.admin.id);
@@ -48,7 +68,8 @@ export class AdminCollectiblesController {
   @Roles("SUPER_ADMIN", "OVE_OPERATOR")
   async updateAsset(
     @Param("id") id: string,
-    @Body(new ZodValidationPipe(UpdateCollectibleAssetSchema)) body: z.infer<typeof UpdateCollectibleAssetSchema>,
+    @Body(new ZodValidationPipe(UpdateCollectibleAssetSchema))
+    body: z.infer<typeof UpdateCollectibleAssetSchema>,
     @Req() req: AuthenticatedAdminRequest,
   ): Promise<CollectibleAsset> {
     return this.collectibles.updateAsset(id, body, req.admin.id);
@@ -66,7 +87,7 @@ export class AdminCollectiblesController {
     @Query("status") status?: string,
     @Query("token_id") tokenId?: string,
     @Query("limit") limit?: string,
-  ): Promise<CollectibleHoldingWithAssetAndAccount[]> {
+  ): Promise<Omit<CollectibleHoldingWithAssetAndAccount, "revokeReason">[]> {
     return this.collectibles.searchHoldings({
       commonUserId,
       accountCode,
@@ -82,7 +103,9 @@ export class AdminCollectiblesController {
   @Get("holdings/:id")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "OVE_OPERATOR", "EVENT_OPERATOR", "AUDITOR")
-  async getHolding(@Param("id") id: string): Promise<CollectibleHoldingWithAssetAndAccount> {
+  async getHolding(
+    @Param("id") id: string,
+  ): Promise<Omit<CollectibleHoldingWithAssetAndAccount, "revokeReason">> {
     return this.collectibles.getHolding(id);
   }
 
@@ -91,9 +114,10 @@ export class AdminCollectiblesController {
   @Roles("SUPER_ADMIN", "OVE_OPERATOR")
   async revokeHolding(
     @Param("id") id: string,
-    @Body(new ZodValidationPipe(RevokeCollectibleHoldingSchema)) body: z.infer<typeof RevokeCollectibleHoldingSchema>,
+    @Body(new ZodValidationPipe(RevokeCollectibleHoldingSchema))
+    body: z.infer<typeof RevokeCollectibleHoldingSchema>,
     @Req() req: AuthenticatedAdminRequest,
-  ): Promise<CollectibleHolding> {
+  ): Promise<Omit<CollectibleHolding, "revokeReason">> {
     return this.collectibles.revokeHolding(id, req.admin.id, body.reason);
   }
 }

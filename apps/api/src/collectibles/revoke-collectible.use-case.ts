@@ -1,18 +1,34 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { generateId, type CollectibleHolding, type CreatedByType, type Prisma, type PrismaClient } from "@ove/database";
+import {
+  generateId,
+  type CollectibleHolding,
+  type CreatedByType,
+  type Prisma,
+  type PrismaClient,
+} from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CollectibleEntitlementTombstonesRepository } from "./collectible-entitlement-tombstones.repository";
 import { CollectibleHoldingsRepository } from "./collectible-holdings.repository";
-import { NFT_MARKET_SOURCE_SYSTEM_KEYS, entitlementAdvisoryLockKey } from "./constants";
+import {
+  ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES,
+  KNOWN_COLLECTIBLE_REVOKE_REASON_CODES,
+  entitlementAdvisoryLockKey,
+} from "./constants";
 
 export interface RevokeCollectibleParams {
   entitlementId: string;
   reason: string;
+  /** PR-W3-a: 構造化された取消理由コード(例: "full_refund")。既知語彙は
+   * KNOWN_COLLECTIBLE_REVOKE_REASON_CODES参照。未知でも取消は継続し、別途監査記録する。 */
+  reasonCode?: string | null;
   /** AuditLogの`actorId`。外部イベント起点なら`source_system_key`、管理画面起点ならadminId。 */
   sourceSystemKey: string;
   /** 既定は`EXTERNAL_SERVICE`(entitlement.revoked経由)。管理画面からの手動取消は`ADMIN`を渡す。 */
   actorType?: CreatedByType;
   eventId: string;
+  correlationId?: string | null;
+  /** Market側event本文のoccurred_at (Wallet側処理時刻のrevokedAtとは別軸)。 */
+  occurredAt?: Date | null;
 }
 
 export type RevokeCollectibleResult =
@@ -50,7 +66,9 @@ export class RevokeCollectibleUseCase {
     private readonly tombstones: CollectibleEntitlementTombstonesRepository,
   ) {}
 
-  async execute(params: RevokeCollectibleParams): Promise<RevokeCollectibleResult> {
+  async execute(
+    params: RevokeCollectibleParams,
+  ): Promise<RevokeCollectibleResult> {
     const actorType = params.actorType ?? "EXTERNAL_SERVICE";
     const isAutomated = actorType !== "ADMIN";
 
@@ -60,11 +78,17 @@ export class RevokeCollectibleUseCase {
       // (grant-collectible.use-caseの同名キーと衝突させ、tombstone作成とHolding作成を排他する)。
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(params.entitlementId)}))`;
       await this.holdings.lockByEntitlementId(params.entitlementId, tx);
-      const holding = await this.holdings.findByEntitlementId(params.entitlementId, tx);
+      const holding = await this.holdings.findByEntitlementId(
+        params.entitlementId,
+        tx,
+      );
       if (!holding) {
         if (!isAutomated) return { status: "not_found" };
 
-        const existingTombstone = await this.tombstones.findByEntitlementId(params.entitlementId, tx);
+        const existingTombstone = await this.tombstones.findByEntitlementId(
+          params.entitlementId,
+          tx,
+        );
         if (!existingTombstone) {
           await this.tombstones.create(
             {
@@ -73,18 +97,38 @@ export class RevokeCollectibleUseCase {
               sourceSystemKey: params.sourceSystemKey,
               eventId: params.eventId,
               reason: params.reason,
+              reasonCode: params.reasonCode ?? null,
+              correlationId: params.correlationId ?? null,
+              occurredAt: params.occurredAt ?? null,
               revokedAt: new Date(),
             },
             tx,
           );
+          await this.recordUnknownReasonCodeIfNeeded(tx, {
+            targetType: "collectible_entitlement_tombstone",
+            targetId: params.entitlementId,
+            actorType,
+            actorId: params.sourceSystemKey,
+            reasonCode: params.reasonCode,
+            eventId: params.eventId,
+          });
         }
         return { status: "tombstoned" };
       }
-      if (holding.status === "REVOKED") return { status: "already_revoked", holding };
+      if (holding.status === "REVOKED")
+        return { status: "already_revoked", holding };
 
       if (isAutomated) {
+        // PR-W3-a: 生のsource_system_key文字列同士の比較ではなく、論理Market単位で比較する。
+        // sennokuni-nft-market/sengoku-marketは同一論理Marketの別名(ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES
+        // 参照)のため、片方で付与しもう片方で取消しても一致として扱う。未知のsource_system_key
+        // (戦国マーケットのsengoku-commerce等)や、異なる論理Marketからの取消は引き続き拒否する。
+        const requesterMarket =
+          ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES[params.sourceSystemKey];
+        const holdingMarket =
+          ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES[holding.sourceSystemKey];
         const sourceMismatch =
-          !NFT_MARKET_SOURCE_SYSTEM_KEYS.has(params.sourceSystemKey) || holding.sourceSystemKey !== params.sourceSystemKey;
+          !requesterMarket || requesterMarket !== holdingMarket;
         if (sourceMismatch) {
           await this.recordFailure(tx, holding, {
             actorType,
@@ -109,7 +153,19 @@ export class RevokeCollectibleUseCase {
       }
 
       const revokedAt = new Date();
-      const revoked = await this.holdings.revoke(holding.id, { revokedAt, revokeReason: params.reason }, tx);
+      const revoked = await this.holdings.revoke(
+        holding.id,
+        {
+          revokedAt,
+          revokeReason: params.reason,
+          revokeReasonCode: params.reasonCode ?? null,
+          revokedBySourceSystemKey: params.sourceSystemKey,
+          revokedByEventId: params.eventId,
+          revokedCorrelationId: params.correlationId ?? null,
+          revokedOccurredAt: params.occurredAt ?? null,
+        },
+        tx,
+      );
 
       await tx.auditLog.create({
         data: {
@@ -121,7 +177,9 @@ export class RevokeCollectibleUseCase {
           targetId: revoked.id,
           result: "SUCCESS",
           reason: params.reason,
-          beforeData: { status: holding.status } as unknown as Prisma.InputJsonValue,
+          beforeData: {
+            status: holding.status,
+          } as unknown as Prisma.InputJsonValue,
           afterData: {
             status: "REVOKED",
             revokedAt: revokedAt.toISOString(),
@@ -130,8 +188,56 @@ export class RevokeCollectibleUseCase {
           } as unknown as Prisma.InputJsonValue,
         },
       });
+      await this.recordUnknownReasonCodeIfNeeded(tx, {
+        targetType: "collectible_holding",
+        targetId: revoked.id,
+        actorType,
+        actorId: params.sourceSystemKey,
+        reasonCode: params.reasonCode,
+        eventId: params.eventId,
+      });
 
       return { status: "revoked", holding: revoked };
+    });
+  }
+
+  /**
+   * PR-W3-a レビュー指摘5: 形式上正しいが既知語彙に無いreason_codeは、取消処理自体は
+   * 継続しつつ、監査ログへ別途記録する(afterDataへ入れるのは検証済みreasonCodeの値のみ)。
+   * 同一event_idの再処理は`InboundEvent`の冪等キャッシュにより、この呼び出し自体が
+   * 再実行されないため重複記録されない。
+   */
+  private async recordUnknownReasonCodeIfNeeded(
+    tx: Prisma.TransactionClient,
+    params: {
+      targetType: string;
+      targetId: string;
+      actorType: CreatedByType;
+      actorId: string;
+      reasonCode?: string | null;
+      eventId: string;
+    },
+  ): Promise<void> {
+    if (
+      !params.reasonCode ||
+      KNOWN_COLLECTIBLE_REVOKE_REASON_CODES.has(params.reasonCode)
+    )
+      return;
+    await tx.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: params.actorType,
+        actorId: params.actorId,
+        actionType: "COLLECTIBLE_REVOKE_UNKNOWN_REASON_CODE",
+        targetType: params.targetType,
+        targetId: params.targetId,
+        result: "SUCCESS",
+        reason: `unknown reason_code "${params.reasonCode}" (format valid, not in known vocabulary)`,
+        afterData: {
+          reasonCode: params.reasonCode,
+          eventId: params.eventId,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
   }
 
@@ -143,7 +249,13 @@ export class RevokeCollectibleUseCase {
   private async recordFailure(
     tx: Prisma.TransactionClient,
     holding: CollectibleHolding,
-    params: { actorType: CreatedByType; actorId: string; actionType: string; reason: string; eventId: string },
+    params: {
+      actorType: CreatedByType;
+      actorId: string;
+      actionType: string;
+      reason: string;
+      eventId: string;
+    },
   ): Promise<void> {
     await tx.auditLog.create({
       data: {
@@ -155,8 +267,13 @@ export class RevokeCollectibleUseCase {
         targetId: holding.id,
         result: "FAILURE",
         reason: params.reason,
-        beforeData: { status: holding.status, sourceSystemKey: holding.sourceSystemKey } as unknown as Prisma.InputJsonValue,
-        afterData: { eventId: params.eventId } as unknown as Prisma.InputJsonValue,
+        beforeData: {
+          status: holding.status,
+          sourceSystemKey: holding.sourceSystemKey,
+        } as unknown as Prisma.InputJsonValue,
+        afterData: {
+          eventId: params.eventId,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
   }

@@ -24,19 +24,38 @@ export const RewardGrantRequestSchema = z.object({
 export type RewardGrantRequest = z.infer<typeof RewardGrantRequestSchema>;
 
 /**
+ * 千ノ国 全体統合 共通実装契約のcommon_user_id発行形式(`cu_`+32桁16進数)。PR-W2・PR-W3-aの
+ * 複数箇所(残高API・共通イベント契約のentitlement系スキーマ)で同じ形式検証を重複させない
+ * ための共通定数。trim・大文字小文字変換はしない(前後空白・大文字混入はそのまま拒否する)。
+ */
+export const COMMON_USER_ID_PATTERN = /^cu_[0-9a-f]{32}$/;
+export const CommonUserIdSchema = z
+  .string()
+  .regex(COMMON_USER_ID_PATTERN, "Invalid common_user_id format");
+
+/**
  * POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)。
- * 千ノ国 全体統合 共通実装契約のcommon_user_id発行形式(`cu_`+32桁16進数)に厳密に一致する
- * 値のみを許可する。trim・大文字小文字変換は行わない(前後空白・大文字混入はそのまま拒否する)。
  * 形式不正はResolver・DB検索を実行する前に400で弾く。
  */
 export const CommonUserIdBalanceRequestSchema = z.object({
-  common_user_id: z
-    .string()
-    .regex(/^cu_[0-9a-f]{32}$/, "Invalid common_user_id format"),
+  common_user_id: CommonUserIdSchema,
 });
 export type CommonUserIdBalanceRequest = z.infer<
   typeof CommonUserIdBalanceRequestSchema
 >;
+
+/**
+ * PR-W3-a: entitlement.revoked/grantedのreason_code等、構造化コード文字列の共通形式。
+ * 小文字英数字+アンダースコアのみ、先頭は英字、最大64文字。既知語彙は
+ * apps/api/src/collectibles/constants.tsのKNOWN_COLLECTIBLE_REVOKE_REASON_CODESで管理する
+ * (未知コードは拒否せず受理し、表示のみ汎用文言へフォールバックする)。
+ */
+export const COLLECTIBLE_REVOKE_REASON_CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+export const CollectibleRevokeReasonCodeSchema = z
+  .string()
+  .regex(COLLECTIBLE_REVOKE_REASON_CODE_PATTERN, "Invalid reason_code format")
+  .nullable()
+  .optional();
 
 /** POST /api/v1/transactions/debit */
 export const DebitRequestSchema = z.object({
@@ -262,6 +281,85 @@ export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
   order_id: z.string().max(255).nullable().optional(),
 }).passthrough();
 
+/** 千ノ国NFTマーケット契約v2指示書19章。このWallet自身のsite_key。 */
+export const NFT_MARKET_WALLET_TARGET_SITE_KEY = "ovew-wallet";
+
+/**
+ * PR-W3-a: event_version 1.1では、data.entitlement_id/common_user_id/correlation_id/
+ * target_site_keyを必須にする(千ノ国NFTマーケット契約M3a)。1.0は既存の緩い契約のまま
+ * (新たな拒否要因を増やさない)。トップレベル値へのフォールバックは1.0互換処理専用の
+ * normalizeEntitlementEnvelope(apps/api側)でのみ行い、1.1の必須判定では行わない
+ * (data.entitlement_idが無ければ、トップレベルにentitlement_idがあっても1.1としては不正)。
+ */
+/** ISO 8601 UTC ("...Z"サフィックス必須、オフセット表記は不可) かつDate.parseできる値のみ許可。 */
+const ISO_8601_UTC_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+
+function requireEntitlementFieldsForV1_1(
+  body: {
+    event_type: string;
+    event_version: string;
+    occurred_at: string;
+    common_user_id?: string | null;
+    correlation_id?: string | null;
+    target_site_key?: string | null;
+    reason_code?: string | null;
+    data?: unknown;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (body.event_version !== "1.1") return;
+  const dataObj =
+    (body.data as Record<string, unknown> | null | undefined) ?? undefined;
+  const require = (
+    present: boolean,
+    path: (string | number)[],
+    label: string,
+  ) => {
+    if (!present) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path,
+        message: `${label} is required for event_version 1.1`,
+      });
+    }
+  };
+  require(body.common_user_id != null, ["common_user_id"], "common_user_id");
+  if (
+    body.common_user_id != null &&
+    !COMMON_USER_ID_PATTERN.test(body.common_user_id)
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["common_user_id"],
+      message: "Invalid common_user_id format",
+    });
+  }
+  require(body.correlation_id != null, ["correlation_id"], "correlation_id");
+  require(dataObj?.["entitlement_id"] != null, [
+    "data",
+    "entitlement_id",
+  ], "data.entitlement_id");
+  require(body.target_site_key === NFT_MARKET_WALLET_TARGET_SITE_KEY, [
+    "target_site_key",
+  ], `target_site_key ("${NFT_MARKET_WALLET_TARGET_SITE_KEY}")`);
+  const occurredAtValid =
+    ISO_8601_UTC_PATTERN.test(body.occurred_at) &&
+    !Number.isNaN(Date.parse(body.occurred_at));
+  if (!occurredAtValid) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["occurred_at"],
+      message:
+        "occurred_at must be a valid ISO 8601 UTC timestamp for event_version 1.1",
+    });
+  }
+  // reason_codeはentitlement.revoked固有(entitlement.grantedには存在しない概念)。
+  if (body.event_type === "entitlement.revoked") {
+    require(body.reason_code != null, ["reason_code"], "reason_code");
+  }
+}
+
 /**
  * NFTコレクション実装指示書8章。戦国マーケットで購入したデジタルカードの利用権付与。
  * 実際の必須チェック(metadata.entitlement_type/asset_code/name/image_url、
@@ -270,6 +368,9 @@ export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
  */
 export const EntitlementGrantedEventSchema = BaseCommonEventSchema.extend({
   event_type: z.literal("entitlement.granted"),
+  // common_user_idの形式検証(cu_[0-9a-f]{32})は1.1のみ強制する(requireEntitlementFieldsForV1_1)。
+  // 1.0の既存契約(docs/contracts/fixtures/*.v1.jsonの"cu_xxx"等)はこの形式に従わないため、
+  // フィールド定義自体は緩いままにする(新たな拒否要因を増やさない)。
   common_user_id: z.string().max(255).nullable().optional(),
   // PR#2最終修正 P0-4: 業務項目はトップレベルに置くフラットな契約
   // (docs/contracts/fixtures/digital-collectible-granted.v1.json参照)。
@@ -279,13 +380,19 @@ export const EntitlementGrantedEventSchema = BaseCommonEventSchema.extend({
   product_code: z.string().max(255).nullable().optional(),
   entitlement_id: z.string().max(255).nullable().optional(),
   quantity: z.number().nullable().optional(),
-}).passthrough();
+})
+  .passthrough()
+  .superRefine(requireEntitlementFieldsForV1_1);
 
 /** NFTコレクション実装指示書8章。利用権の取消 (全額返金等)。 */
 export const EntitlementRevokedEventSchema = BaseCommonEventSchema.extend({
   event_type: z.literal("entitlement.revoked"),
   entitlement_id: z.string().max(255).nullable().optional(),
-}).passthrough();
+  common_user_id: z.string().max(255).nullable().optional(),
+  reason_code: CollectibleRevokeReasonCodeSchema,
+})
+  .passthrough()
+  .superRefine(requireEntitlementFieldsForV1_1);
 
 /** 契約6.2章の必須イベントのうち、ウォレットが実際に反応するもの (5つの実装対象領域に対応)。 */
 export const COMMON_EVENT_HANDLED_TYPES = [
@@ -300,8 +407,26 @@ export const COMMON_EVENT_HANDLED_TYPES = [
   "entitlement.revoked",
 ] as const;
 
-/** 共通契約v1.1 DRAFT 8章。サポート外`event_version`は422 unsupported_event_versionで拒否する。 */
-export const COMMON_EVENT_SUPPORTED_VERSIONS = ["1.0"] as const;
+/**
+ * PR-W3-a: event_type別の対応event_version表。「共通定数に1件追加しただけで全event_typeが
+ * 新versionを受理してしまう」設計を避けるため、event_type単位で管理する。表に無い
+ * event_type(Walletがハンドラを登録していない、契約上は正当な種別)は
+ * DEFAULT_SUPPORTED_EVENT_VERSIONSがそのまま適用され、1.0のみを受理する(既存動作を維持)。
+ */
+export const EVENT_TYPE_SUPPORTED_VERSIONS: Record<string, readonly string[]> =
+  {
+    "common_user.resolved": ["1.0"],
+    "common_user.merged": ["1.0"],
+    "customer.assignment.changed": ["1.0"],
+    "referral.confirmed": ["1.0"],
+    "reward.granted": ["1.0"],
+    "reward.reversed": ["1.0"],
+    /** 千ノ国NFTマーケット契約M3a。 */
+    "entitlement.granted": ["1.0", "1.1"],
+    "entitlement.revoked": ["1.0", "1.1"],
+  };
+/** 上の表に無いevent_type(Walletがハンドラを登録していない種別)に適用する既定値。 */
+export const DEFAULT_SUPPORTED_EVENT_VERSIONS = ["1.0"] as const;
 
 export const BalanceResponseSchema = z.object({
   ove_account_id: z.string(),

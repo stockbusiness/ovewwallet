@@ -9,10 +9,53 @@
  */
 export const SENGOKU_MARKET_SOURCE_SYSTEM_KEY = "sengoku-market";
 export const SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY = "sennokuni-nft-market";
-export const NFT_MARKET_SOURCE_SYSTEM_KEYS = new Set([
-  SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY,
-  SENGOKU_MARKET_SOURCE_SYSTEM_KEY,
-]);
+
+/**
+ * PR-W3-a レビュー指摘4: `entitlement.granted`/`entitlement.revoked`を受理するsource_system_key
+ * を、Setではなく「source_system_key → 論理Market ID」の明示的マッピングとして持つ。
+ * `sennokuni-nft-market`と`sengoku-market`は**同一のNFT作品マーケットの新旧表記**であり、
+ * 同じentitlement_id名前空間を共有する前提を置いている。この前提は以下の条件でのみ有効:
+ *
+ * - 両キーは同一事業者・同一ID採番基盤(戦国マーケット側`NftIssue.id`)を指す。他事業者・
+ *   他Marketへ流用しない。
+ * - レガシー`sengoku-market`の廃止時期は別途運用判断で決定する(現時点で自動廃止しない)。
+ * - `sengoku-commerce`(戦国マーケットの正式source_system_key、5システム決定1)は
+ *   このマッピングに含まれないため、entitlement.granted/revokedからは常に拒否される。
+ * - 万が一、両キーが実際には別々のID採番基盤であると判明した場合は、この「同一論理Market」
+ *   という前提を撤回し、下記のentitlement_id複合化(既知課題)が完了するまでどちらか一方の
+ *   受信を停止すること。
+ *
+ * 【重要】2つ目の実在Market(戦国マーケット等)のsource_system_keyをこのマッピングへ
+ * 追加するPRは、CollectibleHolding/CollectibleEntitlementTombstoneのentitlement_id一意制約を
+ * source_system_key + entitlement_idへ複合化し、検索条件・advisory lockもsource境界化する
+ * 別PRを先に完了させてから行うこと。下の起動時アサーションが、対応漏れのまま2つ目の
+ * 論理Marketが追加された場合に検知する。
+ */
+export const ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES: Record<string, string> = {
+  [SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
+  [SENGOKU_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
+};
+
+const distinctEntitlementLogicalMarkets = new Set(
+  Object.values(ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES),
+);
+if (distinctEntitlementLogicalMarkets.size !== 1) {
+  throw new Error(
+    "ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES now maps to more than one logical market. " +
+      "This requires the entitlement_id source_system_key composite-uniqueness migration " +
+      "(see PR-W3-a known issue) to ship first. Do not add a second market here without it.",
+  );
+}
+
+export const NFT_MARKET_SOURCE_SYSTEM_KEYS = new Set(
+  Object.keys(ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES),
+);
+
+/** PR-W3-a: entitlement.revoked/tombstoneのreason_codeとして表示マッピングを持つ既知語彙。
+ * 未知の値でも受理し取消処理は継続するが、監査ログへ別途記録する
+ * (`RevokeCollectibleUseCase`参照)。 */
+export const KNOWN_COLLECTIBLE_REVOKE_REASON_CODES = new Set(["full_refund"]);
+
 export const DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE = "digital_collectible";
 
 /**

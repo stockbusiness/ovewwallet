@@ -25,7 +25,9 @@ test.describe("admin-wallet: 管理者MFAのセットアップ→ログイン", 
     await page.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 
     await page.goto(`${ADMIN_URL}/security`);
-    await expect(page.getByText("無効")).toBeVisible();
+    // 「重要: MFAを有効化した後...この画面から自分で無効化することはできません」という説明文にも
+    // 「無効」を含む「無効化」が現れるため、ステータスバッジのみを厳密一致で見る必要がある。
+    await expect(page.getByText("無効", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "MFAを設定する" }).click();
 
     const secret = await page.locator("p.font-bold.font-mono").textContent();

@@ -7,10 +7,10 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import type { RawBodyRequest } from "@nestjs/common";
-import type { Request } from "express";
 import { CommonEventAuthenticator } from "@ove/auth";
-import { KV_STORE } from "../common/kv-store.module";
 import type { KeyValueStore } from "@ove/auth";
+import type { Request } from "express";
+import { KV_STORE } from "../common/kv-store.module";
 import { CommonEventSigningKeysService } from "./common-event-signing-keys.service";
 
 export interface AuthenticatedCommonEventRequest extends Request {
@@ -48,7 +48,9 @@ export class CommonEventAuthGuard implements CanActivate {
     const signature = req.header("x-sennokuni-signature");
 
     if (!keyId || !timestamp || !nonce || !signature) {
-      throw new UnauthorizedException("missing X-SenNoKuni-* authentication headers");
+      throw new UnauthorizedException(
+        "missing X-SenNoKuni-* authentication headers",
+      );
     }
 
     const credentials = await this.signingKeys.resolveActiveSecret(keyId);
@@ -59,7 +61,9 @@ export class CommonEventAuthGuard implements CanActivate {
     if (!req.rawBody) {
       // `rawBody: true`が起動オプションに渡っていない場合にここへ到達する。実装ミスであり
       // 送信元の責任ではないため、認証失敗ではなく明確なサーバーエラーとして扱う。
-      throw new InternalServerErrorException("raw body capture is not enabled (NestFactory.create rawBody option)");
+      throw new InternalServerErrorException(
+        "raw body capture is not enabled (NestFactory.create rawBody option)",
+      );
     }
     const rawBody = req.rawBody.toString("utf8");
 
@@ -80,7 +84,8 @@ export class CommonEventAuthGuard implements CanActivate {
 
     const authenticatedReq = req as unknown as AuthenticatedCommonEventRequest;
     authenticatedReq.commonEventSourceSystemKey = credentials.sourceSystemKey;
-    authenticatedReq.commonEventAllowedEventTypes = credentials.allowedEventTypes;
+    authenticatedReq.commonEventAllowedEventTypes =
+      credentials.allowedEventTypes;
     return true;
   }
 }
