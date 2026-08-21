@@ -1073,7 +1073,20 @@ model CollectibleHolding {
   acquiredAt         DateTime                 @map("acquired_at")
   status             CollectibleHoldingStatus @default(ACTIVE)
   revokedAt          DateTime?                @map("revoked_at")
+  /// 外部システム(Market)からの自由記述。監査・調査目的でのみ保持し、通常の管理画面/
+  /// ユーザー画面へは表示しない (PR-W3-a: `revokeReasonCode`のマッピング済み文言を表示する)。
   revokeReason       String?                  @map("revoke_reason")
+  /// PR-W3-a: 構造化された取消理由コード (例: "full_refund")。表示はこの値をキーに
+  /// 固定文言表へマッピングする。未知の値でも取消処理自体は継続する。
+  revokeReasonCode         String?   @map("revoke_reason_code")
+  /// PR-W3-a: 取消を行った認証済みsource_system_key。付与時のsourceSystemKeyと通常は一致するが
+  /// (自動取消はsource一致を要求する)、管理画面からの手動取消等と区別できるよう独立して保持する。
+  revokedBySourceSystemKey String?   @map("revoked_by_source_system_key")
+  /// PR-W3-a: 取消の起点になったevent_id。再送で値が変わらないことをテストで確認する。
+  revokedByEventId         String?   @map("revoked_by_event_id")
+  revokedCorrelationId     String?   @map("revoked_correlation_id")
+  /// PR-W3-a: Market側event本文のoccurred_at (Wallet側処理時刻のrevokedAtとは別軸)。
+  revokedOccurredAt        DateTime? @map("revoked_occurred_at")
   /// 購入時スナップショット (指示書9章「Asset更新方針」推奨: CollectibleAssetが
   /// マスター、こちらは取得時点の名称・画像URL等を保持する)。P1-3で専用列を追加した後も
   /// 破壊的変更禁止のため残す (専用列導入以前に作られた行の非公式スナップショットとして
@@ -1150,6 +1163,11 @@ model CollectibleEntitlementTombstone {
   sourceSystemKey String   @map("source_system_key")
   eventId         String   @map("event_id")
   reason          String
+  /// PR-W3-a: 構造化された取消理由コード。CollectibleHolding.revokeReasonCodeと同じ意味。
+  reasonCode      String?  @map("reason_code")
+  correlationId   String?  @map("correlation_id")
+  /// PR-W3-a: Market側event本文のoccurred_at (既存revokedAtはTombstone作成時刻)。
+  occurredAt      DateTime? @map("occurred_at")
   revokedAt       DateTime @map("revoked_at")
   createdAt       DateTime @default(now()) @map("created_at")
 

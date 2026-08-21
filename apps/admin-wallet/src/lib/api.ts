@@ -440,7 +440,13 @@ export interface CollectibleHoldingItem {
   acquiredAt: string;
   status: CollectibleHoldingStatus;
   revokedAt: string | null;
-  revokeReason: string | null;
+  // PR-W3-a: 外部システムからの自由記述(revokeReason)は通常のAPIから返らない。
+  // revokeReasonCodeを固定文言表(collectible-revoke-reason.ts)へマッピングして表示する。
+  revokeReasonCode: string | null;
+  revokedBySourceSystemKey: string | null;
+  revokedByEventId: string | null;
+  revokedCorrelationId: string | null;
+  revokedOccurredAt: string | null;
   network: string | null;
   chainId: string | null;
   contractAddress: string | null;

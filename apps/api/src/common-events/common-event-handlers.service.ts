@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, type OnModuleInit } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+} from "@nestjs/common";
 import type { CommonEventBody } from "@ove/shared-types";
 import { CommonEventHandlerRegistry } from "./common-event-handler-registry";
 import { CommonUserMergedHandler } from "./handlers/common-user-merged.handler";
@@ -21,6 +26,8 @@ import { RewardReversedHandler } from "./handlers/reward-reversed.handler";
  */
 @Injectable()
 export class CommonEventHandlersService implements OnModuleInit {
+  private readonly logger = new Logger(CommonEventHandlersService.name);
+
   constructor(
     private readonly registry: CommonEventHandlerRegistry,
     private readonly commonUserResolved: CommonUserResolvedHandler,
@@ -45,10 +52,23 @@ export class CommonEventHandlersService implements OnModuleInit {
     this.registry.register(this.entitlementRevoked);
   }
 
-  async dispatch(eventType: string, body: CommonEventBody, authenticatedSourceSystemKey: string): Promise<unknown> {
+  async dispatch(
+    eventType: string,
+    body: CommonEventBody,
+    authenticatedSourceSystemKey: string,
+    requestId?: string,
+  ): Promise<unknown> {
     const handler = this.registry.resolve(eventType);
     if (!handler) {
-      return { note: `no handler registered for event_type "${eventType}"; recorded only` };
+      // PR-W3-a: ack-onlyで受理したことを、payload本文・PIIを含めずに記録する
+      // (source_system_key/event_type/event_version/event_id/request_idのみ)。
+      this.logger.log(
+        `ack-only: source_system_key=${authenticatedSourceSystemKey} event_type=${eventType} ` +
+          `event_version=${body.event_version} event_id=${body.event_id} request_id=${requestId ?? "-"}`,
+      );
+      return {
+        note: `no handler registered for event_type "${eventType}"; recorded only`,
+      };
     }
 
     // リファクタリング指示書 Phase 5: Phase 4で導入したevent_type別`schema`を実際の
@@ -56,10 +76,17 @@ export class CommonEventHandlersService implements OnModuleInit {
     // 通過した後の、ハンドラごとのより厳密な型チェックとして機能する。
     const parseResult = handler.schema.safeParse(body);
     if (!parseResult.success) {
-      const issues = parseResult.error.errors.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
-      throw new BadRequestException(`event_type "${eventType}" payload failed schema validation: ${issues}`);
+      const issues = parseResult.error.errors
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; ");
+      throw new BadRequestException(
+        `event_type "${eventType}" payload failed schema validation: ${issues}`,
+      );
     }
 
-    return handler.handle({ eventId: body.event_id, eventType, authenticatedSourceSystemKey }, parseResult.data);
+    return handler.handle(
+      { eventId: body.event_id, eventType, authenticatedSourceSystemKey },
+      parseResult.data,
+    );
   }
 }

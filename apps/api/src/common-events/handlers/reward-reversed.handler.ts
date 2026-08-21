@@ -1,10 +1,17 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { RewardReversedEventSchema, type CommonEventBody } from "@ove/shared-types";
+import {
+  RewardReversedEventSchema,
+  type CommonEventBody,
+} from "@ove/shared-types";
 import { isFeatureEnabled } from "../../common/feature-flags";
-import { serializeTransaction } from "../../wallets/wallets.service";
 import { ReverseRewardUseCase } from "../../rewards/reverse-reward.use-case";
+import { serializeTransaction } from "../../wallets/wallets.service";
 import { getReversalOrchestratorSystemKeys } from "../common-event-handler-support";
-import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
+import type {
+  AuthenticatedEventContext,
+  CommonEventHandler,
+  CommonEventResult,
+} from "../common-event-handler.interface";
 
 /**
  * reward.reversed。対応する原取引は`sourceReferenceId`に正式フィールド
@@ -26,20 +33,31 @@ export class RewardReversedHandler implements CommonEventHandler {
 
   constructor(private readonly reverseReward: ReverseRewardUseCase) {}
 
-  async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
+  async handle(
+    context: AuthenticatedEventContext,
+    body: CommonEventBody,
+  ): Promise<CommonEventResult> {
     if (!isFeatureEnabled("ENABLE_EXTERNAL_REWARD_TYPES")) {
-      return { action: "skipped", reason: "ENABLE_EXTERNAL_REWARD_TYPES is disabled" };
+      return {
+        action: "skipped",
+        reason: "ENABLE_EXTERNAL_REWARD_TYPES is disabled",
+      };
     }
 
     // 正式フィールドを優先し、未指定の送信元向けにmetadataを後方互換fallbackとして扱う。
-    const metadata = (body.metadata as Record<string, unknown> | null | undefined) ?? {};
+    const metadata =
+      (body.metadata as Record<string, unknown> | null | undefined) ?? {};
     const originalReference =
       body.original_event_id ??
-      (typeof metadata["original_event_id"] === "string" ? (metadata["original_event_id"] as string) : undefined) ??
+      (typeof metadata["original_event_id"] === "string"
+        ? (metadata["original_event_id"] as string)
+        : undefined) ??
       body.entitlement_id ??
       body.order_id;
     if (!originalReference) {
-      throw new BadRequestException("original_event_id, entitlement_id, or order_id is required");
+      throw new BadRequestException(
+        "original_event_id, entitlement_id, or order_id is required",
+      );
     }
 
     const reversal = await this.reverseReward.execute({
@@ -51,7 +69,9 @@ export class RewardReversedHandler implements CommonEventHandler {
       createdById: context.authenticatedSourceSystemKey,
       isAuthorized: (original) =>
         original.sourceService === context.authenticatedSourceSystemKey ||
-        getReversalOrchestratorSystemKeys().has(context.authenticatedSourceSystemKey),
+        getReversalOrchestratorSystemKeys().has(
+          context.authenticatedSourceSystemKey,
+        ),
       unauthorizedMessage: (original) =>
         `source_system_key "${context.authenticatedSourceSystemKey}" is not allowed to reverse a grant originally issued by "${original.sourceService}"`,
     });

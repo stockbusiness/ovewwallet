@@ -1,5 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { CollectibleHoldingsRepository, type CollectibleHoldingWithAsset } from "./collectible-holdings.repository";
+import {
+  CollectibleHoldingsRepository,
+  type CollectibleHoldingWithAsset,
+} from "./collectible-holdings.repository";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -23,8 +26,14 @@ export interface ListMyCollectiblesParams {
 export class CollectiblesQueryService {
   constructor(private readonly holdings: CollectibleHoldingsRepository) {}
 
-  async listMyCollectibles(oveAccountId: string, params: ListMyCollectiblesParams) {
-    const limit = Math.min(Math.max(params.limit ?? DEFAULT_LIMIT, 1), MAX_LIMIT);
+  async listMyCollectibles(
+    oveAccountId: string,
+    params: ListMyCollectiblesParams,
+  ) {
+    const limit = Math.min(
+      Math.max(params.limit ?? DEFAULT_LIMIT, 1),
+      MAX_LIMIT,
+    );
     const rows = await this.holdings.listForAccount({
       oveAccountId,
       includeRevoked: params.includeRevoked,
@@ -39,7 +48,10 @@ export class CollectiblesQueryService {
 
   /** 他人のHoldingは (存在有無を問わず) 404にする。 */
   async getMyCollectibleDetail(oveAccountId: string, holdingId: string) {
-    const holding = await this.holdings.findByIdForAccountWithAsset(holdingId, oveAccountId);
+    const holding = await this.holdings.findByIdForAccountWithAsset(
+      holdingId,
+      oveAccountId,
+    );
     if (!holding) throw new NotFoundException("collectible holding not found");
     return this.toDto(holding);
   }
@@ -51,13 +63,17 @@ export class CollectiblesQueryService {
       serial_number: holding.serialNumber,
       acquired_at: holding.acquiredAt,
       revoked_at: holding.revokedAt,
-      revoke_reason: holding.revokeReason,
+      // PR-W3-a: 外部システム(Market)からの自由記述(revokeReason)はユーザー画面へ直接
+      // 表示しない。フロントエンドはrevoke_reason_codeを固定文言表(collectible-revoke-reason.ts)
+      // へマッピングして表示する(未知コードは汎用文言へフォールバック)。
+      revoke_reason_code: holding.revokeReasonCode,
       asset: {
         asset_code: holding.asset.assetCode,
         name: holding.displayNameSnapshot ?? holding.asset.name,
         description: holding.descriptionSnapshot ?? holding.asset.description,
         image_url: holding.imageUrlSnapshot ?? holding.asset.imageUrl,
-        thumbnail_url: holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl,
+        thumbnail_url:
+          holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl,
         rarity: holding.raritySnapshot ?? holding.asset.rarity,
         category: holding.asset.category,
         edition_size: holding.asset.editionSize,

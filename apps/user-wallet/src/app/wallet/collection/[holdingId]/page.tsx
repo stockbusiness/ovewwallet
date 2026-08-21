@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CollectibleCardImage } from "@/components/CollectibleCardImage";
 import { apiFetch, ApiError, type CollectibleHoldingSummary } from "@/lib/api";
+import { resolveRevokeReasonDisplay } from "@/lib/collectible-revoke-reason";
 import { collectibleStatusLabel } from "@/lib/collectible-status";
 
 export default function CollectionDetailPage() {
@@ -17,7 +18,9 @@ export default function CollectionDetailPage() {
   useEffect(() => {
     (async () => {
       try {
-        const detail = await apiFetch<CollectibleHoldingSummary>(`/api/v1/me/collectibles/${params.holdingId}`);
+        const detail = await apiFetch<CollectibleHoldingSummary>(
+          `/api/v1/me/collectibles/${params.holdingId}`,
+        );
         setItem(detail);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -56,6 +59,9 @@ export default function CollectionDetailPage() {
   }
 
   const label = collectibleStatusLabel(item.status);
+  const revokeReasonDisplay = resolveRevokeReasonDisplay(
+    item.revoke_reason_code,
+  );
 
   return (
     <main className="flex flex-col gap-6 px-4 pb-10 pt-6">
@@ -63,13 +69,19 @@ export default function CollectionDetailPage() {
 
       <section className="overflow-hidden rounded-2xl border border-sengoku-border bg-sengoku-navy">
         <div className="relative aspect-square w-full">
-          <CollectibleCardImage src={item.asset.image_url} alt={item.asset.name} sizes="(max-width: 640px) 100vw, 480px" />
+          <CollectibleCardImage
+            src={item.asset.image_url}
+            alt={item.asset.name}
+            sizes="(max-width: 640px) 100vw, 480px"
+          />
         </div>
       </section>
 
       <section className="flex flex-col gap-1">
         <p className="text-lg font-bold text-sengoku-text">{item.asset.name}</p>
-        {item.serial_number && <p className="text-xs text-sengoku-muted">#{item.serial_number}</p>}
+        {item.serial_number && (
+          <p className="text-xs text-sengoku-muted">#{item.serial_number}</p>
+        )}
         {item.asset.rarity && (
           <span className="mt-1 inline-block w-fit rounded-full bg-sengoku-gold/15 px-3 py-1 text-xs font-semibold text-sengoku-gold">
             {item.asset.rarity}
@@ -79,20 +91,43 @@ export default function CollectionDetailPage() {
 
       {item.asset.description && (
         <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
-          <p className="text-sm leading-relaxed text-sengoku-text">{item.asset.description}</p>
+          <p className="text-sm leading-relaxed text-sengoku-text">
+            {item.asset.description}
+          </p>
         </section>
       )}
 
       <section className="divide-y divide-sengoku-border overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
         <DetailRow label="ステータス" value={label.primary} />
-        {label.secondary && <DetailRow label="Mint状態" value={label.secondary} />}
-        <DetailRow label="取得日" value={new Date(item.acquired_at).toLocaleString("ja-JP")} />
-        {item.asset.category && <DetailRow label="カテゴリ" value={item.asset.category} />}
-        {item.asset.edition_size != null && <DetailRow label="発行数" value={`${item.asset.edition_size}枚`} />}
-        {item.status === "REVOKED" && item.revoked_at && (
-          <DetailRow label="取消日" value={new Date(item.revoked_at).toLocaleString("ja-JP")} />
+        {label.secondary && (
+          <DetailRow label="Mint状態" value={label.secondary} />
         )}
-        {item.status === "REVOKED" && item.revoke_reason && <DetailRow label="取消理由" value={item.revoke_reason} wrap />}
+        <DetailRow
+          label="取得日"
+          value={new Date(item.acquired_at).toLocaleString("ja-JP")}
+        />
+        {item.asset.category && (
+          <DetailRow label="カテゴリ" value={item.asset.category} />
+        )}
+        {item.asset.edition_size != null && (
+          <DetailRow label="発行数" value={`${item.asset.edition_size}枚`} />
+        )}
+        {item.status === "REVOKED" && item.revoked_at && (
+          <DetailRow
+            label="取消日"
+            value={new Date(item.revoked_at).toLocaleString("ja-JP")}
+          />
+        )}
+        {item.status === "REVOKED" && revokeReasonDisplay && (
+          <DetailRow
+            label="取消理由"
+            value={revokeReasonDisplay.primary}
+            wrap
+          />
+        )}
+        {item.status === "REVOKED" && revokeReasonDisplay && (
+          <DetailRow label="" value={revokeReasonDisplay.description} wrap />
+        )}
       </section>
     </main>
   );
@@ -101,19 +136,38 @@ export default function CollectionDetailPage() {
 function BackHeader() {
   return (
     <header className="flex items-center gap-3">
-      <Link href="/wallet/collection" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
+      <Link
+        href="/wallet/collection"
+        className="flex h-8 w-8 items-center justify-center text-sengoku-muted"
+      >
         <ArrowLeftIcon className="h-5 w-5" />
       </Link>
-      <h1 className="font-heading text-lg font-bold text-sengoku-text">カード詳細</h1>
+      <h1 className="font-heading text-lg font-bold text-sengoku-text">
+        カード詳細
+      </h1>
     </header>
   );
 }
 
-function DetailRow({ label, value, wrap }: { label: string; value: string; wrap?: boolean }) {
+function DetailRow({
+  label,
+  value,
+  wrap,
+}: {
+  label: string;
+  value: string;
+  wrap?: boolean;
+}) {
   return (
     <div className="flex items-start justify-between gap-4 px-4 py-3">
-      <span className="shrink-0 pt-0.5 text-xs text-sengoku-muted">{label}</span>
-      <span className={`text-right text-sm font-semibold text-sengoku-text ${wrap ? "leading-relaxed" : ""}`}>{value}</span>
+      <span className="shrink-0 pt-0.5 text-xs text-sengoku-muted">
+        {label}
+      </span>
+      <span
+        className={`text-right text-sm font-semibold text-sengoku-text ${wrap ? "leading-relaxed" : ""}`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,5 +1,9 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { CollectibleEntitlementTombstone, Prisma, PrismaClient } from "@ove/database";
+import type {
+  CollectibleEntitlementTombstone,
+  Prisma,
+  PrismaClient,
+} from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -10,6 +14,9 @@ export interface CreateTombstoneParams {
   sourceSystemKey: string;
   eventId: string;
   reason: string;
+  reasonCode?: string | null;
+  correlationId?: string | null;
+  occurredAt?: Date | null;
   revokedAt: Date;
 }
 
@@ -21,11 +28,19 @@ export interface CreateTombstoneParams {
 export class CollectibleEntitlementTombstonesRepository {
   constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 
-  async findByEntitlementId(entitlementId: string, client: Db = this.db): Promise<CollectibleEntitlementTombstone | null> {
-    return client.collectibleEntitlementTombstone.findUnique({ where: { entitlementId } });
+  async findByEntitlementId(
+    entitlementId: string,
+    client: Db = this.db,
+  ): Promise<CollectibleEntitlementTombstone | null> {
+    return client.collectibleEntitlementTombstone.findUnique({
+      where: { entitlementId },
+    });
   }
 
-  async create(params: CreateTombstoneParams, client: Db = this.db): Promise<CollectibleEntitlementTombstone> {
+  async create(
+    params: CreateTombstoneParams,
+    client: Db = this.db,
+  ): Promise<CollectibleEntitlementTombstone> {
     return client.collectibleEntitlementTombstone.create({
       data: {
         id: params.id,
@@ -33,6 +48,9 @@ export class CollectibleEntitlementTombstonesRepository {
         sourceSystemKey: params.sourceSystemKey,
         eventId: params.eventId,
         reason: params.reason,
+        reasonCode: params.reasonCode ?? null,
+        correlationId: params.correlationId ?? null,
+        occurredAt: params.occurredAt ?? null,
         revokedAt: params.revokedAt,
       },
     });

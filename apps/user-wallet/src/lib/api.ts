@@ -17,7 +17,10 @@ export class ApiError extends Error {
  * (SameSite=None)を制限する問題を避けるため(2026-07-18、詳細はnext.config.mjs参照)。
  * OVE独自セッションCookieは `credentials: "include"` で送受信する。
  */
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
   const res = await fetch(path, {
     ...options,
     credentials: "include",
@@ -28,7 +31,11 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const body = isJson ? await res.json() : undefined;
 
   if (!res.ok) {
-    throw new ApiError(res.status, body?.message ?? res.statusText, typeof body?.error === "string" ? body.error : undefined);
+    throw new ApiError(
+      res.status,
+      body?.message ?? res.statusText,
+      typeof body?.error === "string" ? body.error : undefined,
+    );
   }
   return body as T;
 }
@@ -184,7 +191,9 @@ export interface CollectibleHoldingSummary {
   serial_number: string | null;
   acquired_at: string;
   revoked_at: string | null;
-  revoke_reason: string | null;
+  // PR-W3-a: 外部システムからの自由記述は通常のAPIから返らない。
+  // revoke_reason_codeを固定文言表(collectible-revoke-reason.ts)へマッピングして表示する。
+  revoke_reason_code: string | null;
   asset: CollectibleAssetSummary;
   onchain: CollectibleOnchainInfo;
 }

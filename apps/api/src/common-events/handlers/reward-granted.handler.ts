@@ -1,11 +1,22 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { RewardGrantedEventSchema, type CommonEventBody } from "@ove/shared-types";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  RewardGrantedEventSchema,
+  type CommonEventBody,
+} from "@ove/shared-types";
 import { isFeatureEnabled } from "../../common/feature-flags";
-import { serializeTransaction } from "../../wallets/wallets.service";
 import { GrantRewardUseCase } from "../../rewards/grant-reward.use-case";
+import { serializeTransaction } from "../../wallets/wallets.service";
 import { CommonEventAccountResolver } from "../common-event-account-resolver";
 import { buildAgencyMetadata } from "../common-event-handler-support";
-import type { AuthenticatedEventContext, CommonEventHandler, CommonEventResult } from "../common-event-handler.interface";
+import type {
+  AuthenticatedEventContext,
+  CommonEventHandler,
+  CommonEventResult,
+} from "../common-event-handler.interface";
 
 /**
  * reward.granted。リファクタリング指示書 Phase 5により正式フィールド`amount`
@@ -27,11 +38,18 @@ export class RewardGrantedHandler implements CommonEventHandler {
     private readonly grantReward: GrantRewardUseCase,
   ) {}
 
-  async handle(context: AuthenticatedEventContext, body: CommonEventBody): Promise<CommonEventResult> {
+  async handle(
+    context: AuthenticatedEventContext,
+    body: CommonEventBody,
+  ): Promise<CommonEventResult> {
     if (!isFeatureEnabled("ENABLE_EXTERNAL_REWARD_TYPES")) {
-      return { action: "skipped", reason: "ENABLE_EXTERNAL_REWARD_TYPES is disabled" };
+      return {
+        action: "skipped",
+        reason: "ENABLE_EXTERNAL_REWARD_TYPES is disabled",
+      };
     }
-    if (!body.common_user_id) throw new BadRequestException("common_user_id is required");
+    if (!body.common_user_id)
+      throw new BadRequestException("common_user_id is required");
 
     const resolved = await this.accountResolver.resolveByCommonUserId(
       body.common_user_id,
@@ -39,7 +57,9 @@ export class RewardGrantedHandler implements CommonEventHandler {
       context.authenticatedSourceSystemKey,
     );
     if (resolved.status === "not_found") {
-      throw new NotFoundException(`no OVE account linked to common_user_id "${body.common_user_id}"`);
+      throw new NotFoundException(
+        `no OVE account linked to common_user_id "${body.common_user_id}"`,
+      );
     }
     if (resolved.status === "conflict") {
       // 複数アカウントに紐づく状態でOVEを動かすと誤付与になりうるため、確実に拒否する。
@@ -50,11 +70,19 @@ export class RewardGrantedHandler implements CommonEventHandler {
     const account = resolved.account;
 
     // 正式フィールドを優先し、未指定の送信元向けにmetadataを後方互換fallbackとして扱う。
-    const metadata = (body.metadata as Record<string, unknown> | null | undefined) ?? {};
+    const metadata =
+      (body.metadata as Record<string, unknown> | null | undefined) ?? {};
     const rawAmount = body.amount ?? metadata["amount"];
-    const numericAmount = typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
-    if (!Number.isInteger(numericAmount) || numericAmount <= 0 || !Number.isSafeInteger(numericAmount)) {
-      throw new BadRequestException("amount must be a positive integer (decimals/zero/negative are rejected)");
+    const numericAmount =
+      typeof rawAmount === "number" ? rawAmount : Number(rawAmount);
+    if (
+      !Number.isInteger(numericAmount) ||
+      numericAmount <= 0 ||
+      !Number.isSafeInteger(numericAmount)
+    ) {
+      throw new BadRequestException(
+        "amount must be a positive integer (decimals/zero/negative are rejected)",
+      );
     }
     const amount = BigInt(numericAmount);
 

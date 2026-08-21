@@ -1,8 +1,11 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
-import type { CommonEventBody } from "@ove/shared-types";
+import {
+  NFT_MARKET_WALLET_TARGET_SITE_KEY,
+  type CommonEventBody,
+} from "@ove/shared-types";
 
-/** 千ノ国NFTマーケット契約v2指示書19章。このWallet自身のsite_key。 */
-export const NFT_MARKET_WALLET_TARGET_SITE_KEY = "ovew-wallet";
+/** PR-W3-a: 1.1の必須項目検証(packages/shared-types)と同じ値を参照するよう共通化した。 */
+export { NFT_MARKET_WALLET_TARGET_SITE_KEY };
 
 const NFT_MARKET_ENTITLEMENT_TYPE_ALIASES: Record<string, string> = {
   DIGITAL_COLLECTIBLE: "digital_collectible",
@@ -10,9 +13,17 @@ const NFT_MARKET_ENTITLEMENT_TYPE_ALIASES: Record<string, string> = {
 };
 
 /** 指示書17章「対象」5フィールド。 */
-type NormalizedEnvelopeField = "entitlement_id" | "order_id" | "order_item_id" | "product_code" | "common_user_id";
+type NormalizedEnvelopeField =
+  | "entitlement_id"
+  | "order_id"
+  | "order_item_id"
+  | "product_code"
+  | "common_user_id";
 
-export type NormalizedEntitlementEnvelope = Record<NormalizedEnvelopeField, string | null | undefined>;
+export type NormalizedEntitlementEnvelope = Record<
+  NormalizedEnvelopeField,
+  string | null | undefined
+>;
 
 /**
  * 千ノ国NFTマーケット契約v2指示書17章。1フィールド分の`data.field`とlegacy
@@ -44,8 +55,11 @@ function normalizeField(
  * undefinedとなりlegacy(トップレベル)へ自然にフォールバックするため、
  * 特別扱いは不要 (指示書17章の注記どおり)。
  */
-export function normalizeEntitlementEnvelope(body: CommonEventBody): NormalizedEntitlementEnvelope {
-  const data = (body.data as Record<string, unknown> | null | undefined) ?? undefined;
+export function normalizeEntitlementEnvelope(
+  body: CommonEventBody,
+): NormalizedEntitlementEnvelope {
+  const data =
+    (body.data as Record<string, unknown> | null | undefined) ?? undefined;
   return {
     entitlement_id: normalizeField(data, body.entitlement_id, "entitlement_id"),
     order_id: normalizeField(data, body.order_id, "order_id"),
@@ -77,4 +91,23 @@ export function assertTargetSiteKeyMatchesWallet(body: CommonEventBody): void {
       `target_site_key "${targetSiteKey}" does not match this wallet ("${NFT_MARKET_WALLET_TARGET_SITE_KEY}")`,
     );
   }
+}
+
+/**
+ * PR-W3-a: `occurred_at`をDateへ変換する。無効な値はInvalid Dateや現在時刻へ暗黙に
+ * フォールバックせず、400として明示的に拒否する
+ * (`entitlement-granted.handler.ts`の`new Date(body.occurred_at)`直書きに同じ問題があったため
+ * ここで共通化し、grant/revoke両方から使う)。
+ */
+export function parseRequiredOccurredAt(
+  rawValue: string,
+  eventTypeLabel: string,
+): Date {
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(
+      `${eventTypeLabel}: occurred_at ("${rawValue}") is not a valid date`,
+    );
+  }
+  return parsed;
 }

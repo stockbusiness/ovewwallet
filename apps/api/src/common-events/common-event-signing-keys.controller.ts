@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
-import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { CommonEventSigningKeysService } from "./common-event-signing-keys.service";
 
 const CreateKeySchema = z.object({
@@ -33,7 +33,10 @@ export class CommonEventSigningKeysController {
 
   @Post()
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
-  async create(@Body(new ZodValidationPipe(CreateKeySchema)) body: z.infer<typeof CreateKeySchema>) {
+  async create(
+    @Body(new ZodValidationPipe(CreateKeySchema))
+    body: z.infer<typeof CreateKeySchema>,
+  ) {
     return this.signingKeys.create(body);
   }
 
