@@ -1,9 +1,9 @@
 import "reflect-metadata";
 import type { INestApplication } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import {
@@ -87,7 +87,9 @@ describe("POST /api/integrations/events (次期改修指示書P0-1/P0-3/P0-4/P0-
 
       await request(app.getHttpServer()).post(ENDPOINT).set(headers).send(body).expect(201);
 
-      const row = await prisma.inboundEvent.findUniqueOrThrow({ where: { eventId: body.event_id } });
+      const row = await prisma.inboundEvent.findFirstOrThrow({
+        where: { sourceSystemKey: "agency-system", eventId: body.event_id },
+      });
       expect(row.sourceSystemKey).toBe("agency-system");
     });
   });
