@@ -31,11 +31,19 @@ export class InboundEventBusyError extends ConflictException {
 }
 
 /**
- * PR-W3-a-1〜a-2移行期限定。`InboundEvent.eventId`は現状まだ単独UNIQUE制約のため、
- * 異なるsource_system_keyが同一event_id値を送った場合にDB側でP2002が起こる。
- * 本来は別イベントとして扱われるべきだが旧制約下では区別できないため、
- * 500(未捕捉例外)ではなく409として返す。PR-W3-a-2で複合UNIQUE化されればこの
- * 経路自体が発生しなくなる (異なるsource_system_keyは衝突しなくなるため)。
+ * compatibility guard (PR-W3-a-2レビュー指摘c、削除しない)。`InboundEvent.eventId`が
+ * 単独UNIQUE制約だった期間 (PR-W3-a-1〜a-2移行期) の名残り。異なるsource_system_keyが
+ * 同一event_id値を送った場合にDB側でP2002が起こり得た。本来は別イベントとして
+ * 扱われるべきだが旧制約下では区別できなかったため、500(未捕捉例外)ではなく
+ * 409として返していた。
+ *
+ * PR-W3-a-2で`source_system_key + event_id`の複合UNIQUEへ切り替えた後は、異なる
+ * source_system_key同士は衝突しなくなるため、このエラーの発生経路は通常到達しない。
+ * それでも削除しない理由:
+ *   - ローリングデプロイ中、新旧コンテナが混在する短い期間の互換性を保つため
+ *   - 万一DB側の制約が単独UNIQUEへロールバックされた場合の防御になるため
+ * 本番でこの経路が実際に到達しなくなったことを確認した後、別PRで削除を検討する
+ * (このPRのスコープではない)。
  */
 export class InboundEventCrossSourceConflictError extends ConflictException {
   constructor(eventId: string) {

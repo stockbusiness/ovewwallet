@@ -4,6 +4,8 @@ import { NestFactory } from "@nestjs/core";
 import { prisma, generateId } from "@ove/database";
 import cookieParser from "cookie-parser";
 import request from "supertest";
+import grantedFixture from "../../../../docs/contracts/fixtures/digital-collectible-granted.v1.json";
+import revokedFixture from "../../../../docs/contracts/fixtures/digital-collectible-revoked.v1.json";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import {
@@ -11,8 +13,6 @@ import {
   commonEventSignedHeaders,
   type TestCommonEventSigningKey,
 } from "./test-helpers";
-import grantedFixture from "../../../../docs/contracts/fixtures/digital-collectible-granted.v1.json";
-import revokedFixture from "../../../../docs/contracts/fixtures/digital-collectible-revoked.v1.json";
 
 const ENDPOINT = "/api/integrations/events";
 const SENGOKU_MARKET = "sengoku-market";
@@ -314,7 +314,9 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const count = await prisma.collectibleHolding.count({ where: { entitlementId: body.entitlement_id } });
       expect(count).toBe(0);
       // Inbound Event行自体を作らないため、Flag OFF中はevent_idがキャッシュされない。
-      const inboundEvent = await prisma.inboundEvent.findUnique({ where: { eventId: body.event_id } });
+      const inboundEvent = await prisma.inboundEvent.findFirst({
+        where: { sourceSystemKey: SENGOKU_MARKET, eventId: body.event_id },
+      });
       expect(inboundEvent).toBeNull();
 
       // Flag ONに戻せば同じevent_idを再送でき、正常に処理される (取りこぼしがない)。
