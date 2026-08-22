@@ -122,6 +122,11 @@ enum TransactionType {
   /// `POST /api/v1/rewards/grant` (X-OVE-*認証・ServiceIntegration経由) とは
   /// 受信経路が異なるため区別する。
   COMMON_EVENT_REWARD
+  /// 千ノ国パスポート「はじまりの旅」学習ミッション専用の特典付与。
+  /// reward_rules.rule_code = "SENGOKU_LEARNING_JOURNEY_REWARD" と対応させる
+  /// (apps/api/src/rewards/rewards.service.ts の RULE_CODE_BY_TRANSACTION_TYPE)。
+  /// 他のイベント報酬 (EVENT_REWARD等) と区別するために新設。
+  LEARNING_JOURNEY_REWARD
   EVENT_REWARD
   CAMPAIGN_REWARD
   REFERRAL_REWARD
