@@ -12,6 +12,7 @@
     "migrate:test": "dotenv -e ../../.env.test -- prisma migrate deploy",
     "seed": "tsx src/seed.ts",
     "rotate-encryption-key": "tsx src/rotate-encryption-key.ts",
+    "issue-service-integration": "tsx src/issue-service-integration.ts",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
