@@ -79,7 +79,10 @@ describe("HMAC契約テストfixture (docs/fixtures/hmac-auth-contract-fixtures.
   it("case6: 空bodyの署名対象文字列は '{}' である(''ではない)", () => {
     const c = fixtures.cases.case6_empty_body;
     expect(c.canonicalBodyString).toBe("{}");
-    expect(JSON.stringify(undefined ?? {})).toBe("{}");
+    // サーバー側実装(req.body ?? {})を模した式。bodyが無い(undefined)場合でも
+    // JSON.stringifyの結果は"{}"になる(""にはならない)ことを確認する。
+    const missingBody: Record<string, never> | undefined = undefined;
+    expect(JSON.stringify(missingBody ?? {})).toBe("{}");
     expect(hmacSign(SECRET, c.signaturePayload)).toBe(c.expectedSignature);
   });
 
