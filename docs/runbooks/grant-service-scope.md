@@ -6,6 +6,17 @@
 
 - `allowed_scopes`は既定で空配列(無権限)。`POST /api/v1/service/accounts/by-common-user-id/balance`
   等、scope制御されたAPIを外部システムが使うには、この手順で個別に付与する必要がある。
+- 現在定義されているscope一覧:
+
+  | scope値                           | 対象API                                                               | 定義箇所                                                  |
+  | --------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
+  | `wallet.balance.read.common-user` | `GET /api/v1/service/accounts/by-common-user-id/balance`              | `apps/api/src/wallets/wallet-service-scopes.ts`           |
+  | `transactions.read`               | `GET /api/v1/service/transactions/by-idempotency-key/:idempotencyKey` | `apps/api/src/transactions/transaction-service-scopes.ts` |
+  | `transactions.export`             | `GET /api/v1/service/transactions/export`                             | `apps/api/src/transactions/transaction-service-scopes.ts` |
+
+  以下の手順例は`wallet.balance.read.common-user`を対象にしているが、
+  `allowed_scopes`配列にscope文字列を追加・削除する手順自体はどのscope値でも同じ。
+
 - 本番環境への付与は、この手順を実行する前に**別途Go承認**を得ること
   (千ノ国5システム改修の承認フローに従う。マイグレーション適用・機能フラグ有効化と同様、
   コード変更のマージだけでは有効化されない)。

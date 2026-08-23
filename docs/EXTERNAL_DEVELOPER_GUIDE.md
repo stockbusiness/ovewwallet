@@ -23,15 +23,15 @@ Version: 1.0
 
 ## 2. 用語
 
-| 用語 | 意味 |
-|---|---|
-| 千ノ国ウォレット / OVE Wallet | 本ドキュメントの対象システム。ポイント・OVE表示残高の台帳を管理する |
-| `service_code` | 連携先を識別するコード。`ServiceCode` enumの値のいずれか (3章参照) |
-| `service_integration` | 連携先ごとに発行されるAPIキー・署名鍵・上限額等の設定 (管理画面「外部サービス管理」) |
-| `external_user_id` | 連携先システム側でのユーザーID。ウォレット側のOVEアカウントIDとは別 |
-| `ove_account_id` | 千ノ国ウォレット内部のアカウントID。外部サービスはこのIDを直接扱わない |
-| `idempotency_key` | 同一操作の重複実行を防ぐための一意キー (**HTTPヘッダーではなくリクエストボディのフィールド**) |
-| OVE表示残高 | 当面、千ノ国ウォレット内で管理するオフチェーンの表示台帳 (6章参照)。暗号資産・価格保証を意味しない |
+| 用語                          | 意味                                                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------------------------- |
+| 千ノ国ウォレット / OVE Wallet | 本ドキュメントの対象システム。ポイント・OVE表示残高の台帳を管理する                                |
+| `service_code`                | 連携先を識別するコード。`ServiceCode` enumの値のいずれか (3章参照)                                 |
+| `service_integration`         | 連携先ごとに発行されるAPIキー・署名鍵・上限額等の設定 (管理画面「外部サービス管理」)               |
+| `external_user_id`            | 連携先システム側でのユーザーID。ウォレット側のOVEアカウントIDとは別                                |
+| `ove_account_id`              | 千ノ国ウォレット内部のアカウントID。外部サービスはこのIDを直接扱わない                             |
+| `idempotency_key`             | 同一操作の重複実行を防ぐための一意キー (**HTTPヘッダーではなくリクエストボディのフィールド**)      |
+| OVE表示残高                   | 当面、千ノ国ウォレット内で管理するオフチェーンの表示台帳 (6章参照)。暗号資産・価格保証を意味しない |
 
 ## 3. 対象システム (`service_code`)
 
@@ -130,14 +130,16 @@ Authorization: Bearer <APIキー>
 
 ## 7. エンドポイント一覧
 
-| メソッド/パス | 認証 | エラー形式 | 説明 |
-|---|---|---|---|
-| `POST /api/v1/rewards/grant` | HMAC | 新形式 (13.1章) | ポイント付与 |
-| `POST /api/v1/transactions/debit` | HMAC | 新形式 | ポイント利用(減算) |
-| `POST /api/v1/transactions/{transactionId}/reverse` | HMAC | 新形式 | 取消 |
-| `GET /api/v1/service/accounts/{externalUserId}/balance` | HMAC | **旧形式 (13.2章)** | 残高照会 |
-| `POST /api/integrations/agencies` (`AGENCY_SYSTEM`専用) | 簡易鍵 | 新形式 | 代理店同期受信 |
-| `POST /api/v1/auth/sso/agency` (`AGENCY_SYSTEM`専用) | JWT (RS256) | **旧形式** | 代理店SSOログイン |
+| メソッド/パス                                                          | 認証                               | エラー形式          | 説明                                |
+| ---------------------------------------------------------------------- | ---------------------------------- | ------------------- | ----------------------------------- |
+| `POST /api/v1/rewards/grant`                                           | HMAC                               | 新形式 (13.1章)     | ポイント付与                        |
+| `POST /api/v1/transactions/debit`                                      | HMAC                               | 新形式              | ポイント利用(減算)                  |
+| `POST /api/v1/transactions/{transactionId}/reverse`                    | HMAC                               | 新形式              | 取消                                |
+| `GET /api/v1/service/accounts/{externalUserId}/balance`                | HMAC                               | **旧形式 (13.2章)** | 残高照会                            |
+| `GET /api/v1/service/transactions/by-idempotency-key/{idempotencyKey}` | HMAC + `transactions.read` scope   | 新形式              | 取引単発照会(日次照合の障害復旧用)  |
+| `GET /api/v1/service/transactions/export`                              | HMAC + `transactions.export` scope | 新形式              | 取引CSV一括ダウンロード(日次照合用) |
+| `POST /api/integrations/agencies` (`AGENCY_SYSTEM`専用)                | 簡易鍵                             | 新形式              | 代理店同期受信                      |
+| `POST /api/v1/auth/sso/agency` (`AGENCY_SYSTEM`専用)                   | JWT (RS256)                        | **旧形式**          | 代理店SSOログイン                   |
 
 Base URL: `${API_URL}` (既定 `http://localhost:4000`)。Swagger: `/api/docs`。
 
@@ -165,17 +167,17 @@ Base URL: `${API_URL}` (既定 `http://localhost:4000`)。Swagger: `/api/docs`�
 }
 ```
 
-| フィールド | 必須 | 説明 |
-|---|---:|---|
-| `service_code` | ○ | 3章のいずれか。認証したAPIキーの`service_code`と一致している必要がある |
-| `external_user_id` | ○ | 1〜255文字 |
-| `event_type` | ○ | 1〜100文字。自由記述 |
-| `event_id` | ○ | 1〜255文字。付与ルールの`per_event_limit`判定にも使われる |
-| `amount` | ○ | 正の整数 |
-| `transaction_type` | - | 既定 `EVENT_REWARD`。`reward_rules`との紐づけに使う |
-| `display_name` | ○ | 1〜255文字。利用者の取引履歴に表示される |
-| `description` | - | 1000文字以内 |
-| `idempotency_key` | ○ | 1〜255文字。**リクエストボディのフィールド** (HTTPヘッダーではない) |
+| フィールド         | 必須 | 説明                                                                   |
+| ------------------ | ---: | ---------------------------------------------------------------------- |
+| `service_code`     |    ○ | 3章のいずれか。認証したAPIキーの`service_code`と一致している必要がある |
+| `external_user_id` |    ○ | 1〜255文字                                                             |
+| `event_type`       |    ○ | 1〜100文字。自由記述                                                   |
+| `event_id`         |    ○ | 1〜255文字。付与ルールの`per_event_limit`判定にも使われる              |
+| `amount`           |    ○ | 正の整数                                                               |
+| `transaction_type` |    - | 既定 `EVENT_REWARD`。`reward_rules`との紐づけに使う                    |
+| `display_name`     |    ○ | 1〜255文字。利用者の取引履歴に表示される                               |
+| `description`      |    - | 1000文字以内                                                           |
+| `idempotency_key`  |    ○ | 1〜255文字。**リクエストボディのフィールド** (HTTPヘッダーではない)    |
 
 レスポンス (201、`TransactionResponseSchema`):
 
@@ -249,6 +251,60 @@ Base URL: `${API_URL}` (既定 `http://localhost:4000`)。Swagger: `/api/docs`�
 **認証済みの連携先自身に紐づく`external_user_id`のみ**照会できる。他サービスに
 紐づく`external_user_id`を指定すると404になる (横断的な残高照会はできない設計)。
 
+### 8.5 `GET /api/v1/service/transactions/by-idempotency-key/{idempotencyKey}`
+
+日次照合API (8.6章)の障害復旧用。grant/debitの送信は成功したが応答を受け取れな
+かった場合に、`idempotency_key`で実際に取引が成立しているかを確認する。
+
+要`transactions.read` scope (14章参照。運用担当者への付与依頼が必要)。**認証済みの連携先自身が作成した取引のみ**
+照会できる。他サービスの取引・存在しない`idempotency_key`はいずれも同じ404になる
+(存在有無を区別しない)。
+
+レスポンス (200):
+
+```json
+{
+  "id": "01H...",
+  "idempotency_key": "LEARNING_JOURNEY_REWARD:MISSION-001:USER-123",
+  "external_user_id": "USER-123",
+  "amount": "100",
+  "transaction_type": "LEARNING_JOURNEY_REWARD",
+  "rule_code": "SENGOKU_LEARNING_JOURNEY_REWARD",
+  "occurred_at": "2026-07-15T10:00:00.000Z",
+  "status": "COMPLETED"
+}
+```
+
+### 8.6 `GET /api/v1/service/transactions/export`
+
+日次〜月次照合用のCSV一括ダウンロード。要`transactions.export` scope (14章参照。運用担当者への付与依頼が必要)。
+**認証済みの連携先自身が作成した取引のみ**が対象になる(横断照会不可)。
+
+| クエリパラメータ | 必須 | 説明                                                                      |
+| ---------------- | ---: | ------------------------------------------------------------------------- |
+| `period_from`    |    ○ | ISO 8601日時。`occurred_at >= period_from`                                |
+| `period_to`      |    ○ | ISO 8601日時。`occurred_at <= period_to`。**`period_from`以降**であること |
+| `rule_code`      |    - | `reward_rules.rule_code`で絞り込み。未知の値は400                         |
+| `cursor`         |    - | 前回レスポンスの`X-Next-Cursor`ヘッダーの値。続きから取得する場合に指定   |
+
+- `period_from`〜`period_to`の範囲は**92日以内**(超過は400)。より広い範囲が必要な
+  場合は複数回に分けて呼び出す。
+- 1回のレスポンスは最大10,000件。超過分は無言で切り捨てず、応答ヘッダー
+  `X-Has-More: true`と`X-Next-Cursor: <cursor>`で続きがあることを示す。全件取得する
+  には、`X-Has-More: false`になるまで`cursor`を使って呼び出しを繰り返す。
+- 行の並び順は`occurred_at, id`昇順で安定している(同一`occurred_at`でも呼び出しの
+  たびに順序が変わらない)。
+
+レスポンス (200、`Content-Type: text/csv; charset=utf-8`、UTF-8 BOM付き):
+
+```csv
+transaction_id,idempotency_key,external_user_id,amount,transaction_type,rule_code,occurred_at,status
+01H...,LEARNING_JOURNEY_REWARD:MISSION-001:USER-123,USER-123,100,LEARNING_JOURNEY_REWARD,SENGOKU_LEARNING_JOURNEY_REWARD,2026-07-15T10:00:00.000Z,COMPLETED
+```
+
+`external_user_id`等、連携先が自由に指定できる値が`=`/`+`/`-`/`@`で始まる場合、
+Excel等での数式誤解釈を防ぐため先頭に`'`が付与される(CSVインジェクション対策)。
+
 ## 9. 冪等性
 
 `idempotency_key`は千ノ国ウォレット独自の設計として、**HTTPヘッダーではなく
@@ -281,11 +337,11 @@ Base URL: `${API_URL}` (既定 `http://localhost:4000`)。Swagger: `/api/docs`�
 `reward_rules`の上限は一切適用されず、後述の11章のサービス単位の上限のみが
 チェックされる (OVE有効期限も付与されない)。
 
-| `transaction_type` | `reward_rules.rule_code` | 対象サービス |
-|---|---|---|
-| `REGISTRATION_BONUS` | `SENGOKU_REGISTRATION_BONUS` | `SENGOKU_PASSPORT` |
-| `AIART_ATTENDANCE` | `AIART_ATTENDANCE_REWARD` | `AIART` |
-| `SENGOKU_EC_PURCHASE` | `SENGOKU_EC_PURCHASE_REWARD` | `SENGOKU_EC` |
+| `transaction_type`    | `reward_rules.rule_code`     | 対象サービス       |
+| --------------------- | ---------------------------- | ------------------ |
+| `REGISTRATION_BONUS`  | `SENGOKU_REGISTRATION_BONUS` | `SENGOKU_PASSPORT` |
+| `AIART_ATTENDANCE`    | `AIART_ATTENDANCE_REWARD`    | `AIART`            |
+| `SENGOKU_EC_PURCHASE` | `SENGOKU_EC_PURCHASE_REWARD` | `SENGOKU_EC`       |
 
 `SENGOKU_EC`(戦国EC/戦国楽市楽座)向けの購入特典ポイント付与には
 **`transaction_type: "SENGOKU_EC_PURCHASE"`** を使用すること。マッピング自体は
@@ -339,29 +395,37 @@ sengoku-ai.com側の開発者は、自システムの外部開発者向け連携
 ```json
 {
   "ok": false,
-  "error": { "code": "VALIDATION_ERROR", "message": "amount must be a positive integer" },
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "amount must be a positive integer"
+  },
   "request_id": "..."
 }
 ```
 
 主な`code`:
 
-| `code` | HTTPステータス | 意味 |
-|---|---:|---|
-| `API_KEY_REQUIRED` | 401 | 認証ヘッダー未指定 |
-| `INVALID_API_KEY` | 401 | APIキー不正・署名不正・リプレイ検知・IP拒否 |
-| `VALIDATION_ERROR` | 400 | リクエスト形式不正、付与ルール上限超過等 |
-| `FEATURE_DISABLED` | 503 | 対象機能のFeature Flagが無効 |
-| `NOT_FOUND` | 404 | 対象ウォレット・取引・アカウントが存在しない |
-| `InsufficientBalanceError` | 409 | 残高不足 |
-| `WalletNotActiveError` | 409 | ウォレットが停止中 |
-| `TransactionNotReversibleError` | 409 | 既に取消済み等、取消できない状態 |
-| `INTERNAL_ERROR` | 500 | 想定外のエラー |
+| `code`                          | HTTPステータス | 意味                                         |
+| ------------------------------- | -------------: | -------------------------------------------- |
+| `API_KEY_REQUIRED`              |            401 | 認証ヘッダー未指定                           |
+| `INVALID_API_KEY`               |            401 | APIキー不正・署名不正・リプレイ検知・IP拒否  |
+| `VALIDATION_ERROR`              |            400 | リクエスト形式不正、付与ルール上限超過等     |
+| `FEATURE_DISABLED`              |            503 | 対象機能のFeature Flagが無効                 |
+| `NOT_FOUND`                     |            404 | 対象ウォレット・取引・アカウントが存在しない |
+| `InsufficientBalanceError`      |            409 | 残高不足                                     |
+| `WalletNotActiveError`          |            409 | ウォレットが停止中                           |
+| `TransactionNotReversibleError` |            409 | 既に取消済み等、取消できない状態             |
+| `INTERNAL_ERROR`                |            500 | 想定外のエラー                               |
 
 ### 13.2 旧形式 (残高照会・代理店SSOログイン)
 
 ```json
-{ "statusCode": 401, "message": "invalid API key", "error": "Unauthorized", "requestId": "..." }
+{
+  "statusCode": 401,
+  "message": "invalid API key",
+  "error": "Unauthorized",
+  "requestId": "..."
+}
 ```
 
 NestJSの標準的なエラー形式に近い。`error`フィールドは13.1章のような安定した
@@ -374,6 +438,12 @@ NestJSの標準的なエラー形式に近い。`error`フィールドは13.1章
 追加する場合は、`service_code`(3章)を運用担当者へ伝え、`service_integrations`
 行の作成を依頼すること。発行されたAPIキー・署名鍵はサーバーログへ一度だけ出力
 される (再表示不可)。安全な方法で受け取り、以後は自システム側で厳重に保管する。
+
+一部のエンドポイント (`GET /api/v1/service/accounts/{externalUserId}/balance`の
+`common_user_id`検索、8.5/8.6章の取引照会・CSV出力等) は、APIキーとは別に
+`service_integrations.allowed_scopes`への個別scope付与が必要 (既定は空配列＝
+無権限)。必要なscope名はエンドポイントごとに7章の表・各詳細章に記載している。
+scopeの付与・剥奪は運用担当者が`docs/runbooks/grant-service-scope.md`の手順で行う。
 
 ## 15. セキュリティ
 
