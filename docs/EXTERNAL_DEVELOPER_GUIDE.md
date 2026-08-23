@@ -70,11 +70,25 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 - 署名対象文字列: `` `${timestamp}.${nonce}.${method}:${path}:${JSON.stringify(body)}` ``
   (`method`は大文字、`path`はクエリ文字列を含むフルパス、`body`はNode.jsの
   `JSON.stringify`と完全一致させること。キー順序・非ASCII文字のエスケープに注意)
-- タイムスタンプの許容ずれ: **±5分**。これを超えると401。
+- **bodyを持たないリクエスト(GET等)の署名対象文字列**: サーバー側実装は
+  `JSON.stringify(req.body ?? {})`を使うため、bodyが無い場合も**必ず`"{}"`**
+  (空文字列`""`でも`"null"`でもない)を使うこと。
+- タイムスタンプの許容ずれ: **±5分**。これを超えると401。`X-OVE-Timestamp`は
+  必ずミリ秒epoch(13桁、`Date.now()`相当)であること。秒epoch(10桁)を送ると
+  署名計算自体は成功するが、サーバー側の現在時刻(ミリ秒)との差分が許容ずれを
+  大きく超え401になる。
 - `X-OVE-Nonce` は連携先ごとに一度しか使えない (リプレイ拒否)。同じnonceを2回送ると
-  401になる。
+  401になる。有効期限はタイムスタンプ許容ずれと同じ約5分。
 - `signing_secret` はAPIキー発行時にのみ平文で渡される (11章参照)。以後は
   ウォレット側もハッシュ・暗号化保存のみで、生値を再取得することはできない。
+- **契約テスト用固定fixture**: 上記の仕様を人手での転記に頼らず機械的に検証できるよう、
+  `docs/fixtures/hmac-auth-contract-fixtures.json`に11ケース(通常リクエスト・
+  ミリ秒/秒timestamp・クエリ文字列を含むfullPath・rawBody完全一致・日本語payload・
+  空body・JSONキー順序不一致・nonce再利用・タイムスタンプ範囲外・署名不一致・
+  正常系2xx)の入力値と期待署名/期待結果を収録している。このfixtureは
+  `packages/auth/src/hmac-contract-fixtures.test.ts`でサーバー側実装(`hmacSign`/
+  `hmacVerify`)との整合性を継続的に検証しており、実装と乖離しない。連携先の
+  契約テストでもこのfixtureを正として利用すること。
 
 ### 4.2 簡易鍵認証 (`AGENCY_SYSTEM`専用)
 
