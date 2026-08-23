@@ -150,6 +150,8 @@ export default function CollectibleHoldingDetailPage() {
         </tbody>
       </table>
 
+      {message && <p className="mb-4 text-sm text-sengoku-green">{message}</p>}
+
       {holding.status !== "REVOKED" && (
         <section className="rounded-lg border border-sengoku-border bg-sengoku-navy p-4">
           <h2 className="mb-2 text-sm font-semibold">手動取消</h2>
@@ -170,9 +172,6 @@ export default function CollectibleHoldingDetailPage() {
               {revoking ? "処理中..." : "取消する"}
             </button>
           </div>
-          {message && (
-            <p className="mt-2 text-sm text-sengoku-green">{message}</p>
-          )}
         </section>
       )}
     </>
