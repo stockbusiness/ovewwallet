@@ -1,0 +1,179 @@
+{
+  "secretUsedForFixedCases": "fixture-test-signing-secret-do-not-use-in-prod",
+  "algorithm": "HMAC-SHA256, hex digest",
+  "signaturePayloadFormat": "${timestamp}.${nonce}.${method}:${path}:${JSON.stringify(body ?? {})}",
+  "cases": {
+    "case1_normal_grant": {
+      "method": "POST",
+      "path": "/api/v1/rewards/grant",
+      "body": {
+        "service_code": "SENGOKU_PASSPORT",
+        "external_user_id": "PASSPORT-USER-0001",
+        "event_type": "LEARNING_MISSION_COMPLETED",
+        "event_id": "MISSION-2026-0001",
+        "amount": 3000,
+        "transaction_type": "LEARNING_JOURNEY_REWARD",
+        "display_name": "はじまりの旅 特典",
+        "idempotency_key": "LEARNING_JOURNEY_REWARD:MISSION-2026-0001:PASSPORT-USER-0001"
+      },
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case1",
+      "signaturePayload": "1755600000000.fixture-nonce-case1.POST:/api/v1/rewards/grant:{\"service_code\":\"SENGOKU_PASSPORT\",\"external_user_id\":\"PASSPORT-USER-0001\",\"event_type\":\"LEARNING_MISSION_COMPLETED\",\"event_id\":\"MISSION-2026-0001\",\"amount\":3000,\"transaction_type\":\"LEARNING_JOURNEY_REWARD\",\"display_name\":\"はじまりの旅 特典\",\"idempotency_key\":\"LEARNING_JOURNEY_REWARD:MISSION-2026-0001:PASSPORT-USER-0001\"}",
+      "expectedSignature": "97d7da28b98b562213796391147bad496edb87d62b30bcc723823b890ca56fee"
+    },
+    "case2_timestamp_must_be_milliseconds": {
+      "correct_example": {
+        "timestamp": "1755600000000",
+        "nonce": "fixture-nonce-case2-ms",
+        "signaturePayload": "1755600000000.fixture-nonce-case2-ms.POST:/api/v1/example:{\"a\":1}",
+        "expectedSignature": "6f93b9611ff90c80a4b09b4d5f4bcaaca774a12a924d7b86846e806b08d96c22",
+        "note": "13桁のミリ秒epoch。署名計算自体は成功するが、これが正しい形式。"
+      },
+      "wrong_example_seconds": {
+        "timestamp": "1755600000",
+        "nonce": "fixture-nonce-case2-sec",
+        "signaturePayload": "1755600000.fixture-nonce-case2-sec.POST:/api/v1/example:{\"a\":1}",
+        "expectedSignature": "193fdcbaf191e45a05bcaac754dbd814edfbbb9bd5f1f834885965ab27258c91",
+        "note": "10桁の秒epochを渡すと、サーバー側の現在時刻(ミリ秒)との差が±5分を大きく超えるため401 (timestamp is outside the allowed skew) になる。署名自体は数学的に正しく計算できてしまう点に注意。"
+      }
+    },
+    "case3_full_path_with_query_string": {
+      "method": "GET",
+      "path": "/api/v1/service/transactions/export?period_from=2026-08-01T00%3A00%3A00.000Z&period_to=2026-08-31T23%3A59%3A59.000Z&rule_code=SENGOKU_LEARNING_JOURNEY_REWARD",
+      "body": {},
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case3",
+      "signaturePayload": "1755600000000.fixture-nonce-case3.GET:/api/v1/service/transactions/export?period_from=2026-08-01T00%3A00%3A00.000Z&period_to=2026-08-31T23%3A59%3A59.000Z&rule_code=SENGOKU_LEARNING_JOURNEY_REWARD:{}",
+      "expectedSignature": "a87085d6486649b907ed8805a0cbd9f17f5e94b2b6a8a06de31f391a075d108e",
+      "note": "pathはクエリ文字列を含むreq.originalUrlそのもの。エンコード済みの生文字列をそのまま使うこと(再エンコードしない)。"
+    },
+    "case4_raw_body_matches_signed_body": {
+      "method": "POST",
+      "path": "/api/v1/example",
+      "body": {
+        "external_user_id": "USER-1",
+        "amount": 100
+      },
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case4",
+      "rawBodySentOverWire": "{\"external_user_id\":\"USER-1\",\"amount\":100}",
+      "signaturePayload": "1755600000000.fixture-nonce-case4.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
+      "expectedSignature": "7466a24e4adc8cc7a2083039ea03824969ce34dbfb5be882e895681d728afd0c",
+      "note": "署名対象文字列内のJSON.stringify(body)と、実際にHTTPで送信するrawBodyの文字列は「完全一致」でなければならない。事前にstringify結果を保存しておき、それをそのままHTTP bodyとして送ること(送信直前に再stringifyすると、実装によってはキー順序が変わり不一致になりうる)。"
+    },
+    "case5_japanese_payload": {
+      "method": "POST",
+      "path": "/api/v1/example",
+      "body": {
+        "display_name": "はじまりの旅 特典",
+        "description": "2026年7月度ミッション達成分"
+      },
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case5",
+      "signaturePayload": "1755600000000.fixture-nonce-case5.POST:/api/v1/example:{\"display_name\":\"はじまりの旅 特典\",\"description\":\"2026年7月度ミッション達成分\"}",
+      "expectedSignature": "b65805f327170fcf4066fb3454fddb6ad74c2157f33faf63a2e609a5de5c0bc2",
+      "note": "JSON.stringifyは日本語をエスケープせずUTF-8のまま出力する(\\uXXXXエスケープしない)。送信側もJSON.stringifyの既定動作(非ASCIIエスケープなし)に従うこと。"
+    },
+    "case6_empty_body": {
+      "method": "GET",
+      "path": "/api/v1/service/accounts/EXT-USER-1/balance",
+      "canonicalBodyString": "{}",
+      "signaturePayload": "1755600000000.fixture-nonce-case6.GET:/api/v1/service/accounts/EXT-USER-1/balance:{}",
+      "expectedSignature": "2d0f29ca7eaba470b91b473e733d596fad6961dec19827ea947d5e9651ea6ef7",
+      "note": "bodyを持たないGET等でも、署名対象文字列には必ず JSON.stringify({}) === '{}' を使う。空文字列''や'null'ではない。サーバー側実装: `JSON.stringify(req.body ?? {})`。"
+    },
+    "case7_json_key_order_mismatch": {
+      "method": "POST",
+      "path": "/api/v1/example",
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case7",
+      "signedWithBody": {
+        "a": 1,
+        "b": 2
+      },
+      "signedSignaturePayload": "1755600000000.fixture-nonce-case7.POST:/api/v1/example:{\"a\":1,\"b\":2}",
+      "signature": "d321a7e2a17d85b273a5febf758e5af251870aeeb5e92b8bc25b4d35eb2edb7b",
+      "butActuallySentBody": {
+        "b": 2,
+        "a": 1
+      },
+      "actualSentRawBody": "{\"b\":2,\"a\":1}",
+      "result": "401 invalid HMAC signature",
+      "note": "署名計算に使ったオブジェクトのキー順序と、実際に送信したJSON文字列のキー順序が異なると、意味的に同じ内容でも署名不一致で401になる。署名計算と実送信は同一のJSON.stringify結果を使うこと。"
+    },
+    "case8_nonce_reuse": {
+      "firstRequest": {
+        "method": "POST",
+        "path": "/api/v1/example",
+        "body": {
+          "external_user_id": "USER-1",
+          "amount": 100
+        },
+        "timestamp": "1755600000000",
+        "nonce": "fixture-nonce-case8-reused",
+        "signaturePayload": "1755600000000.fixture-nonce-case8-reused.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
+        "expectedSignature": "59f2e2ddd445bf7d1785d27576da63814380f102c559d859dcbb797c112d2cd5",
+        "expectedResult": "2xx (初回は成功)"
+      },
+      "secondRequestSameNonce": {
+        "method": "POST",
+        "path": "/api/v1/example",
+        "body": {
+          "external_user_id": "USER-1",
+          "amount": 100
+        },
+        "timestamp": "1755600001000",
+        "nonce": "fixture-nonce-case8-reused",
+        "signaturePayload": "1755600001000.fixture-nonce-case8-reused.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
+        "expectedSignature": "df270dc46670a531e164a7469f1a5d8f46c444e9afd6a1be15688998e988c5bc",
+        "expectedResult": "401 nonce has already been used (replay detected)"
+      },
+      "note": "nonceはserviceIntegration単位で一度しか使えない(Redis上でincrし2回目以降を拒否)。有効期限は±5分のタイムスタンプ許容幅と同じ(約5分)。同一nonceは、timestampやbodyが異なっていても再利用不可。"
+    },
+    "case9_timestamp_out_of_range": {
+      "note": "この検証はサーバー側の「現在時刻」との差分(±5分=300000ms)で行うため、固定タイムスタンプでは再現できない。契約テストでは実行時に Date.now() - 6*60*1000 (6分前) や Date.now() + 6*60*1000 (6分後) を都度計算してリクエストすること。",
+      "recipe": {
+        "method": "POST",
+        "path": "/api/v1/example",
+        "body": {},
+        "timestamp": "Date.now() - 6*60*1000 (文字列化)",
+        "nonce": "実行のたびに新しい値",
+        "expectedResult": "401 request timestamp is outside the allowed skew"
+      }
+    },
+    "case10_signature_mismatch": {
+      "method": "POST",
+      "path": "/api/v1/example",
+      "body": {
+        "external_user_id": "USER-1",
+        "amount": 100
+      },
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case10",
+      "signaturePayload": "1755600000000.fixture-nonce-case10.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
+      "sentSignature": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expectedResult": "401 invalid HMAC signature",
+      "note": "正しいsignaturePayloadに対し、意図的に不正な(または他の鍵で計算した)signatureを送った場合の例。"
+    },
+    "case11_valid_signature_returns_2xx": {
+      "note": "ケース1と同じ内容だが、契約テストとして実際にstaging/localのAPIへ送信し2xxが返ることまで確認する。timestampは送信直前のDate.now()を使う必要がある(ケース1の固定値1755600000000は過去の時刻なので、そのまま送ると401になる)。",
+      "recipe": {
+        "method": "POST",
+        "path": "/api/v1/rewards/grant",
+        "body": {
+          "service_code": "SENGOKU_PASSPORT",
+          "external_user_id": "PASSPORT-USER-CONTRACT-TEST",
+          "event_type": "LEARNING_MISSION_COMPLETED",
+          "event_id": "MISSION-CONTRACT-TEST-001",
+          "amount": 100,
+          "transaction_type": "LEARNING_JOURNEY_REWARD",
+          "display_name": "契約テスト",
+          "idempotency_key": "LEARNING_JOURNEY_REWARD:MISSION-CONTRACT-TEST-001:PASSPORT-USER-CONTRACT-TEST"
+        },
+        "timestamp": "実行時のDate.now()",
+        "nonce": "実行のたびに新しい一意な値",
+        "expectedResult": "201 (TransactionResponseSchema)"
+      }
+    }
+  }
+}
