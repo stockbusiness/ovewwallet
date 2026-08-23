@@ -1,8 +1,24 @@
 import { BadRequestException } from "@nestjs/common";
-import type { Prisma, PrismaClient, RewardRule, TransactionType } from "@ove/database";
+import type {
+  Prisma,
+  PrismaClient,
+  RewardRule,
+  TransactionType,
+} from "@ove/database";
 import type { RewardRuleRepository } from "./reward-rule.repository";
 
 type Db = PrismaClient | Prisma.TransactionClient;
+
+/**
+ * PR-W3-b: 千ノ国パスポート「はじまりの旅」からの依頼(reward_rules未登録・無効の場合に
+ * 無制限で付与を通してしまうfail-open挙動への懸念)を受け、特定のtransaction_typeだけ
+ * 「有効なreward_rules行が必須」にオプトインできるようにする。全transaction_typeを
+ * 一律fail-closedにすると、意図的にルール未登録のまま運用している既存の型
+ * (reward_rules登録前の暫定運用等)を壊しうるため、個別指定方式にした。
+ */
+const REWARD_RULE_REQUIRED_TRANSACTION_TYPES = new Set<TransactionType>([
+  "LEARNING_JOURNEY_REWARD",
+]);
 
 export interface EnforceRewardRuleLimitsParams {
   ruleCode: string;
@@ -23,9 +39,11 @@ export interface EnforceRewardRuleLimitsParams {
  * `CommonEventHandlersService.handleRewardGranted` (共通イベントInbox経由、
  * 次期改修指示書P0-4) の両方から共有する。
  *
- * ルールが未登録、または`status`がACTIVEでない場合は何も検証せず素通りさせる
+ * ルールが未登録、または`status`がACTIVEでない場合、既定では何も検証せず素通りさせる
  * (`docs/external-api.md`の既存の運用方針: 運用担当者がルールを登録するまでは
- * ServiceIntegration側の上限のみ有効、という前提を維持する)。
+ * ServiceIntegration側の上限のみ有効、という前提を維持する)。ただし
+ * `REWARD_RULE_REQUIRED_TRANSACTION_TYPES`に含まれるtransaction_typeは、ルールが
+ * 未登録・非ACTIVEなら付与自体を拒否する(fail-closed)。
  *
  * モジュール化後レビュー対応 P1-3: 呼び出し元が`reward_rules`行を`FOR UPDATE`で
  * ロック済みの`$transaction`内から呼ぶことを想定し、`db`は`PrismaClient`単体だけでなく
@@ -36,13 +54,23 @@ export async function enforceRewardRuleLimits(
   rewardRules: RewardRuleRepository,
   params: EnforceRewardRuleLimitsParams,
 ): Promise<RewardRule | null> {
-  const { ruleCode, walletId, transactionType, eventId, amount, extraWhere } = params;
+  const { ruleCode, walletId, transactionType, eventId, amount, extraWhere } =
+    params;
   const rule = await rewardRules.findByRuleCode(ruleCode, db);
-  if (!rule || rule.status !== "ACTIVE") return rule;
+  if (!rule || rule.status !== "ACTIVE") {
+    if (REWARD_RULE_REQUIRED_TRANSACTION_TYPES.has(transactionType)) {
+      throw new BadRequestException(
+        `reward rule ${ruleCode} is required for transaction_type "${transactionType}" but is not registered or not ACTIVE`,
+      );
+    }
+    return rule;
+  }
 
   const now = new Date();
   if (rule.startsAt && now < rule.startsAt) {
-    throw new BadRequestException(`reward rule ${ruleCode} has not started yet`);
+    throw new BadRequestException(
+      `reward rule ${ruleCode} has not started yet`,
+    );
   }
   if (rule.endsAt && now > rule.endsAt) {
     throw new BadRequestException(`reward rule ${ruleCode} has already ended`);
@@ -53,16 +81,26 @@ export async function enforceRewardRuleLimits(
       where: { walletId, transactionType, status: "COMPLETED", ...extraWhere },
     });
     if (count >= rule.perUserLimit) {
-      throw new BadRequestException(`per_user_limit (${rule.perUserLimit}) already reached for ${ruleCode}`);
+      throw new BadRequestException(
+        `per_user_limit (${rule.perUserLimit}) already reached for ${ruleCode}`,
+      );
     }
   }
 
   if (rule.perEventLimit) {
     const count = await db.oveTransaction.count({
-      where: { walletId, transactionType, sourceReferenceId: eventId, status: "COMPLETED", ...extraWhere },
+      where: {
+        walletId,
+        transactionType,
+        sourceReferenceId: eventId,
+        status: "COMPLETED",
+        ...extraWhere,
+      },
     });
     if (count >= rule.perEventLimit) {
-      throw new BadRequestException(`per_event_limit (${rule.perEventLimit}) already reached for ${ruleCode}`);
+      throw new BadRequestException(
+        `per_event_limit (${rule.perEventLimit}) already reached for ${ruleCode}`,
+      );
     }
   }
 
@@ -72,21 +110,35 @@ export async function enforceRewardRuleLimits(
 
   if (rule.monthlyCountLimit) {
     const count = await db.oveTransaction.count({
-      where: { transactionType, status: "COMPLETED", occurredAt: { gte: monthStart }, ...extraWhere },
+      where: {
+        transactionType,
+        status: "COMPLETED",
+        occurredAt: { gte: monthStart },
+        ...extraWhere,
+      },
     });
     if (count >= rule.monthlyCountLimit) {
-      throw new BadRequestException(`monthly_count_limit (${rule.monthlyCountLimit}) already reached for ${ruleCode}`);
+      throw new BadRequestException(
+        `monthly_count_limit (${rule.monthlyCountLimit}) already reached for ${ruleCode}`,
+      );
     }
   }
 
   if (rule.monthlyAmountLimit) {
     const sum = await db.oveTransaction.aggregate({
-      where: { transactionType, status: "COMPLETED", occurredAt: { gte: monthStart }, ...extraWhere },
+      where: {
+        transactionType,
+        status: "COMPLETED",
+        occurredAt: { gte: monthStart },
+        ...extraWhere,
+      },
       _sum: { amount: true },
     });
     const grantedThisMonth = sum._sum.amount ?? 0n;
     if (grantedThisMonth + amount > rule.monthlyAmountLimit) {
-      throw new BadRequestException(`monthly_amount_limit (${rule.monthlyAmountLimit.toString()}) exceeded for ${ruleCode}`);
+      throw new BadRequestException(
+        `monthly_amount_limit (${rule.monthlyAmountLimit.toString()}) exceeded for ${ruleCode}`,
+      );
     }
   }
 
@@ -97,7 +149,9 @@ export async function enforceRewardRuleLimits(
     });
     const grantedGlobally = sum._sum.amount ?? 0n;
     if (grantedGlobally + amount > rule.globalAmountLimit) {
-      throw new BadRequestException(`global_amount_limit (${rule.globalAmountLimit.toString()}) exceeded for ${ruleCode}`);
+      throw new BadRequestException(
+        `global_amount_limit (${rule.globalAmountLimit.toString()}) exceeded for ${ruleCode}`,
+      );
     }
   }
 

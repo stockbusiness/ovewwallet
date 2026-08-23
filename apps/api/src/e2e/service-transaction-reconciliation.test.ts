@@ -43,9 +43,28 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
     serviceNoScope = await createTestServiceIntegration("SENGOKU_METAVERSE", {
       allowedScopes: [],
     });
+    // PR-W3-b: LEARNING_JOURNEY_REWARDはreward_rules必須(fail-closed)になったため、
+    // grantViaServiceA()が使うSENGOKU_LEARNING_JOURNEY_REWARDルールを用意しておく。
+    await prisma.rewardRule.upsert({
+      where: { ruleCode: "SENGOKU_LEARNING_JOURNEY_REWARD" },
+      update: { status: "ACTIVE" },
+      create: {
+        id: generateId(),
+        ruleCode: "SENGOKU_LEARNING_JOURNEY_REWARD",
+        ruleName: "はじまりの旅 特典 (照合APIテスト用)",
+        sourceService: "SENGOKU_PASSPORT",
+        rewardAmount: 100,
+        approvalType: "AUTOMATIC",
+        status: "ACTIVE",
+        displayName: "はじまりの旅 特典",
+      },
+    });
   });
 
   afterAll(async () => {
+    await prisma.rewardRule.deleteMany({
+      where: { ruleCode: "SENGOKU_LEARNING_JOURNEY_REWARD" },
+    });
     await app.close();
     await prisma.$disconnect();
   });

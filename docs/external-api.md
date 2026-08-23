@@ -8,11 +8,11 @@ Base URL: `${API_URL}` (デフォルト `http://localhost:4000`)。Swagger: `/ap
 
 ## エンドポイント
 
-| メソッド/パス | 認証 | 説明 |
-|---|---|---|
-| `POST /api/v1/rewards/grant` | HMAC (外部サービス) | ポイント付与。idempotency必須 |
-| `POST /api/v1/transactions/debit` | HMAC (外部サービス) | ポイント利用 (減算) |
-| `POST /api/v1/transactions/{transactionId}/reverse` | HMAC (外部サービス) | 取消 |
+| メソッド/パス                                           | 認証                | 説明                                                               |
+| ------------------------------------------------------- | ------------------- | ------------------------------------------------------------------ |
+| `POST /api/v1/rewards/grant`                            | HMAC (外部サービス) | ポイント付与。idempotency必須                                      |
+| `POST /api/v1/transactions/debit`                       | HMAC (外部サービス) | ポイント利用 (減算)                                                |
+| `POST /api/v1/transactions/{transactionId}/reverse`     | HMAC (外部サービス) | 取消                                                               |
 | `GET /api/v1/service/accounts/{externalUserId}/balance` | HMAC (外部サービス) | 残高照会。**認証済みの連携先自身の`external_user_id`のみ**照会可能 |
 
 > **本人向け** の残高照会・取引履歴・取引詳細は `GET /api/v1/me/wallet` /
@@ -77,6 +77,13 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 - `monthly_count_limit`/`monthly_amount_limit`: **ルール単位 (キャンペーン全体、
   全ウォレット横断) の当月合計** が上限に達する/超えるなら拒否
 - `global_amount_limit`: ルール単位の全期間累計が上限を超えるなら拒否
+
+**PR-W3-b (千ノ国パスポート「はじまりの旅」からの依頼)**: `LEARNING_JOURNEY_REWARD`
+のみ例外的に、対応する`reward_rules`行(`SENGOKU_LEARNING_JOURNEY_REWARD`)が
+未登録・非ACTIVEの場合、上記の「制約が一切効かない」ではなく**付与自体を400で拒否**
+する(fail-closed)。`apps/api/src/rewards/reward-rule-limits.ts`の
+`REWARD_RULE_REQUIRED_TRANSACTION_TYPES`にオプトインしたtransaction_typeだけが対象
+で、他のtransaction_typeは引き続き上記の既定挙動(fail-open)のまま。
 
 `monthly_count_limit`/`monthly_amount_limit` は `per_user_limit` (ユーザー単位) とは
 異なり、当初の実装では誤ってウォレット単位で集計してしまうバグがあった
