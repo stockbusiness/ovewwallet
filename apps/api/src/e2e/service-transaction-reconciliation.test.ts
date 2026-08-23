@@ -6,7 +6,17 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
-import { createTestServiceIntegration, signedHeaders, type TestServiceIntegration } from "./test-helpers";
+import { TRANSACTION_SERVICE_SCOPES } from "../transactions/transaction-service-scopes";
+import {
+  createTestServiceIntegration,
+  signedHeaders,
+  type TestServiceIntegration,
+} from "./test-helpers";
+
+const SCOPES = [
+  TRANSACTION_SERVICE_SCOPES.TRANSACTIONS_READ,
+  TRANSACTION_SERVICE_SCOPES.TRANSACTIONS_EXPORT,
+];
 
 /**
  * 千ノ国パスポート等との日次照合用API (/api/v1/service/transactions/*)。
@@ -17,14 +27,22 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
   let app: INestApplication;
   let serviceA: TestServiceIntegration;
   let serviceB: TestServiceIntegration;
+  let serviceNoScope: TestServiceIntegration;
 
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
-    serviceA = await createTestServiceIntegration("SENGOKU_PASSPORT");
-    serviceB = await createTestServiceIntegration("AIART");
+    serviceA = await createTestServiceIntegration("SENGOKU_PASSPORT", {
+      allowedScopes: SCOPES,
+    });
+    serviceB = await createTestServiceIntegration("AIART", {
+      allowedScopes: SCOPES,
+    });
+    serviceNoScope = await createTestServiceIntegration("SENGOKU_METAVERSE", {
+      allowedScopes: [],
+    });
   });
 
   afterAll(async () => {
@@ -32,7 +50,9 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
     await prisma.$disconnect();
   });
 
-  async function grantViaServiceA(overrides: Partial<Record<string, unknown>> = {}) {
+  async function grantViaServiceA(
+    overrides: Partial<Record<string, unknown>> = {},
+  ) {
     const server = app.getHttpServer();
     const externalUserId = `svc-recon-${generateId()}`;
     const idempotencyKey = `IDEM-${generateId()}`;
@@ -52,7 +72,11 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
       .set(signedHeaders(serviceA, "POST", "/api/v1/rewards/grant", grantBody))
       .send(grantBody)
       .expect(201);
-    return { externalUserId, idempotencyKey, transactionId: res.body.id as string };
+    return {
+      externalUserId,
+      idempotencyKey,
+      transactionId: res.body.id as string,
+    };
   }
 
   describe("GET /by-idempotency-key/:idempotencyKey", () => {
@@ -97,6 +121,15 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
         .get(`/api/v1/service/transactions/by-idempotency-key/anything`)
         .expect(401);
     });
+
+    it("transactions.read scopeが無ければ403になる", async () => {
+      const path = `/api/v1/service/transactions/by-idempotency-key/anything`;
+
+      await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceNoScope, "GET", path, {}))
+        .expect(403);
+    });
   });
 
   describe("GET /export", () => {
@@ -113,7 +146,9 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
         .expect(200);
 
       expect(res.headers["content-type"]).toContain("text/csv");
-      expect(res.text).toContain("transaction_id,idempotency_key,external_user_id,amount,transaction_type,rule_code,occurred_at,status");
+      expect(res.text).toContain(
+        "transaction_id,idempotency_key,external_user_id,amount,transaction_type,rule_code,occurred_at,status",
+      );
       expect(res.text).toContain(idempotencyKey);
       expect(res.text).toContain(externalUserId);
       expect(res.text).toContain("SENGOKU_LEARNING_JOURNEY_REWARD");
@@ -135,7 +170,9 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
       };
       const grantResB = await request(app.getHttpServer())
         .post("/api/v1/rewards/grant")
-        .set(signedHeaders(serviceB, "POST", "/api/v1/rewards/grant", grantBodyB))
+        .set(
+          signedHeaders(serviceB, "POST", "/api/v1/rewards/grant", grantBodyB),
+        )
         .send(grantBodyB)
         .expect(201);
       expect(grantResB.body.transaction_type).toBe("AIART_ATTENDANCE");
@@ -171,6 +208,136 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
         .get(path)
         .set(signedHeaders(serviceA, "GET", path, {}))
         .expect(400);
+    });
+
+    it("period_from > period_toは400になる", async () => {
+      const periodFrom = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const periodTo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}`;
+
+      await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceA, "GET", path, {}))
+        .expect(400);
+    });
+
+    it("照会期間が92日を超えると400になる", async () => {
+      const periodFrom = new Date(
+        Date.now() - 100 * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      const periodTo = new Date().toISOString();
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}`;
+
+      await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceA, "GET", path, {}))
+        .expect(400);
+    });
+
+    it("transactions.export scopeが無ければ403になる", async () => {
+      const periodFrom = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const periodTo = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}`;
+
+      await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceNoScope, "GET", path, {}))
+        .expect(403);
+    });
+
+    it("不正なcursorは400になる", async () => {
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(new Date(Date.now() - 60 * 60 * 1000).toISOString())}&period_to=${encodeURIComponent(new Date(Date.now() + 60 * 60 * 1000).toISOString())}&cursor=not-a-valid-cursor`;
+
+      await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceA, "GET", path, {}))
+        .expect(400);
+    });
+
+    it("外部ユーザーが制御する値がExcel数式として解釈されないようエスケープされる", async () => {
+      // external_user_idは連携先が自由に指定できる値。AccountLink経由でCSVへ
+      // 反映されるため、先頭が「=」等でもCSVインジェクションにならないことを確認する。
+      const formulaLikeExternalUserId = `=cmd|'/c calc'!A1-${generateId()}`;
+      const idempotencyKey = `IDEM-${generateId()}`;
+      const grantBody = {
+        service_code: "SENGOKU_PASSPORT",
+        external_user_id: formulaLikeExternalUserId,
+        event_type: "LEARNING_MISSION_COMPLETED",
+        event_id: `MISSION-${generateId()}`,
+        amount: 100,
+        transaction_type: "LEARNING_JOURNEY_REWARD",
+        display_name: "はじまりの旅 特典",
+        idempotency_key: idempotencyKey,
+      };
+      await request(app.getHttpServer())
+        .post("/api/v1/rewards/grant")
+        .set(
+          signedHeaders(serviceA, "POST", "/api/v1/rewards/grant", grantBody),
+        )
+        .send(grantBody)
+        .expect(201);
+
+      const periodFrom = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const periodTo = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}`;
+
+      const res = await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceA, "GET", path, {}))
+        .expect(200);
+
+      expect(res.text).not.toContain(`,${formulaLikeExternalUserId},`);
+      expect(res.text).toContain(`,'${formulaLikeExternalUserId},`);
+    });
+
+    it("1ページに収まる件数のときはX-Has-More: falseで、X-Next-Cursorは付与されない", async () => {
+      const periodFrom = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+      const first = await grantViaServiceA();
+      const second = await grantViaServiceA();
+      const periodTo = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+      const basePath = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}`;
+
+      const fullRes = await request(app.getHttpServer())
+        .get(basePath)
+        .set(signedHeaders(serviceA, "GET", basePath, {}))
+        .expect(200);
+      expect(fullRes.headers["x-has-more"]).toBe("false");
+      expect(fullRes.headers["x-next-cursor"]).toBeUndefined();
+      expect(fullRes.text).toContain(first.idempotencyKey);
+      expect(fullRes.text).toContain(second.idempotencyKey);
+    });
+
+    it("cursorで指定した取引より後(occurred_at, id昇順)だけが返る", async () => {
+      // 10,000件超をseedして本物のページ境界を再現するのは非現実的なため、
+      // サーバーが実際に払い出すレスポンス形式(base64url化されたJSON)を模した
+      // cursorを渡し、キーセットフィルタ(occurred_at, id)自体の正しさを検証する。
+      const first = await grantViaServiceA();
+      const second = await grantViaServiceA();
+
+      const firstTx = await prisma.oveTransaction.findUniqueOrThrow({
+        where: { idempotencyKey: first.idempotencyKey },
+      });
+      const cursor = Buffer.from(
+        JSON.stringify({
+          occurredAt: firstTx.occurredAt.toISOString(),
+          id: firstTx.id,
+        }),
+        "utf8",
+      ).toString("base64url");
+
+      const periodFrom = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const periodTo = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      const path = `/api/v1/service/transactions/export?period_from=${encodeURIComponent(periodFrom)}&period_to=${encodeURIComponent(periodTo)}&cursor=${cursor}`;
+
+      const res = await request(app.getHttpServer())
+        .get(path)
+        .set(signedHeaders(serviceA, "GET", path, {}))
+        .expect(200);
+
+      expect(res.text).not.toContain(first.idempotencyKey);
+      expect(res.text).toContain(second.idempotencyKey);
     });
   });
 });
