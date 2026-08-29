@@ -148,7 +148,18 @@ export interface ReleaseHoldParams {
   createdBy: string;
 }
 
-/** 保留解除。held_balance から available_balance へ戻し、RELEASE取引を追加する。 */
+/**
+ * 保留解除。held_balance から available_balance へ戻し、RELEASE取引を追加する。
+ *
+ * holdの存在確認そのものはロック取得前に行うが (どのウォレットをロックすべきか
+ * 決めるために必要)、`status !== "HELD"`の判定は必ずウォレットのロック取得後に
+ * 再読込したholdで行う。異なるidempotencyKeyを持つ2つのreleaseHold呼び出しが
+ * 同じholdIdへ同時に来た場合、先勝ちのトランザクションがholdWalletの行ロックを
+ * 保持している間、後発はlockWallet()でブロックされる。ロック取得前の判定結果を
+ * そのまま使うと、後発は解除済みのholdを検知できずheld_balanceを二重に
+ * available_balanceへ戻してしまう (先勝ち側のコミット後にブロックが解除されても、
+ * 古い"HELD"の判定結果をそのまま使い続けてしまうため)。
+ */
 export async function releaseHold(
   params: ReleaseHoldParams,
   db: Db = defaultPrisma,
@@ -160,12 +171,16 @@ export async function releaseHold(
 
   try {
     return await db.$transaction(async (tx) => {
+      const initialHold = await tx.walletHold.findUnique({ where: { id: params.holdId } });
+      if (!initialHold) throw new HoldNotFoundError(params.holdId);
+
+      const wallet = await lockWallet(tx, initialHold.walletId);
+      if (!wallet) throw new WalletNotFoundError(initialHold.walletId);
+
+      // ロック取得後に再読込して判定する (上記コメント参照)。
       const hold = await tx.walletHold.findUnique({ where: { id: params.holdId } });
       if (!hold) throw new HoldNotFoundError(params.holdId);
       if (hold.status !== "HELD") throw new HoldNotActiveError(hold.id, hold.status);
-
-      const wallet = await lockWallet(tx, hold.walletId);
-      if (!wallet) throw new WalletNotFoundError(hold.walletId);
 
       const balanceBefore = wallet.availableBalance;
       const balanceAfter = balanceBefore + hold.amount;
