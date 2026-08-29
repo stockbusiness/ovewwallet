@@ -50,7 +50,7 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   HOLD: "保留",
   RELEASE: "保留解除",
   CAMPAIGN_REWARD: "キャンペーン特典",
-  EXPIRATION: "OVE失効",
+  EXPIRATION: "ORI失効",
   DAILY_LOGIN_BONUS: "継続ログインボーナス",
 };
 

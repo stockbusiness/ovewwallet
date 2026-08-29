@@ -18,7 +18,7 @@ function formatDetail(r: ApprovalRequestItem): string {
   if (r.payload.kind === "MIGRATION_EXECUTION") {
     return `${r.payload.batchName} (${r.payload.fileName})`;
   }
-  return `${Number(r.payload.amount).toLocaleString("ja-JP")} OVE`;
+  return `${Number(r.payload.amount).toLocaleString("ja-JP")} ORI`;
 }
 
 /** 承認待ちがこの時間を超えて放置されている場合、強調表示する (SLA可視化)。 */

@@ -69,7 +69,7 @@ export default function BulkGrantsPage() {
         <h1 className="mb-1 text-xl font-bold">CSV一括付与</h1>
         <p className="mb-4 text-xs text-sengoku-muted">
           形式: external_user_id,amount,transaction_name,reason,event_id,idempotency_key
-          (external_user_id は OVEアカウントコード。同じCSVを再実行しても二重付与されません)
+          (external_user_id は ORIアカウントコード。同じCSVを再実行しても二重付与されません)
         </p>
 
         <div className="mb-4 flex items-center gap-3">
@@ -106,7 +106,7 @@ export default function BulkGrantsPage() {
               <Stat label="エラー件数" value={summary.errorCount} tone="text-sengoku-red" />
             </div>
             <p className="mb-3 text-sm">
-              合計付与予定OVE: {Number(summary.totalAmountGranted).toLocaleString("ja-JP")}
+              合計付与予定ORI: {Number(summary.totalAmountGranted).toLocaleString("ja-JP")}
             </p>
             <table className="w-full text-left text-xs">
               <thead className="text-sengoku-muted">

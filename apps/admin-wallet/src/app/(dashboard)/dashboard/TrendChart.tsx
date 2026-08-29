@@ -79,11 +79,11 @@ export function TrendChart({ data }: TrendChartProps) {
       <div className="mb-3 flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1.5 text-sengoku-muted">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: GOLD }} />
-          発行OVE
+          発行ORI
         </span>
         <span className="flex items-center gap-1.5 text-sengoku-muted">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: RED }} />
-          利用OVE
+          利用ORI
         </span>
       </div>
 
@@ -93,7 +93,7 @@ export function TrendChart({ data }: TrendChartProps) {
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverIndex(null)}
         role="img"
-        aria-label="発行OVEと利用OVEの過去30日推移の折れ線グラフ"
+        aria-label="発行ORIと利用ORIの過去30日推移の折れ線グラフ"
       >
         {yTicks.map((tick) => {
           const y = PAD_TOP + plotHeight * (1 - tick / maxValue);
@@ -141,10 +141,10 @@ export function TrendChart({ data }: TrendChartProps) {
         <div className="mt-2 rounded-lg border border-sengoku-border bg-sengoku-bg px-3 py-2 text-xs text-sengoku-muted">
           <span className="font-semibold text-sengoku-text">{hovered.date}</span>
           <span className="ml-3" style={{ color: GOLD }}>
-            発行 {Number(hovered.credited).toLocaleString("ja-JP")} OVE
+            発行 {Number(hovered.credited).toLocaleString("ja-JP")} ORI
           </span>
           <span className="ml-3" style={{ color: RED }}>
-            利用 {Number(hovered.debited).toLocaleString("ja-JP")} OVE
+            利用 {Number(hovered.debited).toLocaleString("ja-JP")} ORI
           </span>
         </div>
       )}

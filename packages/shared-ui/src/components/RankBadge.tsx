@@ -25,7 +25,7 @@ export function RankBadge({ lifetimeCredited }: RankBadgeProps) {
         <p className="text-xs text-sengoku-faint">
           累計獲得
           <br />
-          {lifetimeCredited.toLocaleString("ja-JP")} OVE
+          {lifetimeCredited.toLocaleString("ja-JP")} ORI
         </p>
       </div>
       <div
@@ -39,7 +39,7 @@ export function RankBadge({ lifetimeCredited }: RankBadgeProps) {
       </div>
       {next && (
         <p className="mt-2 text-xs text-sengoku-muted">
-          あと{next.remaining.toLocaleString("ja-JP")} OVEで「{next.rank.name}」に昇格
+          あと{next.remaining.toLocaleString("ja-JP")} ORIで「{next.rank.name}」に昇格
         </p>
       )}
     </section>

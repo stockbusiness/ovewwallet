@@ -44,8 +44,8 @@ export default function WalletsPage() {
               <tr key={w.id} className="border-t border-sengoku-border">
                 <td className="p-3">{w.walletCode}</td>
                 <td className="p-3">{w.status}</td>
-                <td className="p-3">{Number(w.availableBalance).toLocaleString("ja-JP")} OVE</td>
-                <td className="p-3">{Number(w.heldBalance).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">{Number(w.availableBalance).toLocaleString("ja-JP")} ORI</td>
+                <td className="p-3">{Number(w.heldBalance).toLocaleString("ja-JP")} ORI</td>
                 <td className="p-3">
                   <Link href={`/wallets/${w.id}`} className="text-sengoku-gold underline">
                     詳細

@@ -78,15 +78,15 @@ export default function DashboardPage() {
       </div>
 
           <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile label="発行済OVE合計" value={`${totalAvailable.toLocaleString("ja-JP")} OVE`} />
+            <StatTile label="発行済ORI合計" value={`${totalAvailable.toLocaleString("ja-JP")} ORI`} />
             <StatTile label="総アカウント数" value={stats.totalAccounts.toLocaleString("ja-JP")} />
-            <StatTile label="本日付与OVE" value={`${todayCredited.toLocaleString("ja-JP")} OVE`} delta={creditedDelta} />
-            <StatTile label="本日利用OVE" value={`${todayDebited.toLocaleString("ja-JP")} OVE`} delta={debitedDelta} />
+            <StatTile label="本日付与ORI" value={`${todayCredited.toLocaleString("ja-JP")} ORI`} delta={creditedDelta} />
+            <StatTile label="本日利用ORI" value={`${todayDebited.toLocaleString("ja-JP")} ORI`} delta={debitedDelta} />
           </div>
 
           <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5 lg:col-span-2">
-              <h2 className="mb-4 text-sm font-bold text-sengoku-text">OVE発行・利用推移 (過去30日)</h2>
+              <h2 className="mb-4 text-sm font-bold text-sengoku-text">ORI発行・利用推移 (過去30日)</h2>
               <TrendChart data={stats.dailyTrend} />
             </section>
 

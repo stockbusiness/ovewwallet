@@ -61,7 +61,7 @@ export default function AccountDetailPage() {
     if (!Number.isInteger(balance) || balance < 0 || !reviewReason) return;
     if (
       !window.confirm(
-        `調査済みの残高 ${balance.toLocaleString("ja-JP")} OVE で確定します。この操作の後は再度検証できません。よろしいですか？`,
+        `調査済みの残高 ${balance.toLocaleString("ja-JP")} ORI で確定します。この操作の後は再度検証できません。よろしいですか？`,
       )
     )
       return;
@@ -128,7 +128,7 @@ export default function AccountDetailPage() {
                 {account.wallet ? (
                   <Link href={`/wallets/${account.wallet.id}`} className="text-sengoku-gold underline">
                     {account.wallet.walletCode} (
-                    {Number(account.wallet.availableBalance).toLocaleString("ja-JP")} OVE)
+                    {Number(account.wallet.availableBalance).toLocaleString("ja-JP")} ORI)
                   </Link>
                 ) : (
                   "未作成"
@@ -165,7 +165,7 @@ export default function AccountDetailPage() {
             </p>
             <div className="flex flex-col gap-3">
               <label className="text-xs">
-                確認済み残高 (OVE、不明な場合は調査してから入力してください)
+                確認済み残高 (ORI、不明な場合は調査してから入力してください)
                 <input
                   type="number"
                   min={0}

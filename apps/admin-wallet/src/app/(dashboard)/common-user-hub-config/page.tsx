@@ -82,14 +82,14 @@ export default function CommonUserHubConfigPage() {
 
         <HelpPanel storageKey="common-user-hub-config" title="このページについて・設定手順">
           <p>
-            新しいユーザーがOVEウォレットに登録したとき、代理店システム側の「共通顧客HUB」へ
+            新しいユーザーがORIウォレットに登録したとき、代理店システム側の「共通顧客HUB」へ
             問い合わせて共通ID(common_user_id)を取得・連携するための接続先設定です。
           </p>
           <div>
             <p className="font-semibold text-sengoku-text">事前に必要なもの</p>
             <p>
               代理店システム(sengoku-ai.com)の担当者から、「AI受信用APIキー」を発行してもらってください。
-              これはOVE側で作れるものではなく、必ず相手から受け取る必要があります。
+              これはORI側で作れるものではなく、必ず相手から受け取る必要があります。
             </p>
           </div>
           <div>

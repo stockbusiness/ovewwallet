@@ -99,7 +99,7 @@ export default function DailyBonusHistoryPage() {
               return (
                 <div
                   key={key}
-                  title={claim ? `${claim.streak_count}日連続・${claim.amount} OVE` : undefined}
+                  title={claim ? `${claim.streak_count}日連続・${claim.amount} ORI` : undefined}
                   className={`flex aspect-square flex-col items-center justify-center rounded-lg text-xs ${
                     claim ? "bg-sengoku-gold/20 font-bold text-sengoku-gold" : "text-sengoku-faint"
                   }`}

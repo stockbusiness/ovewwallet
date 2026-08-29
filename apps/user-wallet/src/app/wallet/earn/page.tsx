@@ -47,7 +47,7 @@ export default function EarnOvePage() {
         <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="font-heading text-lg font-bold text-sengoku-text">OVEを貯める</h1>
+        <h1 className="font-heading text-lg font-bold text-sengoku-text">ORIを貯める</h1>
       </header>
 
       {toast && (
@@ -59,7 +59,7 @@ export default function EarnOvePage() {
       )}
 
       <p className="text-xs leading-relaxed text-sengoku-muted">
-        連携サービスでの活動に応じてOVEを獲得できます。現在開催中の獲得機会は以下の通りです。
+        連携サービスでの活動に応じてORIを獲得できます。現在開催中の獲得機会は以下の通りです。
       </p>
 
       {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
@@ -91,7 +91,7 @@ export default function EarnOvePage() {
               </span>
               <span className="shrink-0 text-sm font-bold text-sengoku-green">
                 +{Number(r.reward_amount).toLocaleString("ja-JP")}
-                <span className="ml-0.5 text-xs font-medium">OVE</span>
+                <span className="ml-0.5 text-xs font-medium">ORI</span>
               </span>
             </button>
           </li>

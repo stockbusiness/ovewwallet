@@ -18,7 +18,7 @@ export interface BalanceCardProps {
  * 利用可能残高を強調表示するカード。ウォレットホームの主役要素となるよう、
  * 金のグラデーション枠とグロー、円環ロゴモチーフの薄い装飾を持つ。
  */
-export function BalanceCard({ label = "利用可能残高", amount, unit = "OVE", stats = [], footnote }: BalanceCardProps) {
+export function BalanceCard({ label = "利用可能残高", amount, unit = "ORI", stats = [], footnote }: BalanceCardProps) {
   return (
     <section
       className="relative overflow-hidden rounded-2xl border border-sengoku-gold/50 bg-gradient-to-br from-sengoku-navy via-sengoku-navy to-sengoku-navy-deep p-5"

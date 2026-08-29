@@ -61,12 +61,12 @@ export default function WalletReferralsPage() {
         <h1 className="mb-1 text-xl font-bold">代理店紹介トークン受け入れ</h1>
         <p className="mb-4 text-xs text-sengoku-muted">
           代理店紹介URL (<code>/invite/&#123;token&#125;</code>) 経由の受付・新規登録時の紐付け・
-          初回登録特典3,000 OVEの状態を確認する画面 (Phase 1: 確認のみ。手動確定・取消はPhase 3で追加)。
+          初回登録特典3,000 ORIの状態を確認する画面 (Phase 1: 確認のみ。手動確定・取消はPhase 3で追加)。
         </p>
 
         <div className="mb-4 rounded-lg border border-sengoku-gold-soft bg-sengoku-navy-deep p-3 text-xs text-sengoku-muted">
           <p className="font-semibold text-sengoku-gold-soft">
-            旧制度について: 初回登録特典(3,000 OVE)は旧制度です。千ノ国5システム改修 PR-W1
+            旧制度について: 初回登録特典(3,000 ORI)は旧制度です。千ノ国5システム改修 PR-W1
             (新規発生停止日: 2026-08-20)により、新規のPENDING作成を停止しています。
           </p>
           <p className="mt-1">
@@ -82,20 +82,20 @@ export default function WalletReferralsPage() {
             )}
           </p>
           <p className="mt-1">
-            この画面に表示されている既存のPENDING/CONFIRMED/REJECTEDの特典履歴・OVE残高は、
+            この画面に表示されている既存のPENDING/CONFIRMED/REJECTEDの特典履歴・ORI残高は、
             この停止によって削除・変更されることはありません。
           </p>
         </div>
 
         <HelpPanel storageKey="wallet-referrals" title="このページについて・使い方">
           <p>
-            代理店の紹介URL(<code>/invite/&#123;token&#125;</code>)経由でOVEウォレットに登録した人が、
-            紹介関係として正しく成立し、初回登録特典(3,000 OVE)が付与されたかを確認する画面です。
+            代理店の紹介URL(<code>/invite/&#123;token&#125;</code>)経由でORIウォレットに登録した人が、
+            紹介関係として正しく成立し、初回登録特典(3,000 ORI)が付与されたかを確認する画面です。
           </p>
           <div>
             <p className="font-semibold text-sengoku-text">状態の意味</p>
             <ul className="ml-4 list-disc">
-              <li>受付済み(登録前): 紹介URLはクリックされたが、まだOVEウォレットへの登録が完了していない</li>
+              <li>受付済み(登録前): 紹介URLはクリックされたが、まだORIウォレットへの登録が完了していない</li>
               <li>登録済み・確認待ち: 登録は完了したが、紹介関係の最終確認が済んでいない</li>
               <li>紹介関係確定: 正常に成立し、特典も処理された状態</li>
               <li>否認/エラー/期限切れ/取消: 何らかの理由で成立しなかった状態</li>
@@ -130,7 +130,7 @@ export default function WalletReferralsPage() {
           <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
             <tr>
               <th className="p-3">状態</th>
-              <th className="p-3">登録OVEアカウント</th>
+              <th className="p-3">登録ORIアカウント</th>
               <th className="p-3">代理店ID</th>
               <th className="p-3">登録特典</th>
               <th className="p-3">受付日時</th>
@@ -151,7 +151,7 @@ export default function WalletReferralsPage() {
                     </td>
                     <td className="p-3">{item.agencyId ?? "-"}</td>
                     <td className="p-3">
-                      {benefit ? `${Number(benefit.amount).toLocaleString("ja-JP")} OVE (${benefit.status})` : "-"}
+                      {benefit ? `${Number(benefit.amount).toLocaleString("ja-JP")} ORI (${benefit.status})` : "-"}
                     </td>
                     <td className="p-3">{new Date(item.capturedAt).toLocaleString("ja-JP")}</td>
                     <td className="p-3">
