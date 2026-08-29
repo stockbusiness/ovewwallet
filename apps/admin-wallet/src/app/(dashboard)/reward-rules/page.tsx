@@ -90,7 +90,7 @@ export default function RewardRulesPage() {
         "/api/v1/admin/expire-credits/preview",
       );
       setExpiryPreview(
-        `今すぐ実行すると、${result.wallets_affected}件のウォレットで合計${Number(result.total_amount).toLocaleString("ja-JP")} OVEが失効します`,
+        `今すぐ実行すると、${result.wallets_affected}件のウォレットで合計${Number(result.total_amount).toLocaleString("ja-JP")} ORIが失効します`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "予告レポートの取得に失敗しました");
@@ -109,7 +109,7 @@ export default function RewardRulesPage() {
         { method: "POST" },
       );
       setExpiryResult(
-        `${result.wallets_processed}件のウォレットで、合計${Number(result.total_expired_amount).toLocaleString("ja-JP")} OVEを失効させました`,
+        `${result.wallets_processed}件のウォレットで、合計${Number(result.total_expired_amount).toLocaleString("ja-JP")} ORIを失効させました`,
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "失効バッチの実行に失敗しました");
@@ -162,7 +162,7 @@ export default function RewardRulesPage() {
               </select>
             </label>
             <label className="text-xs">
-              付与額 (OVE)
+              付与額 (ORI)
               <input value={rewardAmount} onChange={(e) => setRewardAmount(e.target.value)} className="mt-1 block w-28 rounded-md border border-sengoku-border px-2 py-1 text-sm" />
             </label>
             <label className="text-xs">
@@ -212,7 +212,7 @@ export default function RewardRulesPage() {
                     <p className="text-xs text-sengoku-faint">{r.displayName}</p>
                   </td>
                   <td className="p-3">{r.sourceService}</td>
-                  <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} OVE</td>
+                  <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} ORI</td>
                   <td className="p-3">
                     {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
                   </td>
@@ -220,7 +220,7 @@ export default function RewardRulesPage() {
                   <td className="p-3">
                     {summary && summary.totalAmount !== null ? (
                       <>
-                        {Number(summary.totalAmount).toLocaleString("ja-JP")} OVE
+                        {Number(summary.totalAmount).toLocaleString("ja-JP")} ORI
                         <p className="text-xs text-sengoku-faint">{summary.count}件</p>
                       </>
                     ) : (
@@ -242,9 +242,9 @@ export default function RewardRulesPage() {
         </table>
 
         <section className="mt-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-4">
-          <h2 className="mb-1 text-sm font-semibold">OVE失効バッチ</h2>
+          <h2 className="mb-1 text-sm font-semibold">ORI失効バッチ</h2>
           <p className="mb-3 text-xs text-sengoku-muted">
-            有効期限が到来した獲得OVEを失効させます。cron等の外部スケジューラは未接続のため、
+            有効期限が到来した獲得ORIを失効させます。cron等の外部スケジューラは未接続のため、
             当面はここから手動実行してください (docs/credit-expiry.md参照)。
           </p>
           <div className="flex flex-wrap items-center gap-3">

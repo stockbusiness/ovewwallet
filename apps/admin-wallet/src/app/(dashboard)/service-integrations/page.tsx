@@ -66,7 +66,7 @@ export default function ServiceIntegrationsPage() {
 
         <HelpPanel storageKey="service-integrations" title="このページについて・使い方">
           <p>
-            OVEウォレットへAPI経由でアクセスしている外部サービス(代理店システム等)の一覧と、
+            ORIウォレットへAPI経由でアクセスしている外部サービス(代理店システム等)の一覧と、
             緊急停止・再開を行う画面です。新しい外部サービスをここから追加することはできません(追加はエンジニアの作業が必要です)。
           </p>
           <div>
@@ -111,8 +111,8 @@ export default function ServiceIntegrationsPage() {
                     {s.status}
                   </span>
                 </td>
-                <td className="p-3">{Number(s.perRequestAmountLimit).toLocaleString("ja-JP")} OVE</td>
-                <td className="p-3">{Number(s.dailyAmountLimit).toLocaleString("ja-JP")} OVE</td>
+                <td className="p-3">{Number(s.perRequestAmountLimit).toLocaleString("ja-JP")} ORI</td>
+                <td className="p-3">{Number(s.dailyAmountLimit).toLocaleString("ja-JP")} ORI</td>
                 <td className="p-3">{s.lastAccessedAt ? new Date(s.lastAccessedAt).toLocaleString("ja-JP") : "-"}</td>
                 <td className="p-3">
                   {s.status === "ACTIVE" ? (

@@ -53,7 +53,7 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     // 拒否されているので、統合元の残高はまだ動いていない (利用可能残高・累計獲得の
     // 2箇所に同じ値が表示されるため、いずれかが見えていればよい)。
     await requesterPage.goto(`${ADMIN_URL}/wallets/${source.walletId}`);
-    await expect(requesterPage.getByText("2,000 OVE").first()).toBeVisible();
+    await expect(requesterPage.getByText("2,000 ORI").first()).toBeVisible();
 
     // 別の管理者 (承認者) が承認すると、はじめて統合が実行される。
     const approverCtx = await browser.newContext();
@@ -66,6 +66,6 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     });
 
     await approverPage.goto(`${ADMIN_URL}/wallets/${target.walletId}`);
-    await expect(approverPage.getByText("2,500 OVE").first()).toBeVisible({ timeout: NAV_TIMEOUT_SHORT }); // 500 + 2000
+    await expect(approverPage.getByText("2,500 ORI").first()).toBeVisible({ timeout: NAV_TIMEOUT_SHORT }); // 500 + 2000
   });
 });

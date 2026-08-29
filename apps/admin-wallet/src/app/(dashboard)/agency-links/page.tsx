@@ -53,20 +53,20 @@ export default function AgencyLinksPage() {
         <h1 className="mb-1 text-xl font-bold">代理店連携状態一覧</h1>
         <p className="mb-4 text-xs text-sengoku-muted">
           戦国経済圏代理店システム (sengoku-ai.com) から受信した同期データと、SSOログインによる
-          OVEアカウントとの紐付け状態。「未紐付け」は同期のみ受信済みで、まだSSOログインが
+          ORIアカウントとの紐付け状態。「未紐付け」は同期のみ受信済みで、まだSSOログインが
           行われていない状態 (詳細は docs/agency-integration.md 参照)。
         </p>
 
         <HelpPanel storageKey="agency-links" title="このページについて・使い方">
           <p>
-            代理店システム(sengoku-ai.com)から連携されている顧客が、OVEウォレットのアカウントと
+            代理店システム(sengoku-ai.com)から連携されている顧客が、ORIウォレットのアカウントと
             正しく紐付いているかを確認するための画面です。設定項目はなく、状況確認・問い合わせ対応専用です。
           </p>
           <div>
             <p className="font-semibold text-sengoku-text">状態の意味</p>
             <ul className="ml-4 list-disc">
-              <li><span className="text-sengoku-gold-soft">未紐付け(同期のみ)</span>: 代理店システムからの顧客情報は届いているが、その顧客がまだOVEウォレットへSSOログインしていない</li>
-              <li><span className="text-sengoku-green">紐付け済み</span>: SSOログイン済みで、OVEアカウントと紐付いている</li>
+              <li><span className="text-sengoku-gold-soft">未紐付け(同期のみ)</span>: 代理店システムからの顧客情報は届いているが、その顧客がまだORIウォレットへSSOログインしていない</li>
+              <li><span className="text-sengoku-green">紐付け済み</span>: SSOログイン済みで、ORIアカウントと紐付いている</li>
               <li><span className="text-sengoku-faint">解除済み</span>: 代理店システム側でその顧客が退会・削除された等により、連携が自動的に解除された</li>
             </ul>
           </div>
@@ -74,7 +74,7 @@ export default function AgencyLinksPage() {
             <p className="font-semibold text-sengoku-text">よくある使い方</p>
             <p>
               「代理店側のお客様から、ポイントが連携されていないと問い合わせが来た」ようなとき、external_idや代理店名で該当行を探し、
-              状態が「未紐付け」のままであれば、そのお客様にまだOVEウォレットへのSSOログインをしてもらう必要があることが分かります。
+              状態が「未紐付け」のままであれば、そのお客様にまだORIウォレットへのSSOログインをしてもらう必要があることが分かります。
               「詳細」を開くと、共通ID・紹介トークンなど、より詳しい情報を確認できます。
             </p>
           </div>
@@ -105,7 +105,7 @@ export default function AgencyLinksPage() {
             <tr>
               <th className="p-3">external_id</th>
               <th className="p-3">状態</th>
-              <th className="p-3">紐付けOVEアカウント</th>
+              <th className="p-3">紐付けORIアカウント</th>
               <th className="p-3">代理店名</th>
               <th className="p-3">連絡先メール</th>
               <th className="p-3">同期/認証日時</th>

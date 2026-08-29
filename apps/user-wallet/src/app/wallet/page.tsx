@@ -103,7 +103,7 @@ export default function WalletTopPage() {
         next_streak: result.current_streak,
         next_amount: result.amount,
       });
-      setToast(`${result.amount} OVEを受け取りました (${result.current_streak}日連続)`);
+      setToast(`${result.amount} ORIを受け取りました (${result.current_streak}日連続)`);
       // 継続ログインボーナスもCREDITのため、階級表示(RankBadge)が参照する
       // lifetime_creditedも合わせて更新する (available_balanceだけ更新すると、
       // 再読み込みするまで階級表示が古い累計獲得量のまま止まって見える不具合になる)。
@@ -160,15 +160,15 @@ export default function WalletTopPage() {
         <BalanceCard
           amount={Number(balance.available_balance).toLocaleString("ja-JP")}
           stats={[
-            { label: "保留中残高", value: `${Number(balance.held_balance).toLocaleString("ja-JP")} OVE` },
-            { label: "回収予定残高", value: `${Number(balance.pending_balance).toLocaleString("ja-JP")} OVE` },
+            { label: "保留中残高", value: `${Number(balance.held_balance).toLocaleString("ja-JP")} ORI` },
+            { label: "回収予定残高", value: `${Number(balance.pending_balance).toLocaleString("ja-JP")} ORI` },
           ]}
         />
 
         {expiringCredits && Number(expiringCredits.total_amount) > 0 && (
           <section className="rounded-xl border border-sengoku-gold/40 bg-sengoku-gold/10 p-4">
             <p className="text-sm font-bold text-sengoku-gold-soft">
-              まもなく{Number(expiringCredits.total_amount).toLocaleString("ja-JP")} OVEが失効します
+              まもなく{Number(expiringCredits.total_amount).toLocaleString("ja-JP")} ORIが失効します
             </p>
             {expiringCredits.nearest_expires_at && (
               <p className="mt-0.5 text-xs text-sengoku-gold-soft">
@@ -189,7 +189,7 @@ export default function WalletTopPage() {
                 <p className="mt-0.5 text-xs text-sengoku-muted">
                   {dailyBonus.claimed_today
                     ? `本日は受け取り済み (${dailyBonus.current_streak}日連続)`
-                    : `${dailyBonus.next_streak}日目・${Number(dailyBonus.next_amount).toLocaleString("ja-JP")} OVE`}
+                    : `${dailyBonus.next_streak}日目・${Number(dailyBonus.next_amount).toLocaleString("ja-JP")} ORI`}
                 </p>
               </div>
               <button
@@ -220,7 +220,7 @@ export default function WalletTopPage() {
                     </span>
                   </span>
                   <span className="shrink-0 font-bold text-sengoku-gold">
-                    {Number(h.amount).toLocaleString("ja-JP")} OVE
+                    {Number(h.amount).toLocaleString("ja-JP")} ORI
                   </span>
                 </li>
               ))}
@@ -230,8 +230,8 @@ export default function WalletTopPage() {
 
         <ActionGrid
           items={[
-            { icon: <GiftIcon className="h-6 w-6" />, label: "OVEを貯める", href: "/wallet/earn" },
-            { icon: <CartIcon className="h-6 w-6" />, label: "OVEを使う", href: "/wallet/use" },
+            { icon: <GiftIcon className="h-6 w-6" />, label: "ORIを貯める", href: "/wallet/earn" },
+            { icon: <CartIcon className="h-6 w-6" />, label: "ORIを使う", href: "/wallet/use" },
             { icon: <ClockIcon className="h-6 w-6" />, label: "取引履歴", href: "/wallet/transactions" },
             { icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", href: "/wallet/services" },
           ]}

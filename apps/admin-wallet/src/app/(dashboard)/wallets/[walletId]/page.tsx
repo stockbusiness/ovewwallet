@@ -119,7 +119,7 @@ export default function WalletDetailPage() {
           <h2 className="mb-3 text-sm font-semibold">個別付与 / 個別減算 / 残高保留</h2>
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-xs">
-              金額 (OVE)
+              金額 (ORI)
               <input
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -155,7 +155,7 @@ export default function WalletDetailPage() {
             {wallet.holds.map((h) => (
               <li key={h.id} className="flex items-center justify-between py-2 text-sm">
                 <span>
-                  {Number(h.amount).toLocaleString("ja-JP")} OVE ・ {h.reason} ・ {h.status}
+                  {Number(h.amount).toLocaleString("ja-JP")} ORI ・ {h.reason} ・ {h.status}
                 </span>
                 {h.status === "HELD" && (
                   <button onClick={() => releaseHold(h.id)} className="text-xs text-sengoku-gold underline">
@@ -202,7 +202,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-sengoku-border bg-sengoku-navy p-3">
       <p className="text-xs text-sengoku-muted">{label}</p>
-      <p className="mt-1 font-bold text-sengoku-gold">{Number(value).toLocaleString("ja-JP")} OVE</p>
+      <p className="mt-1 font-bold text-sengoku-gold">{Number(value).toLocaleString("ja-JP")} ORI</p>
     </div>
   );
 }

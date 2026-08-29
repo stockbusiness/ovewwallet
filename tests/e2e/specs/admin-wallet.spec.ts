@@ -22,7 +22,7 @@ test.describe("admin-wallet: ログイン→個別付与→残高反映", () => 
     await page.goto(`${ADMIN_URL}/wallets/${walletId}`);
     await expect(page.getByText(walletCode)).toBeVisible();
 
-    await page.getByLabel("金額 (OVE)").fill("1500");
+    await page.getByLabel("金額 (ORI)").fill("1500");
     await page.getByLabel("理由").fill("Playwright E2E自動テスト");
     await page.getByRole("button", { name: "付与", exact: true }).click();
 

@@ -92,7 +92,7 @@ export default function WalletMenuPage() {
       setError(
         err instanceof ApiError
           ? err.status === 400
-            ? "残高が残っているため退会できません。OVEを使い切ってから再度お試しください。"
+            ? "残高が残っているため退会できません。ORIを使い切ってから再度お試しください。"
             : err.message
           : "退会に失敗しました",
       );
@@ -122,7 +122,7 @@ export default function WalletMenuPage() {
           <p className="text-sm font-bold text-sengoku-text">紹介登録特典</p>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-sengoku-muted">{REFERRAL_STATUS_LABEL[referralStatus.status]}</span>
-            <span className="font-bold text-sengoku-gold">{Number(referralStatus.amount).toLocaleString("ja-JP")} OVE</span>
+            <span className="font-bold text-sengoku-gold">{Number(referralStatus.amount).toLocaleString("ja-JP")} ORI</span>
           </div>
           {referralStatus.status === "CONFIRMED" && referralStatus.confirmed_at && (
             <p className="mt-1 text-xs text-sengoku-faint">
@@ -141,11 +141,11 @@ export default function WalletMenuPage() {
           <ThemeToggle />
         </div>
         <MenuLink href="/wallet/services" label="連携サービス" />
-        <MenuLink href="/wallet/earn" label="OVEを貯める" />
-        <MenuLink href="/wallet/use" label="OVEを使う" />
+        <MenuLink href="/wallet/earn" label="ORIを貯める" />
+        <MenuLink href="/wallet/use" label="ORIを使う" />
         {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
-        <MenuLink href="/about" label="OVEについて" />
+        <MenuLink href="/about" label="ORIについて" />
         <MenuLink href="/terms" label="利用規約" />
       </section>
 

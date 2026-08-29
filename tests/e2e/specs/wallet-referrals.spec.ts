@@ -53,6 +53,6 @@ test.describe("代理店紹介トークン受け入れ: /invite/{token} → LINE
     const row = adminPage.locator("tr", { hasText: account.accountCode });
     await expect(row).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
     await expect(row).toContainText("登録済み・確認待ち");
-    await expect(row).toContainText("3,000 OVE (PENDING)");
+    await expect(row).toContainText("3,000 ORI (PENDING)");
   });
 });

@@ -118,7 +118,7 @@ export default function AccountsPage() {
                 <td className="p-3">
                   {a.wallet ? (
                     <Link href={`/wallets/${a.wallet.id}`} className="text-sengoku-gold underline">
-                      {Number(a.wallet.availableBalance).toLocaleString("ja-JP")} OVE
+                      {Number(a.wallet.availableBalance).toLocaleString("ja-JP")} ORI
                     </Link>
                   ) : (
                     "-"

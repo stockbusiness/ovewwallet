@@ -73,7 +73,7 @@ export default function TransactionDetailPage() {
         </span>
         <p className="text-lg font-bold text-sengoku-text">{title}</p>
         <p className={`text-3xl font-bold ${amountColor}`}>
-          {signedAmount} <span className="text-lg font-semibold text-sengoku-gold-soft">OVE</span>
+          {signedAmount} <span className="text-lg font-semibold text-sengoku-gold-soft">ORI</span>
         </p>
       </section>
 
@@ -89,9 +89,9 @@ export default function TransactionDetailPage() {
         <DetailRow label="取引ID" value={transaction.transaction_code} mono />
         <DetailRow label="取引種別" value={TRANSACTION_TYPE_LABEL[transaction.transaction_type] ?? transaction.transaction_type} />
         <DetailRow label="方向" value={isCredit ? "獲得" : "利用"} />
-        <DetailRow label="金額" value={`${signedAmount} OVE`} valueColor={amountColor} />
-        <DetailRow label="残高 (取引前)" value={`${Number(transaction.balance_before).toLocaleString("ja-JP")} OVE`} />
-        <DetailRow label="残高 (取引後)" value={`${Number(transaction.balance_after).toLocaleString("ja-JP")} OVE`} />
+        <DetailRow label="金額" value={`${signedAmount} ORI`} valueColor={amountColor} />
+        <DetailRow label="残高 (取引前)" value={`${Number(transaction.balance_before).toLocaleString("ja-JP")} ORI`} />
+        <DetailRow label="残高 (取引後)" value={`${Number(transaction.balance_after).toLocaleString("ja-JP")} ORI`} />
         {transaction.source_service && <DetailRow label="提供元サービス" value={transaction.source_service} />}
         {transaction.source_reference_id && <DetailRow label="関連ID" value={transaction.source_reference_id} mono />}
         {transaction.description && <DetailRow label="説明" value={transaction.description} wrap />}

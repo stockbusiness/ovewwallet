@@ -12,7 +12,7 @@ export interface TransactionItemProps {
 }
 
 /** 取引一覧・ウォレットホームの「最近の取引」で使う1行。獲得は緑、利用は深紅で表示する。 */
-export function TransactionItem({ icon, title, subtitle, amount, direction, unit = "OVE", href }: TransactionItemProps) {
+export function TransactionItem({ icon, title, subtitle, amount, direction, unit = "ORI", href }: TransactionItemProps) {
   const formatted = `${direction === "CREDIT" ? "+" : "-"}${Number(amount).toLocaleString("ja-JP")}`;
   const isCredit = direction === "CREDIT";
   const amountColor = isCredit ? "text-sengoku-green" : "text-sengoku-red";

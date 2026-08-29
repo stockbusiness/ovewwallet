@@ -375,7 +375,7 @@ export const FEATURE_FLAG_LABELS: Record<keyof FeatureFlags, string> = {
   ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX: "NFTコレクション entitlement受信",
   ENABLE_COLLECTIBLE_CLAIM_FLOW: "NFTカードClaim導線",
   ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS:
-    "旧登録特典(3,000 OVE)の新規発生(true=旧挙動維持)",
+    "旧登録特典(3,000 ORI)の新規発生(true=旧挙動維持)",
   ENABLE_COMMON_USER_BALANCE_API:
     "common_user_id起点の残高照会API(要scope付与)",
 };

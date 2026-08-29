@@ -43,7 +43,7 @@ export default function UseOvePage() {
         <Link href="/wallet" className="flex h-8 w-8 items-center justify-center text-sengoku-muted">
           <ArrowLeftIcon className="h-5 w-5" />
         </Link>
-        <h1 className="font-heading text-lg font-bold text-sengoku-text">OVEを使う</h1>
+        <h1 className="font-heading text-lg font-bold text-sengoku-text">ORIを使う</h1>
       </header>
 
       {toast && (
@@ -59,12 +59,12 @@ export default function UseOvePage() {
           <p className="text-xs text-sengoku-muted">利用可能残高</p>
           <p className="mt-1 flex items-baseline gap-1.5">
             <span className="text-2xl font-bold text-sengoku-gold">{Number(balance.available_balance).toLocaleString("ja-JP")}</span>
-            <span className="text-sm font-semibold text-sengoku-gold-soft">OVE</span>
+            <span className="text-sm font-semibold text-sengoku-gold-soft">ORI</span>
           </p>
         </section>
       )}
 
-      <p className="text-xs leading-relaxed text-sengoku-muted">連携済みサービスでOVEを利用できます。</p>
+      <p className="text-xs leading-relaxed text-sengoku-muted">連携済みサービスでORIを利用できます。</p>
 
       {error && <p className="text-sm text-sengoku-gold-soft">{error}</p>}
       {!error && services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
