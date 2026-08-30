@@ -13,6 +13,7 @@
 | ジョブ名 | 既定スケジュール (UTC) | 日本時間 | 呼び出す処理 |
 |---|---|---|---|
 | `credit-expiry` | `0 17 * * *` | 毎日 02:00 | `AdminRewardRulesService.runExpiryBatch()` |
+| `data-retention` | `30 19 * * *` | 毎日 04:30 | `DataRetentionService.purgeExpiredData()` |
 | `reconciliation` | `0 20 * * *` | 毎日 05:00 | `AdminService.reconcile()` |
 | `outbox-dispatch` | `*/5 * * * *` | 5分ごと | `OutboxService.processPendingEvents()` |
 
@@ -31,6 +32,13 @@
 | `EXPIRY_CRON` | `0 17 * * *` | 失効バッチのcron式 (5フィールド、UTC) |
 | `RECONCILIATION_CRON` | `0 20 * * *` | 整合性チェックのcron式 |
 | `OUTBOX_CRON` | `*/5 * * * *` | Outbox送信のcron式 |
+| `RETENTION_CRON` | `30 19 * * *` | データ保持ジョブのcron式 |
+| `USER_SESSION_RETENTION_DAYS` | `90` | 期限切れセッションを期限切れ後どれだけ残すか |
+| `API_ACCESS_LOG_RETENTION_DAYS` | `180` | 外部APIアクセスログをどれだけ残すか |
+| `OUTBOX_SENT_RETENTION_DAYS` | `90` | 送信済みOutboxイベントをどれだけ残すか |
+
+保持日数は正の整数として解釈できない値を設定した場合、既定値にフォールバックする
+(設定ミスで0日になり必要なデータまで消えるのを避けるため)。
 
 Feature Flag (`ENABLE_*`) と異なり**既定で有効**にしている。これらは新機能ではなく
 「本来ずっと動いているべき運用処理」であり、既定OFFにすると本番で有効化を忘れたときに
@@ -84,6 +92,22 @@ scheduled job "outbox-dispatch" finished in 240ms: processed=3 failed=0 batches=
 ```
 scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation / outbox dispatch will NOT run automatically
 ```
+
+## データ保持ジョブが消すもの・消さないもの
+
+| テーブル | 扱い |
+|---|---|
+| `user_sessions` | 有効期限切れから保持期間を過ぎた行を削除。ログインデバイス一覧は元から期限切れを除外して表示しているため、利用者から見える情報は変わらない |
+| `api_access_logs` | 記録から保持期間を過ぎた行を削除 |
+| `integration_outbox` | **送信済み(SENT)のみ**削除。PENDING/PROCESSINGは未送信、FAILEDは人手の対応待ちのため、古くても残す |
+| `audit_logs` / `ove_transactions` | **削除しない**。DBトリガーでDELETE自体を禁止しており(設計どおり)、長期保管が前提。削除ではなくアーカイブ方針を別途決める |
+| `inbound_events` | **削除しない**。外部イベントの重複受信を防ぐ記録で、古い行を消すと同じ`event_id`の再送で二重処理(報酬の二重付与など)になりうる。表のサイズより取り違えの実害が大きいため対象外とした |
+
+一度に大量削除すると長時間ロックを保持するため、1000件ずつ・1テーブルあたり最大20回
+(2万件) に分けて実行する。上限に達した分は警告ログを出して次回の実行に持ち越す。
+
+保持期間の既定値は「調査に必要な期間は残しつつ無限に増やさない」ことを狙った暫定値。
+法令・社内規程で保持期間が定まったら上記の環境変数で上書きすること。
 
 ## 異常時の挙動
 
