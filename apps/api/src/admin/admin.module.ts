@@ -60,6 +60,8 @@ import { AdminService } from "./admin.service";
   ],
   // AdminApprovalServiceは共通イベントハンドラ (common_user.merged) からも
   // システム起点のアカウント統合申請を作成するために参照する (二段階承認を再利用)。
-  exports: [AdminApprovalService],
+  // AdminService・AdminRewardRulesServiceは`SchedulerModule`が定期実行から呼び出す
+  // (整合性チェック・失効バッチ。手動実行と同じ処理を使うためロジックを複製しない)。
+  exports: [AdminApprovalService, AdminService, AdminRewardRulesService],
 })
 export class AdminModule {}

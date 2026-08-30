@@ -69,6 +69,10 @@ export default defineConfig({
       // Next.js Image Optimizerのremote patterns (apps/*/next.config.mjs) が同じホストを
       // 許可するようapps/api・apps/user-wallet・apps/admin-walletの3プロセス全てに揃える。
       env: {
+        // このAPIプロセスは`.env.test`を読まずに起動するため、定期実行を明示的に切る。
+        // Outbox送信ジョブ(既定5分ごと)がテスト中に走ると、specが検証している紹介
+        // イベントのキュー状態を書き換えてしまい結果が不安定になる。
+        SCHEDULER_ENABLED: "false",
         ENABLE_WALLET_REFERRAL_TOKEN: "true",
         // PR-W1: wallet-referrals.spec.tsが旧登録特典(3,000 OVE PENDING)の管理画面表示を
         // 検証しているため、既存挙動の回帰確認として明示的にONにする。

@@ -19,6 +19,7 @@ import { HealthController } from "./health.controller";
 import { OutboxModule } from "./outbox/outbox.module";
 import { ReferralsModule } from "./referrals/referrals.module";
 import { RewardsModule } from "./rewards/rewards.module";
+import { SchedulerModule } from "./scheduler/scheduler.module";
 import { TransactionsModule } from "./transactions/transactions.module";
 import { WalletsModule } from "./wallets/wallets.module";
 
@@ -41,6 +42,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     CommonEventsModule,
     CollectiblesModule,
     CollectibleClaimsModule,
+    SchedulerModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
