@@ -8,6 +8,10 @@
  * - ENCRYPTION_KEY: 未設定だと`getEncryptionKey()`がdev-only-insecure-encryption-key
  *   フォールバックを使ってしまう (このアサーションにより本番ではその分岐へ到達しない)。
  * - LINE_CHANNEL_ID: LINEログインの本番実装(`LineIdTokenVerifier`)に必須。
+ * - APP_URL / ADMIN_URL: CORSとCSRF対策が共有する許可オリジン一覧
+ *   (`allowed-origins.ts`)の唯一の入力。未設定だと許可リストが空になり、
+ *   CSRF対策のオリジン検証が「何が正当なオリジンか不明」として素通しになる
+ *   (`csrf-protection.middleware.ts`参照)。
  */
 export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV !== "production") return;
@@ -16,6 +20,8 @@ export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): v
   if (!env.REDIS_URL) missing.push("REDIS_URL");
   if (!env.ENCRYPTION_KEY) missing.push("ENCRYPTION_KEY");
   if (!env.LINE_CHANNEL_ID) missing.push("LINE_CHANNEL_ID");
+  if (!env.APP_URL) missing.push("APP_URL");
+  if (!env.ADMIN_URL) missing.push("ADMIN_URL");
 
   if (missing.length > 0) {
     throw new Error(

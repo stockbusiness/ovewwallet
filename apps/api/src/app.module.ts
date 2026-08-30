@@ -9,6 +9,7 @@ import { AuthModule } from "./auth/auth.module";
 import { CommonEventsModule } from "./common-events/common-events.module";
 import { CollectiblesModule } from "./collectibles/collectibles.module";
 import { CollectibleClaimsModule } from "./collectible-claims/collectible-claims.module";
+import { csrfProtectionMiddleware } from "./common/csrf-protection.middleware";
 import { KeyValueStoreModule } from "./common/kv-store.module";
 import { PrismaModule } from "./common/prisma.module";
 import { RepositoriesModule } from "./common/repositories.module";
@@ -46,6 +47,8 @@ import { WalletsModule } from "./wallets/wallets.module";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(requestIdMiddleware).forRoutes("*");
+    // CSRF対策はAppModule側で登録する。main.tsのbootstrap()ではなくここに置くことで、
+    // AppModuleを起動する全てのe2eテストでも本番と同じ経路が有効になる。
+    consumer.apply(requestIdMiddleware, csrfProtectionMiddleware).forRoutes("*");
   }
 }

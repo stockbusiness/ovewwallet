@@ -5,6 +5,7 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import "./common/bigint-json";
 import { AppModule } from "./app.module";
+import { getAllowedOrigins } from "./common/allowed-origins";
 import { LedgerExceptionFilter } from "./common/ledger-exception.filter";
 import { assertAuthModeSafeForProduction } from "./common/assert-auth-mode";
 import { assertProductionEnvSafe } from "./common/assert-production-env";
@@ -27,10 +28,8 @@ async function bootstrap() {
   // 呼ばれる構成のため、cross-originを許可する。
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(cookieParser());
-  const allowedOrigins = [process.env.APP_URL, process.env.ADMIN_URL].filter(
-    (v): v is string => Boolean(v),
-  );
-  app.enableCors({ origin: allowedOrigins, credentials: true });
+  // CSRF対策 (csrf-protection.middleware.ts) と同じ許可リストを使う。
+  app.enableCors({ origin: getAllowedOrigins(), credentials: true });
   app.useGlobalFilters(new LedgerExceptionFilter());
 
   const config = new DocumentBuilder()
