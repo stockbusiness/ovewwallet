@@ -120,4 +120,30 @@ describe("管理画面MFA (指示書13章)", () => {
     const server = app.getHttpServer();
     await request(server).post("/api/v1/admin/login/mfa").send({ mfaToken: "not-a-real-token", code: "123456" }).expect(401);
   });
+
+  it("rejects replaying the same valid TOTP code against the same MFA action", async () => {
+    const server = app.getHttpServer();
+    const replayEmail = `e2e-mfa-replay-${generateId()}@ovewallet.local`;
+    await prisma.adminUser.create({
+      data: {
+        id: generateId(),
+        adminCode: `OVE-ADM-${generateId()}`,
+        email: replayEmail,
+        passwordHash: hashSecret(password),
+        role: "SUPER_ADMIN",
+        displayName: "E2E MFA Replay Admin",
+      },
+    });
+
+    const login = await request(server).post("/api/v1/admin/login").send({ email: replayEmail, password }).expect(201);
+    const cookie = login.headers["set-cookie"] as unknown as string[];
+    const setupRes = await request(server).post("/api/v1/admin/mfa/setup").set("Cookie", cookie).expect(201);
+    const { secret } = setupRes.body;
+
+    const code = computeTotpCode(secret);
+    // 1回目: 有効化成功 (このステップを使用済みとして記録する)
+    await request(server).post("/api/v1/admin/mfa/enable").set("Cookie", cookie).send({ code }).expect(201);
+    // 2回目: 時刻的にはまだ有効な窓内 (±30秒) でも、同じコードの再送はリプレイとして拒否される
+    await request(server).post("/api/v1/admin/mfa/enable").set("Cookie", cookie).send({ code }).expect(401);
+  });
 });
