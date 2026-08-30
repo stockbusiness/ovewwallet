@@ -143,9 +143,11 @@ export class AdminRewardRulesService {
   }
 
   /**
-   * 有効期限が到来した獲得OVEを失効させるバッチを手動実行する
-   * (cron等の外部スケジューラは未接続のため、当面は管理画面からの手動実行を想定。
-   * docs/credit-expiry.md「運用」参照)。
+   * 有効期限が到来した獲得ORIを失効させるバッチ。
+   *
+   * 通常は`SchedulerModule`が日次で自動実行する (`docs/runbooks/scheduled-jobs.md`)。
+   * 管理画面からの臨時実行もこのメソッドを呼ぶ。自動・手動で挙動が分かれないよう
+   * 処理を複製しない (docs/credit-expiry.md「運用」参照)。
    */
   async runExpiryBatch() {
     const result = await expireDueCreditLots(this.db);

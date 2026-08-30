@@ -62,6 +62,7 @@ jobs:
           SESSION_SECRET=test-session-secret-please-change-32chars-min
           COOKIE_DOMAIN=localhost
           ENCRYPTION_KEY=test-only-insecure-encryption-key
+          SCHEDULER_ENABLED=false
           EOF
 
       - name: Apply migrations to the test database

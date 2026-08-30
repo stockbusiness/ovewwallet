@@ -8,8 +8,10 @@ import { Roles, RolesGuard } from "../common/roles.guard";
 /**
  * Transactional Outbox の管理画面向け参照/手動再送API (開発ガイドライン15章
  * 「紹介連携状態一覧・SYNC_PENDING/FAILED/CONFLICTの絞り込み・自動再送回数・手動再送」)。
- * 現時点では代理店システム等の実際の宛先ハンドラは未登録のため、キューは空か
- * `no destination handler registered` エラーのイベントのみが積まれる想定。
+ * 宛先ハンドラは`AGENCY_SYSTEM` (代理店システム) が登録済み (`referrals.module.ts`)。
+ * 通常の送信は`SchedulerModule`が5分ごとに自動実行するため
+ * (`docs/runbooks/scheduled-jobs.md`)、下の`dispatch`は臨時実行の入口として残している。
+ * 再送上限に達した`FAILED`は自動再送されないため、`:id/retry`で手動再送する。
  */
 @ApiTags("admin-outbox")
 @Controller("api/v1/admin/outbox")
