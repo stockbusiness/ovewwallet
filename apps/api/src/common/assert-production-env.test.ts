@@ -6,6 +6,8 @@ describe("assertProductionEnvSafe (次期改修指示書P0-6)", () => {
     REDIS_URL: "redis://localhost:6379",
     ENCRYPTION_KEY: "a".repeat(32),
     LINE_CHANNEL_ID: "1234567890",
+    APP_URL: "https://app.example.com",
+    ADMIN_URL: "https://admin.example.com",
   };
 
   it("does not throw when all required production env vars are set", () => {
@@ -14,7 +16,7 @@ describe("assertProductionEnvSafe (次期改修指示書P0-6)", () => {
 
   it("throws listing all missing vars when none are set", () => {
     expect(() => assertProductionEnvSafe({ NODE_ENV: "production" })).toThrow(
-      /REDIS_URL.*ENCRYPTION_KEY.*LINE_CHANNEL_ID/,
+      /REDIS_URL.*ENCRYPTION_KEY.*LINE_CHANNEL_ID.*APP_URL.*ADMIN_URL/,
     );
   });
 
@@ -31,6 +33,18 @@ describe("assertProductionEnvSafe (次期改修指示書P0-6)", () => {
   it("throws when only LINE_CHANNEL_ID is missing", () => {
     const { LINE_CHANNEL_ID: _omit, ...rest } = complete;
     expect(() => assertProductionEnvSafe(rest)).toThrow(/LINE_CHANNEL_ID/);
+  });
+
+  // APP_URL/ADMIN_URLはCORSとCSRF対策が共有する許可オリジン一覧の唯一の入力のため、
+  // 本番で未設定のまま起動させない (csrf-protection.middleware.ts参照)。
+  it("throws when only APP_URL is missing", () => {
+    const { APP_URL: _omit, ...rest } = complete;
+    expect(() => assertProductionEnvSafe(rest)).toThrow(/APP_URL/);
+  });
+
+  it("throws when only ADMIN_URL is missing", () => {
+    const { ADMIN_URL: _omit, ...rest } = complete;
+    expect(() => assertProductionEnvSafe(rest)).toThrow(/ADMIN_URL/);
   });
 
   it("does not throw outside production regardless of missing vars", () => {
