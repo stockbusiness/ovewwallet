@@ -28,6 +28,13 @@ export interface ReverseTransactionParams {
 /**
  * COMPLETED取引の取消。元取引は削除・上書きせず、逆方向の REVERSAL 取引を
  * 追加し、元取引のステータスのみ REVERSED に遷移させる (金額・種別・理由は不変)。
+ *
+ * `transactionId`の存在確認そのものはロック取得前に行うが (どのウォレットを
+ * ロックすべきか決めるために必要)、`status`/`alreadyReversed`の判定は必ず
+ * ウォレットのロック取得後に再読込した値で行う。異なるidempotencyKeyを持つ
+ * 2つのreverseTransaction呼び出しが同じtransactionIdへ同時に来た場合、
+ * releaseHold()と同じ理由 (詳細はhold.tsのコメント参照) で、ロック取得前の
+ * 判定結果をそのまま使うと後発が二重に取消処理を適用してしまう。
  */
 export async function reverseTransaction(
   params: ReverseTransactionParams,
@@ -40,10 +47,18 @@ export async function reverseTransaction(
 
   try {
     return await db.$transaction(async (tx) => {
-      const original = await tx.oveTransaction.findUnique({
+      const initial = await tx.oveTransaction.findUnique({
         where: { id: params.transactionId },
       });
-      if (!original) throw new TransactionNotFoundError(params.transactionId);
+      if (!initial) throw new TransactionNotFoundError(params.transactionId);
+
+      const wallet = await lockWallet(tx, initial.walletId);
+      if (!wallet) throw new WalletNotFoundError(initial.walletId);
+
+      // ロック取得後に再読込して判定する (上記コメント参照)。
+      const original = await tx.oveTransaction.findUniqueOrThrow({
+        where: { id: params.transactionId },
+      });
       if (original.status !== "COMPLETED") {
         throw new TransactionNotReversibleError(original.id, original.status);
       }
@@ -52,9 +67,6 @@ export async function reverseTransaction(
         where: { relatedTransactionId: original.id, transactionType: "REVERSAL" },
       });
       if (alreadyReversed) return alreadyReversed;
-
-      const wallet = await lockWallet(tx, original.walletId);
-      if (!wallet) throw new WalletNotFoundError(original.walletId);
 
       const reversalDirection = original.direction === "CREDIT" ? "DEBIT" : "CREDIT";
       const amount = original.amount;

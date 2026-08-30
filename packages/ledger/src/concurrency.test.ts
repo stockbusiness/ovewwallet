@@ -1,6 +1,8 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { prisma } from "@ove/database";
 import { creditWallet, debitWallet } from "./credit-debit";
+import { holdBalance, releaseHold } from "./hold";
+import { reverseTransaction } from "./reversal";
 import { createTestWallet, truncateLedgerTables } from "./test-helpers";
 
 describe("concurrency (指示書18章: 特に必須のテスト)", () => {
@@ -71,5 +73,83 @@ describe("concurrency (指示書18章: 特に必須のテスト)", () => {
       where: { walletId: wallet.id, status: "COMPLETED", direction: "DEBIT" },
     });
     expect(completedDebits).toBe(5);
+  });
+
+  it("releases a hold exactly once when 10 concurrent releaseHold calls (different idempotency keys) target the same holdId", async () => {
+    const { wallet } = await createTestWallet(1000n);
+    const hold = await holdBalance({
+      walletId: wallet.id,
+      amount: 400,
+      reason: "不正調査のため保留",
+      idempotencyKey: `hold:${wallet.id}:concurrent`,
+      createdBy: "admin-1",
+    });
+
+    const attempts = Array.from({ length: 10 }, (_, i) =>
+      releaseHold({
+        holdId: hold.id,
+        idempotencyKey: `release:${hold.id}:concurrent:${i}`,
+        createdBy: "admin-1",
+      }).then(
+        () => ({ status: "fulfilled" as const }),
+        (error) => ({ status: "rejected" as const, error }),
+      ),
+    );
+
+    const results = await Promise.all(attempts);
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    // 異なるidempotencyKeyで同じholdへ同時に来ても、実際に解除が反映されるのは1件だけ
+    // (2件目以降はロック取得後の再読込で status !== "HELD" を検知し失敗する)。
+    expect(succeeded).toBe(1);
+
+    const updated = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(updated.availableBalance).toBe(1000n); // 二重に戻されない
+    expect(updated.heldBalance).toBe(0n);
+
+    const releaseCount = await prisma.oveTransaction.count({
+      where: { walletId: wallet.id, transactionType: "RELEASE", status: "COMPLETED" },
+    });
+    expect(releaseCount).toBe(1);
+  });
+
+  it("reverses a transaction exactly once when 10 concurrent reverseTransaction calls (different idempotency keys) target the same transactionId", async () => {
+    const { wallet } = await createTestWallet(0n);
+    const original = await creditWallet({
+      walletId: wallet.id,
+      amount: 3000,
+      transactionType: "ADMIN_GRANT",
+      idempotencyKey: `grant:${wallet.id}:concurrent`,
+      displayName: "誤付与",
+      createdByType: "ADMIN",
+      createdById: "admin-1",
+    });
+
+    const attempts = Array.from({ length: 10 }, (_, i) =>
+      reverseTransaction({
+        transactionId: original.id,
+        reason: "誤付与のため取消",
+        idempotencyKey: `reverse:${original.id}:concurrent:${i}`,
+        createdByType: "ADMIN",
+        createdById: "admin-1",
+      }).then(
+        () => ({ status: "fulfilled" as const }),
+        (error) => ({ status: "rejected" as const, error }),
+      ),
+    );
+
+    const results = await Promise.all(attempts);
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    // 異なるidempotencyKeyで同じ取消対象へ同時に来ても、実際に取消が反映されるのは1件だけ
+    // (2件目以降はロック取得後の再読込で status !== "COMPLETED" を検知して失敗するか、
+    // 既存のREVERSALをそのまま返す)。
+    expect(succeeded).toBe(1);
+
+    const updated = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(updated.availableBalance).toBe(0n); // 二重に取消されない
+
+    const reversalCount = await prisma.oveTransaction.count({
+      where: { relatedTransactionId: original.id, transactionType: "REVERSAL" },
+    });
+    expect(reversalCount).toBe(1);
   });
 });
