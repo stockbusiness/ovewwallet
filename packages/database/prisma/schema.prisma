@@ -424,6 +424,8 @@ model UserSession {
   account OveAccount @relation(fields: [oveAccountId], references: [id])
 
   @@index([oveAccountId])
+  /// データ保持ジョブが期限切れセッションを expires_at で抽出して削除するための索引。
+  @@index([expiresAt])
   @@map("user_sessions")
 }
 

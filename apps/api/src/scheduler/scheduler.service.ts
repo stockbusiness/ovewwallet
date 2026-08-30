@@ -7,10 +7,12 @@ import { captureException } from "../common/sentry";
 import { AdminService } from "../admin/admin.service";
 import { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
 import { OutboxService } from "../outbox/outbox.service";
+import { DataRetentionService } from "./data-retention.service";
 import {
   DEFAULT_EXPIRY_CRON,
   DEFAULT_OUTBOX_CRON,
   DEFAULT_RECONCILIATION_CRON,
+  DEFAULT_RETENTION_CRON,
   JOB_LOCK_TTL_SECONDS,
   OUTBOX_MAX_BATCHES_PER_TICK,
   cronExpression,
@@ -20,6 +22,7 @@ import {
 export const JOB_CREDIT_EXPIRY = "credit-expiry";
 export const JOB_RECONCILIATION = "reconciliation";
 export const JOB_OUTBOX_DISPATCH = "outbox-dispatch";
+export const JOB_DATA_RETENTION = "data-retention";
 
 /**
  * 運用処理の定期実行。
@@ -42,6 +45,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly admin: AdminService,
     private readonly rewardRules: AdminRewardRulesService,
     private readonly outbox: OutboxService,
+    private readonly retention: DataRetentionService,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
   ) {}
 
@@ -61,6 +65,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     );
     this.register(JOB_OUTBOX_DISPATCH, cronExpression("OUTBOX_CRON", DEFAULT_OUTBOX_CRON), () =>
       this.runOutboxDispatch(),
+    );
+    this.register(JOB_DATA_RETENTION, cronExpression("RETENTION_CRON", DEFAULT_RETENTION_CRON), () =>
+      this.runDataRetention(),
     );
   }
 
@@ -167,6 +174,14 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       }
 
       return `processed=${processed} failed=${failed} batches=${batches}`;
+    });
+  }
+
+  /** 保持期間を過ぎた行を削除する (`DataRetentionService` に対象と除外理由を記載)。 */
+  async runDataRetention(): Promise<boolean> {
+    return this.withLock(JOB_DATA_RETENTION, async () => {
+      const result = await this.retention.purgeExpiredData();
+      return `user_sessions=${result.userSessions} api_access_logs=${result.apiAccessLogs} outbox_sent=${result.sentOutboxEvents}`;
     });
   }
 }

@@ -1,14 +1,22 @@
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { InMemoryKeyValueStore } from "@ove/auth";
-import { SchedulerService, JOB_CREDIT_EXPIRY, JOB_OUTBOX_DISPATCH, JOB_RECONCILIATION } from "./scheduler.service";
+import {
+  SchedulerService,
+  JOB_CREDIT_EXPIRY,
+  JOB_DATA_RETENTION,
+  JOB_OUTBOX_DISPATCH,
+  JOB_RECONCILIATION,
+} from "./scheduler.service";
 import type { AdminService } from "../admin/admin.service";
 import type { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
+import type { DataRetentionService } from "./data-retention.service";
 import type { OutboxService } from "../outbox/outbox.service";
 
 function build(overrides: {
   admin?: Partial<AdminService>;
   rewardRules?: Partial<AdminRewardRulesService>;
   outbox?: Partial<OutboxService>;
+  retention?: Partial<DataRetentionService>;
   kv?: InMemoryKeyValueStore;
 } = {}) {
   const kv = overrides.kv ?? new InMemoryKeyValueStore();
@@ -25,9 +33,14 @@ function build(overrides: {
     ...overrides.outbox,
   } as unknown as OutboxService;
 
+  const retention = {
+    purgeExpiredData: jest.fn().mockResolvedValue({ userSessions: 4, apiAccessLogs: 9, sentOutboxEvents: 1 }),
+    ...overrides.retention,
+  } as unknown as DataRetentionService;
+
   const registry = new SchedulerRegistry();
-  const service = new SchedulerService(registry, admin, rewardRules, outbox, kv);
-  return { service, registry, admin, rewardRules, outbox, kv };
+  const service = new SchedulerService(registry, admin, rewardRules, outbox, retention, kv);
+  return { service, registry, admin, rewardRules, outbox, retention, kv };
 }
 
 describe("SchedulerService", () => {
@@ -39,7 +52,7 @@ describe("SchedulerService", () => {
   });
 
   describe("ジョブ登録", () => {
-    it("registers all three jobs when enabled", () => {
+    it("registers every job when enabled", () => {
       delete process.env.SCHEDULER_ENABLED; // 未設定=有効 (既定ON)
       const { service, registry } = build();
 
@@ -47,6 +60,7 @@ describe("SchedulerService", () => {
       expect(registry.getCronJob(JOB_CREDIT_EXPIRY)).toBeDefined();
       expect(registry.getCronJob(JOB_RECONCILIATION)).toBeDefined();
       expect(registry.getCronJob(JOB_OUTBOX_DISPATCH)).toBeDefined();
+      expect(registry.getCronJob(JOB_DATA_RETENTION)).toBeDefined();
 
       service.onModuleDestroy();
       // 停止後はタイマーが残らない (プロセスが終了できる)
@@ -113,6 +127,12 @@ describe("SchedulerService", () => {
 
       await expect(service.runOutboxDispatch()).resolves.toBe(true);
       expect(processPendingEvents).toHaveBeenCalledTimes(10); // OUTBOX_MAX_BATCHES_PER_TICK
+    });
+
+    it("runs the data retention purge", async () => {
+      const { service, retention } = build();
+      await expect(service.runDataRetention()).resolves.toBe(true);
+      expect(retention.purgeExpiredData).toHaveBeenCalledTimes(1);
     });
   });
 

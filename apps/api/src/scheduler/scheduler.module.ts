@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AdminModule } from "../admin/admin.module";
 import { OutboxModule } from "../outbox/outbox.module";
+import { DataRetentionService } from "./data-retention.service";
 import { SchedulerService } from "./scheduler.service";
 
 /**
@@ -13,7 +14,7 @@ import { SchedulerService } from "./scheduler.service";
  */
 @Module({
   imports: [ScheduleModule.forRoot(), AdminModule, OutboxModule],
-  providers: [SchedulerService],
+  providers: [SchedulerService, DataRetentionService],
   exports: [SchedulerService],
 })
 export class SchedulerModule {}
