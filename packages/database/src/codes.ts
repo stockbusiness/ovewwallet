@@ -35,3 +35,4 @@ export async function nextDisplayCode(
 export const ACCOUNT_CODE_COUNTER = "OVE_ACCOUNT";
 export const WALLET_CODE_COUNTER = "OVE_WALLET";
 export const TRANSACTION_CODE_COUNTER = "OVE_TRANSACTION";
+export const ADMIN_CODE_COUNTER = "OVE_ADMIN";

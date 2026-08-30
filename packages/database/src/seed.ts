@@ -1,7 +1,13 @@
 import { hashSecret, encryptSecret, generateOpaqueToken } from "@ove/auth";
 import { prisma } from "./client";
 import { generateId } from "./id";
-import { ACCOUNT_CODE_COUNTER, TRANSACTION_CODE_COUNTER, WALLET_CODE_COUNTER } from "./codes";
+import {
+  ACCOUNT_CODE_COUNTER,
+  ADMIN_CODE_COUNTER,
+  TRANSACTION_CODE_COUNTER,
+  WALLET_CODE_COUNTER,
+  nextDisplayCode,
+} from "./codes";
 
 const SERVICE_CODES = [
   "SENGOKU_PASSPORT",
@@ -17,7 +23,12 @@ async function main() {
   console.log("Seeding initial data...");
 
   // カウンタ初期化 (存在しない場合のみ)
-  for (const key of [ACCOUNT_CODE_COUNTER, WALLET_CODE_COUNTER, TRANSACTION_CODE_COUNTER]) {
+  for (const key of [
+    ACCOUNT_CODE_COUNTER,
+    WALLET_CODE_COUNTER,
+    TRANSACTION_CODE_COUNTER,
+    ADMIN_CODE_COUNTER,
+  ]) {
     await prisma.codeCounter.upsert({
       where: { id: key },
       update: {},
@@ -25,22 +36,28 @@ async function main() {
     });
   }
 
-  // 初期管理者 (SUPER_ADMIN) — パスワードは初回ログイン後に必ず変更すること
+  // 初期管理者 (SUPER_ADMIN)。2人目以降は管理画面 (POST /api/v1/admin/admins) から
+  // 追加でき、この初期パスワードも POST /api/v1/admin/password で本人が変更できる。
+  // admin_code は固定値ではなくカウンタから採番する (管理者追加APIと同じ採番列を使い、
+  // 番号が衝突しないようにするため)。
   const adminEmail = "admin@ovewallet.local";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? generateOpaqueToken(12);
-  await prisma.adminUser.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      id: generateId(),
-      adminCode: "OVE-ADM-00000001",
-      email: adminEmail,
-      passwordHash: hashSecret(adminPassword),
-      role: "SUPER_ADMIN",
-      displayName: "Initial Super Admin",
-    },
-  });
-  console.log(`  admin_users: ${adminEmail} / password=${adminPassword} (must be rotated)`);
+  const existingAdmin = await prisma.adminUser.findUnique({ where: { email: adminEmail } });
+  if (existingAdmin) {
+    console.log(`  admin_users: ${adminEmail} (already exists, skipped)`);
+  } else {
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? generateOpaqueToken(12);
+    await prisma.adminUser.create({
+      data: {
+        id: generateId(),
+        adminCode: await nextDisplayCode(prisma, ADMIN_CODE_COUNTER, "OVE-ADM"),
+        email: adminEmail,
+        passwordHash: hashSecret(adminPassword),
+        role: "SUPER_ADMIN",
+        displayName: "Initial Super Admin",
+      },
+    });
+    console.log(`  admin_users: ${adminEmail} / password=${adminPassword} (must be rotated)`);
+  }
 
   // 外部サービス連携の初期レコード。APIキー・署名シークレットは生成時のみ表示し、
   // ハッシュ化した値だけをDBへ保存する。
