@@ -33,10 +33,30 @@ Issueが表示されることを確認済み。データを変更しない安全
   (`GET /api/v1/admin/reconciliation`) を誰かが手動で開かない限り気づけなかった。
   自動修正はしない (指示書17章の方針を維持)。
 
+**フロントエンドのエラー収集 — 実装済み・DSN設定待ち**
+
+`@sentry/nextjs` を `apps/user-wallet` / `apps/admin-wallet` へ導入済み。ブラウザ・
+サーバー(SSR/Route Handler)・Edgeの3実行環境と、描画中の例外の最終受け皿
+(`src/app/global-error.tsx`) を対象にする。APIと同じ方針で `NEXT_PUBLIC_SENTRY_DSN`
+未設定時は `init()` を呼ばず何も送信しない。
+
+- 設定の実体は各アプリの `src/lib/sentry-options.ts`
+  (`sentry.client.config.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` から読む)
+- `tracesSampleRate: 0` (APIと同じくトレースは使わない)、`sendDefaultPii: false`
+  (残高・個人情報を扱うため、IPアドレス・Cookie・リクエストボディを送らない)
+- ビルド時のSentry処理 (`withSentryConfig`) は**DSNを設定したときだけ**有効になる。
+  未設定時は現状とまったく同じビルドで、バンドルサイズも変わらない
+  (共有チャンク 87kB のまま。DSN設定時は 115kB になる)
+- `__SENTRY_TRACING__` / `__SENTRY_DEBUG__` を webpack DefinePlugin で `false` に固定し、
+  使わないトレース用コードをバンドルから落としている (149kB → 115kB)
+
 **残作業 (人手が必要)**:
 1. Sentry側でアラートルール (例: 1分間に5件以上の新規Issueでメール/Slack通知) を設定する。
-2. apps/user-wallet・apps/admin-wallet (Next.js, Vercel) のクライアント/サーバー側エラーは
-   今回は対象外。必要になったら `@sentry/nextjs` を追加する (同様にDSN未設定時はno-opにする)。
+   コードは揃っているため、これが無いとエラーは記録されても誰にも通知されない。
+2. フロントエンド用のSentryプロジェクトを作成し (API用と分けると原因の切り分けがしやすい)、
+   Vercelの環境変数へ `NEXT_PUBLIC_SENTRY_DSN` を設定する。ソースマップを対応付ける場合は
+   併せて `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` も設定する
+   (未設定ならアップロードだけがスキップされ、ビルド自体は成功する)。
 
 ## 2. ヘルスチェック — 実装済み・Railwayの自己監視のみ
 

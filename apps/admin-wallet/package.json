@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ove/shared-ui": "workspace:*",
+    "@sentry/nextjs": "^8.55.2",
     "next": "^14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
