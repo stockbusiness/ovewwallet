@@ -20,30 +20,56 @@ export default function AccountsPage() {
   const router = useRouter();
   const [accounts, setAccounts] = useState<AccountListItem[]>([]);
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  // 入力のたびに検索すると打鍵ごとにリクエストが飛ぶため、入力が止まってから投げる。
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setAppliedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    let cancelled = false;
     (async () => {
+      setLoading(true);
       try {
-        const query = status ? `&status=${status}` : "";
-        const list = await apiFetch<AccountListItem[]>(`/api/v1/admin/accounts?limit=200${query}`);
+        const params = new URLSearchParams({ limit: "200" });
+        if (status) params.set("status", status);
+        if (appliedSearch) params.set("search", appliedSearch);
+        const list = await apiFetch<AccountListItem[]>(`/api/v1/admin/accounts?${params.toString()}`);
+        // 入力を続けている間に古いリクエストが後から届いて上書きするのを防ぐ。
+        if (cancelled) return;
         setAccounts(list);
+        setError(null);
       } catch (err) {
+        if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
           router.push("/login");
           return;
         }
         setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [router, status]);
+    return () => {
+      cancelled = true;
+    };
+  }, [router, status, appliedSearch]);
 
   async function downloadCsv() {
     setExporting(true);
     setError(null);
     try {
-      const query = status ? `?status=${status}` : "";
+      // 画面に出ている絞り込みと同じ条件でCSVを出す (表示とCSVの内容がずれないように)。
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (appliedSearch) params.set("search", appliedSearch);
+      const query = params.toString() ? `?${params.toString()}` : "";
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/accounts/export${query}`, { credentials: "include" });
       if (!res.ok) throw new Error("failed");
       const blob = await res.blob();
@@ -77,22 +103,37 @@ export default function AccountsPage() {
             </Link>
           </div>
         </div>
-        <div className="mb-4 flex items-center gap-2">
-          <label htmlFor="status-filter" className="text-sm text-sengoku-muted">
-            状態で絞り込み:
-          </label>
-          <select
-            id="status-filter"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="rounded-md border border-sengoku-border px-2 py-1 text-sm"
-          >
-            {STATUS_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex min-w-[18rem] flex-1 items-center gap-2">
+            <label htmlFor="account-search" className="whitespace-nowrap text-sm text-sengoku-muted">
+              検索:
+            </label>
+            <input
+              id="account-search"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="メールアドレス / アカウントコード / 表示名 / 電話番号 / common_user_id"
+              className="w-full rounded-md border border-sengoku-border bg-sengoku-navy px-2 py-1 text-sm text-sengoku-text placeholder:text-sengoku-faint"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="status-filter" className="whitespace-nowrap text-sm text-sengoku-muted">
+              状態で絞り込み:
+            </label>
+            <select
+              id="status-filter"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="rounded-md border border-sengoku-border px-2 py-1 text-sm"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         {error && <p className="mb-4 text-sm text-sengoku-red">{error}</p>}
         <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
@@ -106,6 +147,17 @@ export default function AccountsPage() {
             </tr>
           </thead>
           <tbody>
+            {accounts.length === 0 && (
+              <tr className="border-t border-sengoku-border">
+                <td colSpan={5} className="p-6 text-center text-sm text-sengoku-muted">
+                  {loading
+                    ? "読み込み中..."
+                    : appliedSearch
+                      ? `「${appliedSearch}」に一致するアカウントは見つかりませんでした`
+                      : "表示できるアカウントがありません"}
+                </td>
+              </tr>
+            )}
             {accounts.map((a) => (
               <tr key={a.id} className="border-t border-sengoku-border">
                 <td className="p-3">
