@@ -78,15 +78,19 @@ export function computeTotpCode(base32Secret: string, forTimeMs = Date.now(), op
   return hotp(base32Decode(base32Secret), counter, digits);
 }
 
-/** 認証アプリ (Google Authenticator等) が入力したコードを、時計ずれを許容して検証する。 */
-export function verifyTotpCode(
+/**
+ * 入力コードに一致するカウンタ (ステップ番号) を探す。一致しなければ null。
+ * `verifyTotpCode`は真偽しか返さないためリプレイ防止(同じコードの使い回し拒否)の
+ * 判定には使えない。呼び出し元でカウンタ単位のリプレイ防止を行いたい場合はこちらを使う。
+ */
+export function findMatchingTotpCounter(
   base32Secret: string,
   code: string,
   forTimeMs = Date.now(),
   options: TotpOptions = {},
-): boolean {
+): number | null {
   const normalizedCode = code.trim();
-  if (!/^\d+$/.test(normalizedCode)) return false;
+  if (!/^\d+$/.test(normalizedCode)) return null;
 
   const digits = options.digits ?? 6;
   const step = options.stepSeconds ?? 30;
@@ -95,10 +99,21 @@ export function verifyTotpCode(
   const secretBytes = base32Decode(base32Secret);
 
   for (let errorWindow = -window; errorWindow <= window; errorWindow++) {
-    const candidate = hotp(secretBytes, counter + errorWindow, digits);
-    if (timingSafeEqualStrings(candidate, normalizedCode)) return true;
+    const candidateCounter = counter + errorWindow;
+    const candidate = hotp(secretBytes, candidateCounter, digits);
+    if (timingSafeEqualStrings(candidate, normalizedCode)) return candidateCounter;
   }
-  return false;
+  return null;
+}
+
+/** 認証アプリ (Google Authenticator等) が入力したコードを、時計ずれを許容して検証する。 */
+export function verifyTotpCode(
+  base32Secret: string,
+  code: string,
+  forTimeMs = Date.now(),
+  options: TotpOptions = {},
+): boolean {
+  return findMatchingTotpCounter(base32Secret, code, forTimeMs, options) !== null;
 }
 
 /** 認証アプリでのQRコード読み取り用 otpauth:// URI (RFC準拠)。 */

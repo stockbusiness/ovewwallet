@@ -3,11 +3,11 @@ import {
   buildTotpUri,
   decryptSecret,
   encryptSecret,
+  findMatchingTotpCounter,
   generateOpaqueToken,
   generateTotpSecret,
   sha256Hex,
   verifySecret,
-  verifyTotpCode,
   type KeyValueStore,
 } from "@ove/auth";
 import { generateId, type PrismaClient } from "@ove/database";
@@ -18,9 +18,22 @@ import { getEncryptionKey } from "../common/encryption-key";
 
 const MFA_PENDING_TTL_SECONDS = 5 * 60; // MFAコード入力の猶予は5分
 const MFA_ISSUER = "戦国ウォレット管理画面";
+// TOTPの許容ドリフト窓 (±1ステップ=最大90秒) を覆えれば十分。それ以前のコードは
+// verifyTotpCode自体が時刻判定で拒否するため、このTTLを長く保つ意味はない。
+const MFA_LAST_COUNTER_TTL_SECONDS = 10 * 60;
 
 function mfaPendingKey(mfaToken: string): string {
   return `admin-mfa-pending:${sha256Hex(mfaToken)}`;
+}
+
+type MfaAction = "login" | "enable" | "disable";
+
+// アクションごとに直近使用済みステップを分けて記録する。ログイン2段階目・MFA有効化・
+// MFA無効化は別々の前提条件 (mfaToken/セッション/パスワード) がないと呼べないため、
+// 「同一アクションへの同一コードでの再送」だけを確実に防げれば、傍受されたコードを
+// そのリクエストへそのまま再送するという典型的なTOTPリプレイは塞げる。
+function mfaLastCounterKey(adminId: string, action: MfaAction): string {
+  return `admin-mfa-last-counter:${action}:${adminId}`;
 }
 
 export type AdminLoginResult =
@@ -62,7 +75,7 @@ export class AdminAuthService {
       throw new UnauthorizedException("MFA is not available for this account");
     }
     const secret = decryptSecret(admin.mfaSecretEncrypted, getEncryptionKey());
-    if (!verifyTotpCode(secret, code)) {
+    if (!(await this.verifyTotpCodeOnce(admin.id, "login", secret, code))) {
       throw new UnauthorizedException("invalid MFA code");
     }
 
@@ -93,7 +106,7 @@ export class AdminAuthService {
       throw new BadRequestException("MFA setup has not been started");
     }
     const secret = decryptSecret(admin.mfaSecretEncrypted, getEncryptionKey());
-    if (!verifyTotpCode(secret, code)) {
+    if (!(await this.verifyTotpCodeOnce(adminId, "enable", secret, code))) {
       throw new UnauthorizedException("invalid MFA code");
     }
     await this.db.adminUser.update({ where: { id: adminId }, data: { mfaEnabled: true, mfaEnrolledAt: new Date() } });
@@ -110,7 +123,7 @@ export class AdminAuthService {
       throw new BadRequestException("MFA is not enabled");
     }
     const secret = decryptSecret(admin.mfaSecretEncrypted, getEncryptionKey());
-    if (!verifyTotpCode(secret, code)) {
+    if (!(await this.verifyTotpCodeOnce(adminId, "disable", secret, code))) {
       throw new UnauthorizedException("invalid MFA code");
     }
     await this.db.adminUser.update({
@@ -118,6 +131,27 @@ export class AdminAuthService {
       data: { mfaEnabled: false, mfaSecretEncrypted: null, mfaEnrolledAt: null },
     });
     await this.logAdminAudit(adminId, "ADMIN_MFA_DISABLED");
+  }
+
+  /**
+   * TOTPコードを検証し、一致したステップを (adminId, action) 単位で直近使用済みとして
+   * 記録する。同じコード(≒同じステップ)が同じアクションに既に使用済みであれば、
+   * 時刻的には有効な窓内でも拒否する (リプレイ防止。RFC 6238が推奨する
+   * 「直近使用済みステップの記録」)。
+   */
+  private async verifyTotpCodeOnce(adminId: string, action: MfaAction, secret: string, code: string): Promise<boolean> {
+    const counter = findMatchingTotpCounter(secret, code);
+    if (counter === null) return false;
+
+    const key = mfaLastCounterKey(adminId, action);
+    const lastUsedRaw = await this.kv.get(key);
+    const lastUsedCounter = lastUsedRaw !== undefined ? Number(lastUsedRaw) : null;
+    if (lastUsedCounter !== null && counter <= lastUsedCounter) {
+      return false;
+    }
+
+    await this.kv.set(key, String(counter), MFA_LAST_COUNTER_TTL_SECONDS);
+    return true;
   }
 
   private async logAdminAudit(adminId: string, actionType: string): Promise<void> {

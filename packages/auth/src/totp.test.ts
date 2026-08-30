@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTotpUri, computeTotpCode, generateTotpSecret, verifyTotpCode } from "./totp";
+import { buildTotpUri, computeTotpCode, findMatchingTotpCounter, generateTotpSecret, verifyTotpCode } from "./totp";
 
 // RFC 6238 Appendix B の公式テストベクタ (ASCII秘密鍵 "12345678901234567890", SHA1)。
 // RFCの例は8桁だが、動的切り詰め後の mod 10^8 値の下6桁は mod 10^6 の値と一致するため、
@@ -74,6 +74,20 @@ describe("TOTP (RFC 6238)", () => {
     const now = Date.now();
     const codeForA = computeTotpCode(secretA, now);
     expect(verifyTotpCode(secretB, codeForA, now)).toBe(false);
+  });
+
+  it("findMatchingTotpCounter returns the step number that matched, or null when no step matches", () => {
+    const secret = generateTotpSecret();
+    const now = Date.now();
+    const step = Math.floor(now / 1000 / 30);
+    const code = computeTotpCode(secret, now);
+    expect(findMatchingTotpCounter(secret, code, now)).toBe(step);
+
+    const codeOneStepAhead = computeTotpCode(secret, now + 30_000);
+    expect(findMatchingTotpCounter(secret, codeOneStepAhead, now)).toBe(step + 1);
+
+    const codeFarInFuture = computeTotpCode(secret, now + 300_000);
+    expect(findMatchingTotpCounter(secret, codeFarInFuture, now)).toBeNull();
   });
 
   it("builds a well-formed otpauth:// URI without leaking the secret into the label", () => {
