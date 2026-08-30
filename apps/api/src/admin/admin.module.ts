@@ -23,6 +23,8 @@ import { AdminReferralsController } from "./admin-referrals.controller";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminRewardsController } from "./admin-rewards.controller";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
+import { AdminUsersController } from "./admin-users.controller";
+import { AdminUsersService } from "./admin-users.service";
 import { AdminWalletsController } from "./admin-wallets.controller";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
@@ -41,6 +43,7 @@ import { AdminService } from "./admin.service";
     AdminMigrationsController,
     AdminApprovalsController,
     AdminCollectiblesController,
+    AdminUsersController,
   ],
   providers: [
     AdminService,
@@ -56,6 +59,7 @@ import { AdminService } from "./admin.service";
     AdminNoticesService,
     AdminCommonUserHubService,
     AdminCollectiblesService,
+    AdminUsersService,
     LineBroadcastService,
   ],
   // AdminApprovalServiceは共通イベントハンドラ (common_user.merged) からも

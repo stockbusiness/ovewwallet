@@ -6,6 +6,7 @@ import {
   findMatchingTotpCounter,
   generateOpaqueToken,
   generateTotpSecret,
+  hashSecret,
   sha256Hex,
   verifySecret,
   type KeyValueStore,
@@ -85,6 +86,29 @@ export class AdminAuthService {
 
   async logout(token: string): Promise<void> {
     await this.kv.del(adminSessionKey(token));
+  }
+
+  /**
+   * ログイン中の管理者が自分のパスワードを変更する。
+   *
+   * 初期投入スクリプトや`AdminUsersService`が発行した初期パスワードを、受け取った本人が
+   * 変更するための入口。これまで変更手段が無く、初期パスワードを使い続けるしかなかった。
+   * 現在のパスワードを要求するのは、端末を放置した隙に第三者が乗っ取るのを防ぐため。
+   */
+  async changeOwnPassword(adminId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const admin = await this.db.adminUser.findUniqueOrThrow({ where: { id: adminId } });
+    if (!verifySecret(currentPassword, admin.passwordHash)) {
+      throw new UnauthorizedException("invalid password");
+    }
+    if (verifySecret(newPassword, admin.passwordHash)) {
+      throw new BadRequestException("新しいパスワードが現在のパスワードと同じです");
+    }
+
+    await this.db.adminUser.update({
+      where: { id: adminId },
+      data: { passwordHash: hashSecret(newPassword) },
+    });
+    await this.logAdminAudit(adminId, "ADMIN_PASSWORD_CHANGED");
   }
 
   /** MFA設定を開始する。enableMfa()で確認するまでは既存ログインに影響しない。 */
