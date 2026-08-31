@@ -1,13 +1,38 @@
 import { Controller, Get, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { AccountsService } from "./accounts.service";
+import { TermsConsentService } from "./terms-consent.service";
+import { SkipTermsConsent } from "./terms-consent";
 import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
 import { Req } from "@nestjs/common";
 
 @ApiTags("accounts")
 @Controller("api/v1/accounts")
 export class AccountsController {
-  constructor(private readonly accounts: AccountsService) {}
+  constructor(
+    private readonly accounts: AccountsService,
+    private readonly termsConsent: TermsConsentService,
+  ) {}
+
+  /** 利用規約の同意状態 (docs/terms-consent.md)。再同意が必要かをここで判定する。 */
+  @Get("me/terms")
+  @UseGuards(SessionAuthGuard)
+  async termsStatus(@Req() req: AuthenticatedUserRequest) {
+    return this.termsConsent.getStatus(req.account.id);
+  }
+
+  /**
+   * 現行バージョンの利用規約に同意する。
+   *
+   * 再同意していない利用者は更新系の操作を拒否されるため、この入口自体は当然その対象から
+   * 外す (でないと同意できず詰む)。
+   */
+  @Post("me/terms/accept")
+  @UseGuards(SessionAuthGuard)
+  @SkipTermsConsent()
+  async acceptTerms(@Req() req: AuthenticatedUserRequest) {
+    return this.termsConsent.accept(req.account.id);
+  }
 
   @Get("me")
   @UseGuards(SessionAuthGuard)
@@ -40,9 +65,15 @@ export class AccountsController {
     return { ok: true };
   }
 
-  /** ユーザー本人による退会 (docs/account-closure.md参照)。 */
+  /**
+   * ユーザー本人による退会 (docs/account-closure.md参照)。
+   *
+   * 規約の再同意を求めない。新しい規約に同意しない利用者から、サービスを離れる手段まで
+   * 奪うことになるため。
+   */
   @Post("me/close")
   @UseGuards(SessionAuthGuard)
+  @SkipTermsConsent()
   async close(@Req() req: AuthenticatedUserRequest) {
     return this.accounts.requestClosure(req.account.id);
   }

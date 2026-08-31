@@ -8,6 +8,7 @@ import { AccountsController } from "./accounts.controller";
 import { AccountsService } from "./accounts.service";
 import { CommonUserLinkingService } from "./common-user-linking.service";
 import { SessionManagementService } from "./session-management.service";
+import { TermsConsentService } from "./terms-consent.service";
 
 @Module({
   imports: [CommonUserHubModule, ReferralsModule],
@@ -19,6 +20,7 @@ import { SessionManagementService } from "./session-management.service";
     SessionManagementService,
     AccountClosureService,
     AccountAnonymizationService,
+    TermsConsentService,
   ],
   exports: [AccountsService, AccountAnonymizationService],
 })
