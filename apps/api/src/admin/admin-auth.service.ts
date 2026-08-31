@@ -15,6 +15,7 @@ import { generateId, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { KV_STORE } from "../common/kv-store.module";
 import { ADMIN_SESSION_TTL_SECONDS, adminSessionKey } from "../common/admin-auth.guard";
+import { AdminLoginThrottleService } from "./admin-login-throttle.service";
 import { getEncryptionKey } from "../common/encryption-key";
 
 const MFA_PENDING_TTL_SECONDS = 5 * 60; // MFAコード入力の猶予は5分
@@ -46,12 +47,22 @@ export class AdminAuthService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
+    private readonly loginThrottle: AdminLoginThrottleService,
   ) {}
 
   /** MFA未設定の管理者はそのままログインし、設定済みなら仮トークンを返して2段階目を要求する。 */
   async login(email: string, password: string): Promise<AdminLoginResult> {
     const admin = await this.db.adminUser.findUnique({ where: { email } });
-    if (!admin || admin.status !== "ACTIVE" || !verifySecret(password, admin.passwordHash)) {
+    if (!admin || admin.status !== "ACTIVE") {
+      // 存在しない・停止中のアカウントはロックの対象にできない (数える相手が無い)。
+      // ここでロックの有無を応答に出すと、アドレスの実在を教えることになる。
+      throw new UnauthorizedException("invalid email or password");
+    }
+
+    await this.loginThrottle.assertNotLocked(admin.id);
+
+    if (!verifySecret(password, admin.passwordHash)) {
+      await this.loginThrottle.recordFailure(admin.id);
       throw new UnauthorizedException("invalid email or password");
     }
 
@@ -75,8 +86,13 @@ export class AdminAuthService {
     if (!admin || admin.status !== "ACTIVE" || !admin.mfaEnabled || !admin.mfaSecretEncrypted) {
       throw new UnauthorizedException("MFA is not available for this account");
     }
+    // 1段階目と同じロックを2段階目にも掛ける。`mfaToken`は失敗しても消えないため、
+    // ここを数えないとパスワードを知る相手に有効期間いっぱいの総当たりを許してしまう。
+    await this.loginThrottle.assertNotLocked(admin.id);
+
     const secret = decryptSecret(admin.mfaSecretEncrypted, getEncryptionKey());
     if (!(await this.verifyTotpCodeOnce(admin.id, "login", secret, code))) {
+      await this.loginThrottle.recordFailure(admin.id);
       throw new UnauthorizedException("invalid MFA code");
     }
 
@@ -197,6 +213,7 @@ export class AdminAuthService {
     await this.kv.set(adminSessionKey(token), JSON.stringify({ adminUserId: adminId }), ADMIN_SESSION_TTL_SECONDS);
 
     await this.db.adminUser.update({ where: { id: adminId }, data: { lastLoginAt: new Date() } });
+    await this.loginThrottle.recordSuccess(adminId);
     await this.logAdminAudit(adminId, "ADMIN_LOGIN");
 
     return { token, expiresInSeconds: ADMIN_SESSION_TTL_SECONDS };
