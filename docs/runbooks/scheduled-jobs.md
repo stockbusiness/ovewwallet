@@ -138,6 +138,20 @@ scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation 
 一覧には**含めない** (利用者数に比例して増え、管理者が作った全員向けお知らせが埋もれ
 るため)。
 
+## メンテナンス中の挙動
+
+`MAINTENANCE_MODE` が設定されている間 (`readonly`/`full` のいずれも)、全ジョブは
+実行を見送る (`docs/deployment.md`「メンテナンスモード」参照)。どのジョブも書き込みを
+伴うため、更新を止めている間に裏で走り続けては意味が無いため。
+
+```
+scheduled job "credit-expiry" skipped: maintenance mode is readonly
+```
+
+見送った分はメンテナンス明けの次回スケジュールで拾われる。日次ジョブのメンテナンスが
+実行時刻をまたいだ場合、その日の実行は飛ぶ (失効・保持期間削除はいずれも1日遅れても
+実害が無い設計)。長時間のメンテナンス後は、必要に応じて管理画面から手動実行する。
+
 ## 異常時の挙動
 
 - **ジョブが失敗した場合**: エラーログを出して Sentry へ送り (`SENTRY_DSN` 未設定時は
