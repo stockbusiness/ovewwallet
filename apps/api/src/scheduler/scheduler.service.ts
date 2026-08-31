@@ -8,8 +8,10 @@ import { AdminService } from "../admin/admin.service";
 import { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { DataRetentionService } from "./data-retention.service";
+import { ExpiryNoticeService } from "./expiry-notice.service";
 import {
   DEFAULT_EXPIRY_CRON,
+  DEFAULT_EXPIRY_NOTICE_CRON,
   DEFAULT_OUTBOX_CRON,
   DEFAULT_RECONCILIATION_CRON,
   DEFAULT_RETENTION_CRON,
@@ -23,6 +25,7 @@ export const JOB_CREDIT_EXPIRY = "credit-expiry";
 export const JOB_RECONCILIATION = "reconciliation";
 export const JOB_OUTBOX_DISPATCH = "outbox-dispatch";
 export const JOB_DATA_RETENTION = "data-retention";
+export const JOB_EXPIRY_NOTICE = "expiry-notice";
 
 /**
  * 運用処理の定期実行。
@@ -46,6 +49,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly rewardRules: AdminRewardRulesService,
     private readonly outbox: OutboxService,
     private readonly retention: DataRetentionService,
+    private readonly expiryNotice: ExpiryNoticeService,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
   ) {}
 
@@ -68,6 +72,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     );
     this.register(JOB_DATA_RETENTION, cronExpression("RETENTION_CRON", DEFAULT_RETENTION_CRON), () =>
       this.runDataRetention(),
+    );
+    this.register(JOB_EXPIRY_NOTICE, cronExpression("EXPIRY_NOTICE_CRON", DEFAULT_EXPIRY_NOTICE_CRON), () =>
+      this.runExpiryNotice(),
     );
   }
 
@@ -174,6 +181,18 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       }
 
       return `processed=${processed} failed=${failed} batches=${batches}`;
+    });
+  }
+
+  /**
+   * 失効間近のORIについて本人宛のお知らせを作成する (`ExpiryNoticeService`)。
+   * 失効させる`JOB_CREDIT_EXPIRY`とは別ジョブにしている (予告は失効の数日前に出す必要があり、
+   * 失効当日に走る処理とはタイミングが異なるため)。
+   */
+  async runExpiryNotice(): Promise<boolean> {
+    return this.withLock(JOB_EXPIRY_NOTICE, async () => {
+      const result = await this.expiryNotice.createExpiryNotices();
+      return `accounts_notified=${result.accountsNotified} lots_marked=${result.lotsMarked}`;
     });
   }
 

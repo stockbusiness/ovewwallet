@@ -14,6 +14,7 @@ export const DEFAULT_EXPIRY_CRON = "0 17 * * *"; // 02:00 JST
 export const DEFAULT_RECONCILIATION_CRON = "0 20 * * *"; // 05:00 JST (日次バックアップ 03:00 JST の後)
 export const DEFAULT_OUTBOX_CRON = "*/5 * * * *"; // 5分ごと
 export const DEFAULT_RETENTION_CRON = "30 19 * * *"; // 04:30 JST (バックアップ後・整合性チェック前)
+export const DEFAULT_EXPIRY_NOTICE_CRON = "0 1 * * *"; // 10:00 JST (通知が深夜に出ないよう日中に寄せる)
 
 /** 1回のOutbox処理で回すバッチ数の上限。`processPendingEvents()`は既定20件/回。 */
 export const OUTBOX_MAX_BATCHES_PER_TICK = 10;
@@ -30,7 +31,7 @@ export function isSchedulerEnabled(env: NodeJS.ProcessEnv = process.env): boolea
 
 /** cron式の環境変数による上書き。未設定なら既定値を使う。 */
 export function cronExpression(
-  key: "EXPIRY_CRON" | "RECONCILIATION_CRON" | "OUTBOX_CRON" | "RETENTION_CRON",
+  key: "EXPIRY_CRON" | "RECONCILIATION_CRON" | "OUTBOX_CRON" | "RETENTION_CRON" | "EXPIRY_NOTICE_CRON",
   fallback: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -71,4 +72,30 @@ export function retentionDays(
 ): number {
   const parsed = Number(env[key]);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// ── 失効予告 (expiry-notice.service.ts) ────────────────────────────────
+
+/**
+ * 失効の何日前に予告するか。失効バッチ (`DEFAULT_EXPIRY_CRON`) が実際に失効させる前に、
+ * 利用者が使い切る時間を残せる長さにする。
+ */
+export const EXPIRY_NOTICE_DAYS_BEFORE = 7;
+
+/**
+ * 1回の実行で通知を作成するアカウント数の上限。超過分は翌日の実行に持ち越す
+ * (未通知のロットは`expiry_notice_sent_at`がnullのまま残るため、次回に自然と拾われる)。
+ */
+export const EXPIRY_NOTICE_MAX_ACCOUNTS_PER_RUN = 500;
+
+/** 失効予告の`Notice.created_by`。管理者が作ったお知らせと区別するための固定値。 */
+export const EXPIRY_NOTICE_CREATED_BY = "system:expiry-notice";
+
+/**
+ * 予告日数の環境変数による上書き。正の整数として解釈できない値は既定値を使う
+ * (0日以下だと「失効当日に予告する」ことになり、予告の意味が無くなるため)。
+ */
+export function expiryNoticeDaysBefore(env: NodeJS.ProcessEnv = process.env): number {
+  const parsed = Number(env.EXPIRY_NOTICE_DAYS_BEFORE);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : EXPIRY_NOTICE_DAYS_BEFORE;
 }

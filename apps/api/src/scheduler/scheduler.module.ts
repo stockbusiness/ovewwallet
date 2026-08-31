@@ -3,6 +3,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { AdminModule } from "../admin/admin.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { DataRetentionService } from "./data-retention.service";
+import { ExpiryNoticeService } from "./expiry-notice.service";
 import { SchedulerService } from "./scheduler.service";
 
 /**
@@ -14,7 +15,7 @@ import { SchedulerService } from "./scheduler.service";
  */
 @Module({
   imports: [ScheduleModule.forRoot(), AdminModule, OutboxModule],
-  providers: [SchedulerService, DataRetentionService],
+  providers: [SchedulerService, DataRetentionService, ExpiryNoticeService],
   exports: [SchedulerService],
 })
 export class SchedulerModule {}

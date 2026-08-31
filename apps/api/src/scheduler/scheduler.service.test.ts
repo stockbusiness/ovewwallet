@@ -4,12 +4,14 @@ import {
   SchedulerService,
   JOB_CREDIT_EXPIRY,
   JOB_DATA_RETENTION,
+  JOB_EXPIRY_NOTICE,
   JOB_OUTBOX_DISPATCH,
   JOB_RECONCILIATION,
 } from "./scheduler.service";
 import type { AdminService } from "../admin/admin.service";
 import type { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
 import type { DataRetentionService } from "./data-retention.service";
+import type { ExpiryNoticeService } from "./expiry-notice.service";
 import type { OutboxService } from "../outbox/outbox.service";
 
 function build(overrides: {
@@ -17,6 +19,7 @@ function build(overrides: {
   rewardRules?: Partial<AdminRewardRulesService>;
   outbox?: Partial<OutboxService>;
   retention?: Partial<DataRetentionService>;
+  expiryNotice?: Partial<ExpiryNoticeService>;
   kv?: InMemoryKeyValueStore;
 } = {}) {
   const kv = overrides.kv ?? new InMemoryKeyValueStore();
@@ -38,9 +41,14 @@ function build(overrides: {
     ...overrides.retention,
   } as unknown as DataRetentionService;
 
+  const expiryNotice = {
+    createExpiryNotices: jest.fn().mockResolvedValue({ accountsNotified: 2, lotsMarked: 3 }),
+    ...overrides.expiryNotice,
+  } as unknown as ExpiryNoticeService;
+
   const registry = new SchedulerRegistry();
-  const service = new SchedulerService(registry, admin, rewardRules, outbox, retention, kv);
-  return { service, registry, admin, rewardRules, outbox, retention, kv };
+  const service = new SchedulerService(registry, admin, rewardRules, outbox, retention, expiryNotice, kv);
+  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, kv };
 }
 
 describe("SchedulerService", () => {
@@ -61,6 +69,7 @@ describe("SchedulerService", () => {
       expect(registry.getCronJob(JOB_RECONCILIATION)).toBeDefined();
       expect(registry.getCronJob(JOB_OUTBOX_DISPATCH)).toBeDefined();
       expect(registry.getCronJob(JOB_DATA_RETENTION)).toBeDefined();
+      expect(registry.getCronJob(JOB_EXPIRY_NOTICE)).toBeDefined();
 
       service.onModuleDestroy();
       // 停止後はタイマーが残らない (プロセスが終了できる)
@@ -133,6 +142,12 @@ describe("SchedulerService", () => {
       const { service, retention } = build();
       await expect(service.runDataRetention()).resolves.toBe(true);
       expect(retention.purgeExpiredData).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs the expiry notice job", async () => {
+      const { service, expiryNotice } = build();
+      await expect(service.runExpiryNotice()).resolves.toBe(true);
+      expect(expiryNotice.createExpiryNotices).toHaveBeenCalledTimes(1);
     });
   });
 
