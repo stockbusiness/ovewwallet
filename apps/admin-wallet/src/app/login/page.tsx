@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
 
+const TOO_MANY_ATTEMPTS_MESSAGE =
+  "ログインの試行回数が上限に達しました。しばらく時間をおいてから再度お試しください。";
+
 export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -28,7 +31,13 @@ export default function AdminLoginPage() {
         router.push("/dashboard");
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "ログインに失敗しました");
+      // 429はIP単位のレート制限とアカウント単位の失敗ロックの両方で返る。
+      // どちらも利用者の対処は同じ (時間をおく) なので同じ文言にする。
+      if (err instanceof ApiError && err.status === 429) {
+        setError(TOO_MANY_ATTEMPTS_MESSAGE);
+      } else {
+        setError(err instanceof ApiError ? err.message : "ログインに失敗しました");
+      }
     } finally {
       setLoading(false);
     }
@@ -47,7 +56,9 @@ export default function AdminLoginPage() {
     } catch (err) {
       // MFAチャレンジ切れ (401, "MFA challenge expired or invalid") とコード誤り (401, "invalid MFA code")
       // のどちらもエンドユーザー向けの日本語文言に置き換える (バックエンドの英語メッセージを出さない)。
-      if (err instanceof ApiError && err.status === 401 && err.message.includes("expired")) {
+      if (err instanceof ApiError && err.status === 429) {
+        setError(TOO_MANY_ATTEMPTS_MESSAGE);
+      } else if (err instanceof ApiError && err.status === 401 && err.message.includes("expired")) {
         setError("認証セッションの有効期限が切れました。もう一度ログインし直してください。");
       } else {
         setError("認証コードが正しくありません");

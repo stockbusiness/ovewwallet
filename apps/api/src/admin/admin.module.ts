@@ -9,6 +9,7 @@ import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
 import { AdminAuthService } from "./admin-auth.service";
+import { AdminLoginThrottleService } from "./admin-login-throttle.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
 import { AdminCollectiblesController } from "./admin-collectibles.controller";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
@@ -48,6 +49,7 @@ import { AdminService } from "./admin.service";
   providers: [
     AdminService,
     AdminAuthService,
+    AdminLoginThrottleService,
     AdminBulkGrantService,
     AdminServiceIntegrationsService,
     AdminMigrationService,
