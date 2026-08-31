@@ -15,6 +15,9 @@ export const DEFAULT_RECONCILIATION_CRON = "0 20 * * *"; // 05:00 JST (日次バ
 export const DEFAULT_OUTBOX_CRON = "*/5 * * * *"; // 5分ごと
 export const DEFAULT_RETENTION_CRON = "30 19 * * *"; // 04:30 JST (バックアップ後・整合性チェック前)
 export const DEFAULT_EXPIRY_NOTICE_CRON = "0 1 * * *"; // 10:00 JST (通知が深夜に出ないよう日中に寄せる)
+// 毎月2日 09:00 JST。JSTの月境界を確実に過ぎてから前月分を記録する
+// (スナップショットの値自体は実行時刻に依存しないので、日付に余裕を持たせている)。
+export const DEFAULT_LIABILITY_SNAPSHOT_CRON = "0 0 2 * *";
 
 /** 1回のOutbox処理で回すバッチ数の上限。`processPendingEvents()`は既定20件/回。 */
 export const OUTBOX_MAX_BATCHES_PER_TICK = 10;
@@ -31,7 +34,13 @@ export function isSchedulerEnabled(env: NodeJS.ProcessEnv = process.env): boolea
 
 /** cron式の環境変数による上書き。未設定なら既定値を使う。 */
 export function cronExpression(
-  key: "EXPIRY_CRON" | "RECONCILIATION_CRON" | "OUTBOX_CRON" | "RETENTION_CRON" | "EXPIRY_NOTICE_CRON",
+  key:
+    | "EXPIRY_CRON"
+    | "RECONCILIATION_CRON"
+    | "OUTBOX_CRON"
+    | "RETENTION_CRON"
+    | "EXPIRY_NOTICE_CRON"
+    | "LIABILITY_SNAPSHOT_CRON",
   fallback: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {

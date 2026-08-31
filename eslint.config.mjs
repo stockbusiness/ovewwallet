@@ -57,7 +57,12 @@ export default tseslint.config(
             "packages/ledger/src/*.test.ts",
             "packages/ledger/vitest.config.ts",
           ],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 100,
+          // 上限に達するとlintがパースエラー (=CI失敗) になる。テストファイルが増える
+          // たびに上げ直すことになるため、当面の増加を吸収できる値にしてある
+          // (2026-08-31時点で101ファイル)。lintの実行時間が問題になったら、
+          // テスト用のtsconfigを分けてデフォルトプロジェクトへのフォールバック自体を
+          // 無くす方が筋が良い。
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 200,
         },
         tsconfigRootDir: import.meta.dirname,
       },

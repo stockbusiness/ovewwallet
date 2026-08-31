@@ -5,6 +5,7 @@ import {
   JOB_CREDIT_EXPIRY,
   JOB_DATA_RETENTION,
   JOB_EXPIRY_NOTICE,
+  JOB_LIABILITY_SNAPSHOT,
   JOB_OUTBOX_DISPATCH,
   JOB_RECONCILIATION,
 } from "./scheduler.service";
@@ -12,6 +13,7 @@ import type { AdminService } from "../admin/admin.service";
 import type { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
 import type { DataRetentionService } from "./data-retention.service";
 import type { ExpiryNoticeService } from "./expiry-notice.service";
+import type { PointLiabilityService } from "../reporting/point-liability.service";
 import type { OutboxService } from "../outbox/outbox.service";
 
 function build(overrides: {
@@ -20,6 +22,7 @@ function build(overrides: {
   outbox?: Partial<OutboxService>;
   retention?: Partial<DataRetentionService>;
   expiryNotice?: Partial<ExpiryNoticeService>;
+  pointLiability?: Partial<PointLiabilityService>;
   kv?: InMemoryKeyValueStore;
 } = {}) {
   const kv = overrides.kv ?? new InMemoryKeyValueStore();
@@ -46,9 +49,23 @@ function build(overrides: {
     ...overrides.expiryNotice,
   } as unknown as ExpiryNoticeService;
 
+  const pointLiability = {
+    captureMonthEndSnapshot: jest.fn().mockResolvedValue({ created: true }),
+    ...overrides.pointLiability,
+  } as unknown as PointLiabilityService;
+
   const registry = new SchedulerRegistry();
-  const service = new SchedulerService(registry, admin, rewardRules, outbox, retention, expiryNotice, kv);
-  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, kv };
+  const service = new SchedulerService(
+    registry,
+    admin,
+    rewardRules,
+    outbox,
+    retention,
+    expiryNotice,
+    pointLiability,
+    kv,
+  );
+  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, pointLiability, kv };
 }
 
 describe("SchedulerService", () => {
@@ -70,6 +87,7 @@ describe("SchedulerService", () => {
       expect(registry.getCronJob(JOB_OUTBOX_DISPATCH)).toBeDefined();
       expect(registry.getCronJob(JOB_DATA_RETENTION)).toBeDefined();
       expect(registry.getCronJob(JOB_EXPIRY_NOTICE)).toBeDefined();
+      expect(registry.getCronJob(JOB_LIABILITY_SNAPSHOT)).toBeDefined();
 
       service.onModuleDestroy();
       // 停止後はタイマーが残らない (プロセスが終了できる)
@@ -148,6 +166,15 @@ describe("SchedulerService", () => {
       const { service, expiryNotice } = build();
       await expect(service.runExpiryNotice()).resolves.toBe(true);
       expect(expiryNotice.createExpiryNotices).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs the monthly point liability snapshot for the previous month", async () => {
+      const { service, pointLiability } = build();
+      await expect(service.runLiabilitySnapshot()).resolves.toBe(true);
+      // 対象は「締まった直近の月」= 前月 (まだ終わっていない当月は締められない)
+      expect(pointLiability.captureMonthEndSnapshot).toHaveBeenCalledWith(
+        expect.stringMatching(/^\d{4}-\d{2}$/),
+      );
     });
 
     it("メンテナンス中はジョブを走らせない", async () => {

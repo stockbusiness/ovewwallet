@@ -10,9 +10,11 @@ import { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
 import { OutboxService } from "../outbox/outbox.service";
 import { DataRetentionService } from "./data-retention.service";
 import { ExpiryNoticeService } from "./expiry-notice.service";
+import { PointLiabilityService } from "../reporting/point-liability.service";
 import {
   DEFAULT_EXPIRY_CRON,
   DEFAULT_EXPIRY_NOTICE_CRON,
+  DEFAULT_LIABILITY_SNAPSHOT_CRON,
   DEFAULT_OUTBOX_CRON,
   DEFAULT_RECONCILIATION_CRON,
   DEFAULT_RETENTION_CRON,
@@ -27,6 +29,7 @@ export const JOB_RECONCILIATION = "reconciliation";
 export const JOB_OUTBOX_DISPATCH = "outbox-dispatch";
 export const JOB_DATA_RETENTION = "data-retention";
 export const JOB_EXPIRY_NOTICE = "expiry-notice";
+export const JOB_LIABILITY_SNAPSHOT = "liability-snapshot";
 
 /**
  * 運用処理の定期実行。
@@ -51,6 +54,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly outbox: OutboxService,
     private readonly retention: DataRetentionService,
     private readonly expiryNotice: ExpiryNoticeService,
+    private readonly pointLiability: PointLiabilityService,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
   ) {}
 
@@ -76,6 +80,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     );
     this.register(JOB_EXPIRY_NOTICE, cronExpression("EXPIRY_NOTICE_CRON", DEFAULT_EXPIRY_NOTICE_CRON), () =>
       this.runExpiryNotice(),
+    );
+    this.register(
+      JOB_LIABILITY_SNAPSHOT,
+      cronExpression("LIABILITY_SNAPSHOT_CRON", DEFAULT_LIABILITY_SNAPSHOT_CRON),
+      () => this.runLiabilitySnapshot(),
     );
   }
 
@@ -204,6 +213,19 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return this.withLock(JOB_EXPIRY_NOTICE, async () => {
       const result = await this.expiryNotice.createExpiryNotices();
       return `accounts_notified=${result.accountsNotified} lots_marked=${result.lotsMarked}`;
+    });
+  }
+
+  /**
+   * 前月末のポイント負債スナップショットを記録する (`PointLiabilityService`)。
+   * 会計が期首残高を全期間の取引を遡らずに出せるようにするためのもので、
+   * 値は実行時刻に依存しない (月末以降の増減を差し引いて求める)。
+   */
+  async runLiabilitySnapshot(): Promise<boolean> {
+    return this.withLock(JOB_LIABILITY_SNAPSHOT, async () => {
+      const period = PointLiabilityService.previousPeriod();
+      const result = await this.pointLiability.captureMonthEndSnapshot(period);
+      return `period=${period} created=${result.created}`;
     });
   }
 
