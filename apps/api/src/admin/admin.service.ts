@@ -111,17 +111,30 @@ export class AdminService {
     return counts;
   }
 
-  async listAccounts(params: { status?: string; limit?: number }) {
-    return this.accountRepository.list({ status: params.status, take: Math.min(params.limit ?? 50, 200) });
+  /**
+   * アカウント一覧。`search`はアカウントコード・メールアドレス・電話番号・表示名・
+   * common_user_idを横断する部分一致 (問い合わせ対応で利用者を特定するための入口)。
+   */
+  async listAccounts(params: { status?: string; search?: string; limit?: number }) {
+    return this.accountRepository.list({
+      status: params.status,
+      search: params.search,
+      take: Math.min(params.limit ?? 50, 200),
+    });
   }
 
   /**
    * アカウント一覧CSVエクスポート (docs/admin-operations.md参照)。画面の一覧
    * (200件上限) とは別に、直近10,000件を上限として返す
-   * (`docs/transaction-export.md`と同じ方針)。状態での絞り込みも一覧画面と同様に可能。
+   * (`docs/transaction-export.md`と同じ方針)。状態・検索語での絞り込みは
+   * 一覧画面と同様に可能 (画面の表示内容とCSVの内容がずれないようにする)。
    */
-  async exportAccountsCsv(params: { status?: string }): Promise<string> {
-    const accounts = await this.accountRepository.list({ status: params.status, take: 10000 });
+  async exportAccountsCsv(params: { status?: string; search?: string }): Promise<string> {
+    const accounts = await this.accountRepository.list({
+      status: params.status,
+      search: params.search,
+      take: 10000,
+    });
 
     const header = ["アカウントコード", "状態", "表示名", "メールアドレス", "登録日時", "ウォレットコード", "利用可能残高"];
     const rows = accounts.map((a) => [

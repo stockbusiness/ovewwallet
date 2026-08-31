@@ -17,10 +17,19 @@ export class AdminAccountsController {
     private readonly accountMerge: AdminAccountMergeService,
   ) {}
 
+  /**
+   * アカウント一覧。`search`はアカウントコード・メールアドレス・電話番号・表示名・
+   * common_user_idを横断する部分一致で、問い合わせ対応の入口になる
+   * (利用者から提示される情報が項目ごとにまちまちなため、1つの入力欄で引けるようにする)。
+   */
   @Get("accounts")
   @UseGuards(AdminAuthGuard)
-  async listAccounts(@Query("status") status?: string, @Query("limit") limit?: string) {
-    return this.admin.listAccounts({ status, limit: limit ? Number(limit) : undefined });
+  async listAccounts(
+    @Query("status") status?: string,
+    @Query("search") search?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listAccounts({ status, search, limit: limit ? Number(limit) : undefined });
   }
 
   /**
@@ -31,8 +40,12 @@ export class AdminAccountsController {
    */
   @Get("accounts/export")
   @UseGuards(AdminAuthGuard)
-  async exportAccounts(@Query("status") status: string | undefined, @Res() res: Response) {
-    const csv = await this.admin.exportAccountsCsv({ status });
+  async exportAccounts(
+    @Query("status") status: string | undefined,
+    @Query("search") search: string | undefined,
+    @Res() res: Response,
+  ) {
+    const csv = await this.admin.exportAccountsCsv({ status, search });
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", 'attachment; filename="accounts.csv"');
     res.send(csv);

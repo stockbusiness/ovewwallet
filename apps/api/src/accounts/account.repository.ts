@@ -6,7 +6,41 @@ type Db = PrismaClient | Prisma.TransactionClient;
 
 export interface ListAccountsParams {
   status?: string;
+  /**
+   * アカウントコード・メールアドレス・電話番号・表示名・common_user_id を
+   * 横断して部分一致で探す。問い合わせ対応では利用者から提示される情報が
+   * まちまち (メールアドレスのことも表示名のことも代理店側のIDのこともある) なため、
+   * 項目を指定させず1つの入力欄でまとめて引けるようにする。
+   */
+  search?: string;
   take: number;
+}
+
+/**
+ * 検索文字列から where 条件を組み立てる。空文字・空白のみは「絞り込みなし」として
+ * 扱う (検索欄を空にしたときに0件にならないようにする)。
+ *
+ * 大文字小文字は区別しない。アカウントコード (`OVE-ACC-00001234`) は英大文字のみだが、
+ * 利用者が小文字で伝えてくることがあるため同様に扱う。
+ *
+ * 部分一致のため索引は効かず、件数が増えると全表スキャンになる。現在の規模では
+ * `take` の上限 (画面200件・CSV10,000件) と併せて問題にならないが、アカウント数が
+ * 大きく増えた場合は pg_trgm の GIN 索引の追加を検討すること。
+ */
+function buildSearchFilter(search: string | undefined): Prisma.OveAccountWhereInput | undefined {
+  const q = search?.trim();
+  if (!q) return undefined;
+
+  const contains = { contains: q, mode: "insensitive" } as const;
+  return {
+    OR: [
+      { accountCode: contains },
+      { primaryEmail: contains },
+      { primaryPhone: contains },
+      { displayName: contains },
+      { commonUserId: contains },
+    ],
+  };
 }
 
 /**
@@ -60,8 +94,17 @@ export class AccountRepository {
 
   /** 管理画面のアカウント一覧・CSVエクスポートで共用 (`take`の上限のみ呼び出し元で変える)。 */
   async list(params: ListAccountsParams, client: Db = this.db) {
+    const searchFilter = buildSearchFilter(params.search);
+    const statusFilter: Prisma.OveAccountWhereInput | undefined = params.status
+      ? { status: params.status as AccountStatus }
+      : undefined;
+    // 状態と検索語の両方が指定された場合は AND (絞り込みを重ねる) にする。
+    const conditions = [statusFilter, searchFilter].filter(
+      (c): c is Prisma.OveAccountWhereInput => c !== undefined,
+    );
+
     return client.oveAccount.findMany({
-      where: params.status ? { status: params.status as never } : undefined,
+      where: conditions.length > 0 ? { AND: conditions } : undefined,
       orderBy: { createdAt: "desc" },
       take: params.take,
       include: { wallet: true },
