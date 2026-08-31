@@ -18,6 +18,7 @@
 | `reconciliation` | `0 20 * * *` | 毎日 05:00 | `AdminService.reconcile()` |
 | `outbox-dispatch` | `*/5 * * * *` | 5分ごと | `OutboxService.processPendingEvents()` |
 | `expiry-notice` | `0 1 * * *` | 毎日 10:00 | `ExpiryNoticeService.createExpiryNotices()` |
+| `liability-snapshot` | `0 0 2 * *` | 毎月2日 09:00 | `PointLiabilityService.captureMonthEndSnapshot()` |
 
 `expiry-notice` を除き、いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
 分かれないよう、スケジューラ側にロジックを複製していない。手動実行の入口
@@ -37,6 +38,7 @@
 | `RETENTION_CRON` | `30 19 * * *` | データ保持ジョブのcron式 |
 | `EXPIRY_NOTICE_CRON` | `0 1 * * *` | 失効予告のcron式 (通知が深夜に出ないよう日中に寄せている) |
 | `EXPIRY_NOTICE_DAYS_BEFORE` | `7` | 失効の何日前に予告するか (正の整数以外は既定値) |
+| `LIABILITY_SNAPSHOT_CRON` | `0 0 2 * *` | 月末ポイント負債スナップショットのcron式 |
 | `USER_SESSION_RETENTION_DAYS` | `90` | 期限切れセッションを期限切れ後どれだけ残すか |
 | `API_ACCESS_LOG_RETENTION_DAYS` | `180` | 外部APIアクセスログをどれだけ残すか |
 | `OUTBOX_SENT_RETENTION_DAYS` | `90` | 送信済みOutboxイベントをどれだけ残すか |
@@ -82,6 +84,7 @@ scheduled job "reconciliation" registered (cron: 0 20 * * *)
 scheduled job "outbox-dispatch" registered (cron: */5 * * * *)
 scheduled job "data-retention" registered (cron: 30 19 * * *)
 scheduled job "expiry-notice" registered (cron: 0 1 * * *)
+scheduled job "liability-snapshot" registered (cron: 0 0 2 * *)
 ```
 
 実行のたびに結果がログに出る。ログドレインを設定済みならここで検索できる。
@@ -137,6 +140,20 @@ scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation 
 個別通知はアプリの `GET /api/v1/me/notices` に本人だけ表示される。管理画面のお知らせ
 一覧には**含めない** (利用者数に比例して増え、管理者が作った全員向けお知らせが埋もれ
 るため)。
+
+## 月末ポイント負債スナップショット (`liability-snapshot`)
+
+前月末のポイント負債残高を `point_liability_snapshots` に記録する
+(`docs/point-liability.md` 参照)。会計が期首残高を全期間の取引を遡らずに出せるように
+するためのもの。
+
+- 記録する値は**実行時刻に依存しない** (集計時点の実残高から月末以降の増減を差し引いて
+  求める)。ジョブが遅れて走っても、後から手動で実行しても同じ値になる。
+- **一度記録した月は上書きしない**。会計は締めた値が変わらないことを前提にするため。
+  取り直したい場合は該当行を削除してから再実行する (通常は不要)。
+- ジョブが何度か失敗して月をまたいだ場合、その月のスナップショットは欠けたままになる。
+  管理画面の増減表でその月の期首残高が `-` になるので気づける。後から
+  `captureMonthEndSnapshot("YYYY-MM")` を実行すれば正しい値で埋められる。
 
 ## 異常時の挙動
 

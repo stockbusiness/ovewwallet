@@ -62,6 +62,10 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    title: "会計・レポート",
+    links: [{ href: "/reports/point-liability", label: "ポイント負債レポート" }],
+  },
+  {
     title: "ログ・監査",
     links: [
       { href: "/audit-logs", label: "操作ログ" },

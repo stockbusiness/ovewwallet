@@ -18,6 +18,7 @@ import { DailyBonusModule } from "./daily-bonus/daily-bonus.module";
 import { HealthController } from "./health.controller";
 import { OutboxModule } from "./outbox/outbox.module";
 import { ReferralsModule } from "./referrals/referrals.module";
+import { ReportingModule } from "./reporting/reporting.module";
 import { RewardsModule } from "./rewards/rewards.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { TransactionsModule } from "./transactions/transactions.module";
@@ -38,6 +39,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     OutboxModule,
     AgencyModule,
     ReferralsModule,
+    ReportingModule,
     DailyBonusModule,
     CommonEventsModule,
     CollectiblesModule,

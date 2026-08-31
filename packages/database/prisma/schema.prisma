@@ -559,6 +559,26 @@ model OveCreditLot {
   @@map("ove_credit_lots")
 }
 
+/// 月末時点のポイント負債 (発行済み未使用残高) のスナップショット。
+/// 会計が「期首残高」を出すのに全期間の取引を遡らなくて済むようにするため。
+/// 詳細: docs/point-liability.md
+model PointLiabilitySnapshot {
+  id String @id
+  /// 対象月の末日 (JST基準の暦日)。月に1行。
+  periodEnd DateTime @map("period_end") @db.Date
+  /// 月末時点の負債残高。集計時点の実残高から、月末以降の増減を差し引いて求める
+  /// (ジョブがいつ走っても同じ値になるようにするため)。
+  totalBalance BigInt @map("total_balance")
+  /// 算出に使った集計時点の実残高。監査時に計算を追えるように残す。
+  balanceAtCapture BigInt @map("balance_at_capture")
+  /// 差し引いた月末以降の純増減 (符号付き)。同上。
+  movementAfterPeriod BigInt @map("movement_after_period")
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  @@unique([periodEnd])
+  @@map("point_liability_snapshots")
+}
+
 model RewardRule {
   id                 String           @id
   ruleCode           String           @unique @map("rule_code")
