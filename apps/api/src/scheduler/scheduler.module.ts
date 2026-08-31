@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
+import { AccountsModule } from "../accounts/accounts.module";
 import { AdminModule } from "../admin/admin.module";
 import { ReportingModule } from "../reporting/reporting.module";
 import { OutboxModule } from "../outbox/outbox.module";
@@ -15,7 +16,7 @@ import { SchedulerService } from "./scheduler.service";
  * 呼び出す。手動実行と自動実行で挙動が分かれないよう、ロジックはここに複製しない。
  */
 @Module({
-  imports: [ScheduleModule.forRoot(), AdminModule, OutboxModule, ReportingModule],
+  imports: [ScheduleModule.forRoot(), AdminModule, OutboxModule, ReportingModule, AccountsModule],
   providers: [SchedulerService, DataRetentionService, ExpiryNoticeService],
   exports: [SchedulerService],
 })

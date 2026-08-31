@@ -19,6 +19,7 @@
 | `outbox-dispatch` | `*/5 * * * *` | 5分ごと | `OutboxService.processPendingEvents()` |
 | `expiry-notice` | `0 1 * * *` | 毎日 10:00 | `ExpiryNoticeService.createExpiryNotices()` |
 | `liability-snapshot` | `0 0 2 * *` | 毎月2日 09:00 | `PointLiabilityService.captureMonthEndSnapshot()` |
+| `account-anonymization` | `30 20 * * *` | 毎日 05:30 | `AccountAnonymizationService.anonymizeClosedAccounts()` |
 
 `expiry-notice` と `liability-snapshot` を除き、いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
 分かれないよう、スケジューラ側にロジックを複製していない。手動実行の入口
@@ -39,6 +40,10 @@
 | `EXPIRY_NOTICE_CRON` | `0 1 * * *` | 失効予告のcron式 (通知が深夜に出ないよう日中に寄せている) |
 | `EXPIRY_NOTICE_DAYS_BEFORE` | `7` | 失効の何日前に予告するか (正の整数以外は既定値) |
 | `LIABILITY_SNAPSHOT_CRON` | `0 0 2 * *` | 月末ポイント負債スナップショットのcron式 |
+| `ANONYMIZATION_CRON` | `30 20 * * *` | 退会済みアカウント匿名化のcron式 |
+| `ENABLE_ACCOUNT_ANONYMIZATION` | (未設定=無効) | 匿名化の有効化 (`docs/account-anonymization.md`) |
+| `ANONYMIZATION_HASH_KEY` | (未設定) | 匿名化のハッシュ鍵。未設定なら実行しない |
+| `ACCOUNT_ANONYMIZATION_GRACE_DAYS` | `90` | 退会から何日後に匿名化するか |
 | `USER_SESSION_RETENTION_DAYS` | `90` | 期限切れセッションを期限切れ後どれだけ残すか |
 | `API_ACCESS_LOG_RETENTION_DAYS` | `180` | 外部APIアクセスログをどれだけ残すか |
 | `OUTBOX_SENT_RETENTION_DAYS` | `90` | 送信済みOutboxイベントをどれだけ残すか |
@@ -85,6 +90,7 @@ scheduled job "outbox-dispatch" registered (cron: */5 * * * *)
 scheduled job "data-retention" registered (cron: 30 19 * * *)
 scheduled job "expiry-notice" registered (cron: 0 1 * * *)
 scheduled job "liability-snapshot" registered (cron: 0 0 2 * *)
+scheduled job "account-anonymization" registered (cron: 30 20 * * *)
 ```
 
 実行のたびに結果がログに出る。ログドレインを設定済みならここで検索できる。
@@ -154,6 +160,26 @@ scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation 
 - ジョブが何度か失敗して月をまたいだ場合、その月のスナップショットは欠けたままになる。
   管理画面の増減表でその月の期首残高が `-` になるので気づける。後から
   `captureMonthEndSnapshot("YYYY-MM")` を実行すれば正しい値で埋められる。
+## 退会済みアカウントの匿名化 (`account-anonymization`)
+
+猶予期間を過ぎた退会済みアカウントの個人情報を匿名化する
+(`docs/account-anonymization.md` 参照)。
+
+**既定では無効**。削除が不可逆で、猶予日数が法務の確認事項でもあるため、
+`ENABLE_ACCOUNT_ANONYMIZATION=true` を明示するまで1件も消さない。有効化する前に
+管理画面のドライラン (`GET /api/v1/admin/accounts/anonymization-preview`) で対象件数を
+確認すること。
+
+ハッシュ鍵 (`ANONYMIZATION_HASH_KEY`) が未設定の場合、有効でも実行を中止して
+エラーログを出す。鍵が無いまま実行すると、二度と照合できないハッシュを書き込んで
+しまうため。
+
+```
+scheduled job "account-anonymization" finished in 120ms: accounts=42 identities=42
+scheduled job "account-anonymization" finished in 3ms: skipped=disabled
+scheduled job "account-anonymization" finished in 2ms: skipped=hash-key-missing
+```
+
 ## メンテナンス中の挙動
 
 `MAINTENANCE_MODE` が設定されている間 (`readonly`/`full` のいずれも)、全ジョブは

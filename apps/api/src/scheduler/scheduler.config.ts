@@ -18,6 +18,8 @@ export const DEFAULT_EXPIRY_NOTICE_CRON = "0 1 * * *"; // 10:00 JST (通知が�
 // 毎月2日 09:00 JST。JSTの月境界を確実に過ぎてから前月分を記録する
 // (スナップショットの値自体は実行時刻に依存しないので、日付に余裕を持たせている)。
 export const DEFAULT_LIABILITY_SNAPSHOT_CRON = "0 0 2 * *";
+// 毎日 05:30 JST。整合性チェック (05:00 JST) の後、業務時間前に済ませる。
+export const DEFAULT_ANONYMIZATION_CRON = "30 20 * * *";
 
 /** 1回のOutbox処理で回すバッチ数の上限。`processPendingEvents()`は既定20件/回。 */
 export const OUTBOX_MAX_BATCHES_PER_TICK = 10;
@@ -40,7 +42,8 @@ export function cronExpression(
     | "OUTBOX_CRON"
     | "RETENTION_CRON"
     | "EXPIRY_NOTICE_CRON"
-    | "LIABILITY_SNAPSHOT_CRON",
+    | "LIABILITY_SNAPSHOT_CRON"
+    | "ANONYMIZATION_CRON",
   fallback: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {

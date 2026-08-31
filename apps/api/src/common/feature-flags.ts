@@ -34,6 +34,15 @@ export const FEATURE_FLAG_KEYS = [
    * 付与されていなければ403になる (Flagとscopeの両方が必要、`ServiceScopeGuard`参照)。
    */
   "ENABLE_COMMON_USER_BALANCE_API",
+  /**
+   * 退会済みアカウントの個人情報を猶予期間の経過後に匿名化する
+   * (`docs/account-anonymization.md`)。
+   *
+   * 削除は**不可逆**で、猶予日数は法務の確認事項でもあるため、他のFlagと同様に既定OFF
+   * にしている。有効化する前に管理画面のドライラン
+   * (`GET /api/v1/admin/accounts/anonymization-preview`) で対象件数を確認すること。
+   */
+  "ENABLE_ACCOUNT_ANONYMIZATION",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
