@@ -149,6 +149,21 @@ export interface ExpiringCreditsSummary {
   nearest_expires_at: string | null;
 }
 
+/** 利用規約の同意状態 (`GET /api/v1/accounts/me/terms`)。 */
+export interface TermsConsentStatus {
+  current_version: string;
+  agreed_version: string | null;
+  agreed_at: string | null;
+  /** true なら再同意するまで更新系の操作ができない。 */
+  consent_required: boolean;
+}
+
+/**
+ * 再同意が必要なときにAPIが403とともに返す機械可読コード。
+ * 英語のメッセージ文字列で判定しないためのもの。
+ */
+export const TERMS_CONSENT_REQUIRED_CODE = "terms_consent_required";
+
 export interface MeFeatureFlags {
   digital_collection_enabled: boolean;
 }

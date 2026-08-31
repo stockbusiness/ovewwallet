@@ -8,6 +8,7 @@ import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/sh
 import { AuthService, type SessionMeta } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
+import { SkipTermsConsent } from "../accounts/terms-consent";
 import { REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS } from "../referrals/referrals.controller";
 
 /** ログインデバイス一覧向けに、リクエストから接続元情報を取り出す。 */
@@ -127,8 +128,13 @@ export class AuthController {
     return { ove_account_id: session.oveAccountId };
   }
 
+  /**
+   * ログアウト。規約の再同意を求めない — 同意しない利用者からログアウトの手段まで
+   * 奪うことになるため (`docs/terms-consent.md`)。
+   */
   @Post("logout")
   @UseGuards(SessionAuthGuard)
+  @SkipTermsConsent()
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.[SESSION_COOKIE_NAME];
     if (token) await this.auth.logout(token);

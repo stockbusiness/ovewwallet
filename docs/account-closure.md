@@ -49,6 +49,12 @@ Cookie削除)、ログイン画面へ遷移する。残高が残っている場�
 「退会する」リンクから`window.confirm`ダイアログが表示され、確認後にAPI呼び出しが
 成功し`/login`画面へ遷移することを確認した。
 
+## 利用規約の再同意との関係
+
+退会 (`POST /api/v1/accounts/me/close`) は、規約の再同意を求めない対象にしている
+(`docs/terms-consent.md`)。新しい規約に同意しない利用者から、サービスを離れる手段まで
+奪うことになるため。
+
 ## 既知の制約・今後の課題
 
 - Walletの`status`は変更していない (`WalletStatus`enumに`CLOSED`相当の値が無く、
