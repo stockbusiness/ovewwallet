@@ -290,6 +290,8 @@ model OveAccount {
   sessions            UserSession[]
   walletReferrals     WalletReferral[]
   noticeReads         NoticeRead[]
+  /// 宛先がこのアカウントの個別通知 (全員向けのお知らせはここに含まれない)。
+  notices             Notice[]
   dailyBonusClaims    DailyBonusClaim[]
   collectibleHoldings CollectibleHolding[]
 
@@ -546,6 +548,8 @@ model OveCreditLot {
   expiredAt       DateTime? @map("expired_at")
   /// 元のCREDIT取引がREVERSALで取り消された場合にセットする (以後、消費・失効の対象外)
   voidedAt        DateTime? @map("voided_at")
+  /// 失効予告のお知らせを作成した日時。同じロットについて毎日繰り返し通知しないための印。
+  expiryNoticeSentAt DateTime? @map("expiry_notice_sent_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
   wallet      Wallet         @relation(fields: [walletId], references: [id])
@@ -911,14 +915,21 @@ model Notice {
   status      NoticeStatus     @default(PUBLISHED)
   /// IMPORTANTは一覧で強調表示する (docs/notices-read-tracking.md参照)。
   importance  NoticeImportance @default(NORMAL)
+  /// 宛先。null = 全員向け (従来のお知らせ)。値がある場合はその利用者にだけ表示する。
+  /// 失効予告のように本人にしか意味のない連絡を送るために追加した
+  /// (docs/notices-read-tracking.md「個別通知」参照)。
+  oveAccountId String?         @map("ove_account_id")
   publishedAt DateTime         @default(now()) @map("published_at")
   createdBy   String           @map("created_by")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @updatedAt @map("updated_at")
 
-  reads NoticeRead[]
+  account OveAccount?  @relation(fields: [oveAccountId], references: [id])
+  reads   NoticeRead[]
 
   @@index([status, publishedAt])
+  /// 個別通知を宛先で引くための索引 (全員向けはnullなので対象外)。
+  @@index([oveAccountId])
   @@map("notices")
 }
 

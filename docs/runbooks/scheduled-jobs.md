@@ -7,6 +7,7 @@
 - 有効期限が到来した獲得ORIが失効せず、残高と会計上の未使用残高が実態とずれる
 - 代理店システム向けの連携イベントがキューに滞留し、相手方へ何も届かない
 - 台帳と残高キャッシュの不整合が検知されない (Sentry通知の実装はあるが発火しない)
+- 失効間近のORIについて何の予告もなく、利用者は残高が減ってから気づく
 
 ## ジョブ一覧
 
@@ -16,8 +17,9 @@
 | `data-retention` | `30 19 * * *` | 毎日 04:30 | `DataRetentionService.purgeExpiredData()` |
 | `reconciliation` | `0 20 * * *` | 毎日 05:00 | `AdminService.reconcile()` |
 | `outbox-dispatch` | `*/5 * * * *` | 5分ごと | `OutboxService.processPendingEvents()` |
+| `expiry-notice` | `0 1 * * *` | 毎日 10:00 | `ExpiryNoticeService.createExpiryNotices()` |
 
-いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
+`expiry-notice` を除き、いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
 分かれないよう、スケジューラ側にロジックを複製していない。手動実行の入口
 (管理画面のボタン) はこれまで通り残しており、臨時実行に使える。
 
@@ -33,6 +35,8 @@
 | `RECONCILIATION_CRON` | `0 20 * * *` | 整合性チェックのcron式 |
 | `OUTBOX_CRON` | `*/5 * * * *` | Outbox送信のcron式 |
 | `RETENTION_CRON` | `30 19 * * *` | データ保持ジョブのcron式 |
+| `EXPIRY_NOTICE_CRON` | `0 1 * * *` | 失効予告のcron式 (通知が深夜に出ないよう日中に寄せている) |
+| `EXPIRY_NOTICE_DAYS_BEFORE` | `7` | 失効の何日前に予告するか (正の整数以外は既定値) |
 | `USER_SESSION_RETENTION_DAYS` | `90` | 期限切れセッションを期限切れ後どれだけ残すか |
 | `API_ACCESS_LOG_RETENTION_DAYS` | `180` | 外部APIアクセスログをどれだけ残すか |
 | `OUTBOX_SENT_RETENTION_DAYS` | `90` | 送信済みOutboxイベントをどれだけ残すか |
@@ -70,12 +74,14 @@ PENDING→PROCESSING条件付き更新による排他を行っているため、
 
 ## 動作確認
 
-APIの起動ログに次の3行が出ていれば登録できている。
+APIの起動ログに次の5行が出ていれば登録できている。
 
 ```
 scheduled job "credit-expiry" registered (cron: 0 17 * * *)
 scheduled job "reconciliation" registered (cron: 0 20 * * *)
 scheduled job "outbox-dispatch" registered (cron: */5 * * * *)
+scheduled job "data-retention" registered (cron: 30 19 * * *)
+scheduled job "expiry-notice" registered (cron: 0 1 * * *)
 ```
 
 実行のたびに結果がログに出る。ログドレインを設定済みならここで検索できる。
@@ -84,6 +90,7 @@ scheduled job "outbox-dispatch" registered (cron: */5 * * * *)
 scheduled job "credit-expiry" finished in 812ms: wallets_processed=2 total_expired_amount=700
 scheduled job "reconciliation" finished in 1503ms: checked=1284 mismatched=0
 scheduled job "outbox-dispatch" finished in 240ms: processed=3 failed=0 batches=2
+scheduled job "expiry-notice" finished in 96ms: accounts_notified=12 lots_marked=15
 ```
 
 `SCHEDULER_ENABLED=false` で起動した場合は、代わりに次の警告が1行出る。
@@ -109,12 +116,34 @@ scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation 
 保持期間の既定値は「調査に必要な期間は残しつつ無限に増やさない」ことを狙った暫定値。
 法令・社内規程で保持期間が定まったら上記の環境変数で上書きすること。
 
+## 失効予告 (`expiry-notice`)
+
+失効の `EXPIRY_NOTICE_DAYS_BEFORE` 日前 (既定7日) になったロットについて、本人宛の
+お知らせ (`Notice.ove_account_id` を設定した個別通知、重要度 `IMPORTANT`) を作成する。
+失効させる `credit-expiry` とは別ジョブにしている (予告は失効の数日前に出す必要があり、
+失効当日に走る処理とはタイミングが異なるため)。
+
+- **重複防止**: 通知したロットに `ove_credit_lots.expiry_notice_sent_at` を立てる。
+  毎日実行されるが、印の付いたロットは次回以降の対象から外れるため再通知されない。
+  通知の作成と印付けは同一トランザクションで行う。
+- **まとめ方**: 同じアカウントで複数ロットが対象になった場合は1通にまとめ、合計額と
+  最短の失効日 (JSTの暦日) を載せる。
+- **対象外**: 退会済み(`CLOSED`)アカウント、失効済み・取消済み・残高0のロット、
+  既に失効日を過ぎたロット (予告としては手遅れで、次の失効バッチで処理される)。
+- **1回の上限**: 500アカウント。超過分は未通知のまま残るため翌日の実行で拾われる。
+- **LINE配信はしない**。`LineBroadcastService` は全ユーザーへの一斉配信で、本人宛の
+  金額を全員に配信してしまうため。個別配信の口ができたら別途対応する。
+
+個別通知はアプリの `GET /api/v1/me/notices` に本人だけ表示される。管理画面のお知らせ
+一覧には**含めない** (利用者数に比例して増え、管理者が作った全員向けお知らせが埋もれ
+るため)。
+
 ## 異常時の挙動
 
 - **ジョブが失敗した場合**: エラーログを出して Sentry へ送り (`SENTRY_DSN` 未設定時は
   no-op)、プロセスは落とさない。次回のスケジュールで再実行される。
 - **cron式が不正な場合**: そのジョブだけ登録に失敗し、エラーログと Sentry 通知を出す。
-  他の2つは通常どおり登録される (設定ミス1つでAPI全体が起動不能になるのを避けるため)。
+  他のジョブは通常どおり登録される (設定ミス1つでAPI全体が起動不能になるのを避けるため)。
 - **Outboxが滞留している場合**: 1回の実行で最大10バッチ (既定20件/バッチ = 200件) まで
   処理する。それ以上は次回に持ち越す。送信に失敗したイベントは指数バックオフで
   `available_at` が先送りされ、8回で `FAILED` (Dead Letter) になり Sentry 通知が出る。

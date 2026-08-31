@@ -165,13 +165,18 @@ export class WalletsService {
   /**
    * ウォレットホーム画面「お知らせ」向け。公開中のお知らせを新しい順に返す。
    * 本人の既読状態 (notice_reads) を突き合わせて is_read を付与する
-   * (お知らせ自体は全ユーザー共通、既読状態のみアカウント単位)。
+   * (既読状態はアカウント単位)。
    */
   async listPublicNotices(oveAccountId: string) {
     const notices = await this.db.notice.findMany({
-      // publishedAtが未来 (予約投稿, docs/notices-line-broadcast.md「予約投稿」参照) の
-      // ものは、その日時になるまでユーザー向け一覧に含めない。
-      where: { status: "PUBLISHED", publishedAt: { lte: new Date() } },
+      where: {
+        status: "PUBLISHED",
+        // publishedAtが未来 (予約投稿, docs/notices-line-broadcast.md「予約投稿」参照) の
+        // ものは、その日時になるまでユーザー向け一覧に含めない。
+        publishedAt: { lte: new Date() },
+        // 宛先なし = 全員向け、宛先ありは本人だけ (失効予告などの個別通知)。
+        OR: [{ oveAccountId: null }, { oveAccountId }],
+      },
       orderBy: { publishedAt: "desc" },
       take: 20,
     });
@@ -192,7 +197,11 @@ export class WalletsService {
   /** お知らせを既読にする (アカウント単位、複数回呼んでも冪等)。 */
   async markNoticeRead(oveAccountId: string, noticeId: string) {
     const notice = await this.db.notice.findUnique({ where: { id: noticeId } });
-    if (!notice) throw new NotFoundException("notice not found");
+    // 他人宛の個別通知は、その存在自体を知られないよう「無い」ものとして扱う
+    // (既読にできてしまうと、IDの総当たりで他人宛の通知の有無が分かってしまう)。
+    if (!notice || (notice.oveAccountId !== null && notice.oveAccountId !== oveAccountId)) {
+      throw new NotFoundException("notice not found");
+    }
 
     await this.db.noticeRead.upsert({
       where: { noticeId_oveAccountId: { noticeId, oveAccountId } },

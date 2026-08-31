@@ -21,8 +21,18 @@ export class AdminNoticesService {
     private readonly lineBroadcast: LineBroadcastService,
   ) {}
 
+  /**
+   * 管理画面のお知らせ一覧。全員向け (`oveAccountId`がnull) のみを返す。
+   *
+   * 失効予告 (`ExpiryNoticeService`) が作る個別通知は利用者数に比例して増えるため、
+   * ここに混ぜると管理者が作ったお知らせが埋もれ、件数も無制限になる。
+   * この画面は全員向けお知らせの作成・管理が目的なので、対象から外す。
+   */
   async list() {
-    return this.db.notice.findMany({ orderBy: { publishedAt: "desc" } });
+    return this.db.notice.findMany({
+      where: { oveAccountId: null },
+      orderBy: { publishedAt: "desc" },
+    });
   }
 
   async create(params: CreateNoticeParams, adminId: string) {
