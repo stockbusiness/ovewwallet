@@ -11,9 +11,11 @@ import { OutboxService } from "../outbox/outbox.service";
 import { DataRetentionService } from "./data-retention.service";
 import { ExpiryNoticeService } from "./expiry-notice.service";
 import { PointLiabilityService } from "../reporting/point-liability.service";
+import { AccountAnonymizationService } from "../accounts/account-anonymization.service";
 import {
   DEFAULT_EXPIRY_CRON,
   DEFAULT_EXPIRY_NOTICE_CRON,
+  DEFAULT_ANONYMIZATION_CRON,
   DEFAULT_LIABILITY_SNAPSHOT_CRON,
   DEFAULT_OUTBOX_CRON,
   DEFAULT_RECONCILIATION_CRON,
@@ -30,6 +32,7 @@ export const JOB_OUTBOX_DISPATCH = "outbox-dispatch";
 export const JOB_DATA_RETENTION = "data-retention";
 export const JOB_EXPIRY_NOTICE = "expiry-notice";
 export const JOB_LIABILITY_SNAPSHOT = "liability-snapshot";
+export const JOB_ACCOUNT_ANONYMIZATION = "account-anonymization";
 
 /**
  * 運用処理の定期実行。
@@ -55,6 +58,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly retention: DataRetentionService,
     private readonly expiryNotice: ExpiryNoticeService,
     private readonly pointLiability: PointLiabilityService,
+    private readonly anonymization: AccountAnonymizationService,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
   ) {}
 
@@ -85,6 +89,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       JOB_LIABILITY_SNAPSHOT,
       cronExpression("LIABILITY_SNAPSHOT_CRON", DEFAULT_LIABILITY_SNAPSHOT_CRON),
       () => this.runLiabilitySnapshot(),
+    );
+    this.register(
+      JOB_ACCOUNT_ANONYMIZATION,
+      cronExpression("ANONYMIZATION_CRON", DEFAULT_ANONYMIZATION_CRON),
+      () => this.runAccountAnonymization(),
     );
   }
 
@@ -226,6 +235,19 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       const period = PointLiabilityService.previousPeriod();
       const result = await this.pointLiability.captureMonthEndSnapshot(period);
       return `period=${period} created=${result.created}`;
+    });
+  }
+
+  /**
+   * 猶予期間を過ぎた退会済みアカウントの個人情報を匿名化する
+   * (`AccountAnonymizationService`)。Feature Flagが無効なら何もしない。
+   */
+  async runAccountAnonymization(): Promise<boolean> {
+    return this.withLock(JOB_ACCOUNT_ANONYMIZATION, async () => {
+      const result = await this.anonymization.anonymizeClosedAccounts();
+      return result.skippedReason
+        ? `skipped=${result.skippedReason}`
+        : `accounts=${result.anonymizedAccounts} identities=${result.anonymizedIdentities}`;
     });
   }
 

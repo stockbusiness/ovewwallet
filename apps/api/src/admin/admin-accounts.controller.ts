@@ -4,6 +4,7 @@ import type { Response } from "express";
 import { z } from "zod";
 import { AdminService } from "./admin.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
+import { AccountAnonymizationService } from "../accounts/account-anonymization.service";
 import { AccountMergeSchema } from "./dto/admin-accounts.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
@@ -15,6 +16,7 @@ export class AdminAccountsController {
   constructor(
     private readonly admin: AdminService,
     private readonly accountMerge: AdminAccountMergeService,
+    private readonly anonymization: AccountAnonymizationService,
   ) {}
 
   /**
@@ -49,6 +51,23 @@ export class AdminAccountsController {
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", 'attachment; filename="accounts.csv"');
     res.send(csv);
+  }
+
+  /**
+   * 退会済みアカウントの匿名化ドライラン (`docs/account-anonymization.md`)。
+   *
+   * 匿名化は不可逆なので、`ENABLE_ACCOUNT_ANONYMIZATION`を有効化する**前に**
+   * 「今有効にすると何件が対象になるか」を確認するための入口。件数のみを返し、
+   * 個人情報は一切返さない。
+   *
+   * 動的セグメント`:accountId`より前に登録している (`accounts/export`と同じ理由で、
+   * 後に登録するとこの文字列がaccountIdとして解決されてしまう)。
+   */
+  @Get("accounts/anonymization-preview")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN")
+  async anonymizationPreview() {
+    return this.anonymization.preview();
   }
 
   /** アカウント詳細画面 (指示書13章): 連携ID・外部サービス連携・ウォレット・操作ログ。 */

@@ -12,6 +12,7 @@ import {
 import { PRISMA } from "../common/prisma.module";
 import { CommonUserLinkingService } from "./common-user-linking.service";
 import { AccountRepository } from "./account.repository";
+import { anonymizationHashKey, anonymizeSubject } from "./anonymized-identity";
 
 /** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
 export const CURRENT_TERMS_VERSION = "1.0";
@@ -56,20 +57,45 @@ export class AccountRegistrationService {
   ) {}
 
   /**
+   * identityを引く。生の`provider_subject`で見つからなければ、匿名化後のハッシュでも引く。
+   *
+   * 退会済みアカウントの個人情報は猶予期間の経過後に匿名化され、`provider_subject`は
+   * 復元できないハッシュに置き換わる (`docs/account-anonymization.md`)。生の値だけで
+   * 引くと匿名化済みの行に当たらず、**退会した利用者が新規ユーザーとして再登録できて
+   * しまう** (`docs/account-closure.md`が禁じている経路)。ハッシュでも引くことで、
+   * 匿名化後も同一人物の再登録を検出し続ける。
+   *
+   * ハッシュ鍵が未設定の環境では2段階目を行わない (匿名化自体が実行されないため、
+   * 匿名化済みの行が存在しない)。
+   */
+  private async findIdentity(provider: string, providerSubject: string) {
+    const byRawSubject = await this.db.accountIdentity.findUnique({
+      where: { provider_providerSubject: { provider, providerSubject } },
+      include: { account: true },
+    });
+    if (byRawSubject) return byRawSubject;
+
+    const hashKey = anonymizationHashKey();
+    if (hashKey === null) return null;
+
+    return this.db.accountIdentity.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider,
+          providerSubject: anonymizeSubject(providerSubject, hashKey),
+        },
+      },
+      include: { account: true },
+    });
+  }
+
+  /**
    * identity (LINE / EMAIL / 戦国パスポート等) からOVEアカウントを解決する。
    * 未登録なら「1. ユーザーごとのOVEアカウントを作成する」「2. ウォレットを作成する」
    * を1トランザクションで実行する (指示書3章)。
    */
   async findOrCreateByIdentity(params: FindOrCreateIdentityParams): Promise<OveAccount> {
-    const existing = await this.db.accountIdentity.findUnique({
-      where: {
-        provider_providerSubject: {
-          provider: params.provider,
-          providerSubject: params.providerSubject,
-        },
-      },
-      include: { account: true },
-    });
+    const existing = await this.findIdentity(params.provider, params.providerSubject);
     if (existing) {
       // 退会済みアカウントへの再ログインは拒否する (docs/account-closure.md参照)。
       // 同じidentityで新規アカウントを再作成することもしない (同一のLINEユーザーID等で
@@ -151,10 +177,8 @@ export class AccountRegistrationService {
       // 一意制約で片方が失敗しうる。再検索して先に作成された側のアカウントを返す
       // (500を返して登録自体を失敗させない)。
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        const race = await this.db.accountIdentity.findUnique({
-          where: { provider_providerSubject: { provider: params.provider, providerSubject: params.providerSubject } },
-          include: { account: true },
-        });
+        // 上と同じ2段階照合を使う (照合の条件が2箇所で食い違わないように)。
+        const race = await this.findIdentity(params.provider, params.providerSubject);
         if (race) {
           if (race.account.status === "CLOSED") {
             throw new ForbiddenException("this account has been closed");

@@ -263,6 +263,7 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_COLLECTIBLE_CLAIM_FLOW: false,
       ENABLE_LEGACY_REFERRAL_SIGNUP_BONUS: false,
       ENABLE_COMMON_USER_BALANCE_API: false,
+      ENABLE_ACCOUNT_ANONYMIZATION: false,
     });
   });
 

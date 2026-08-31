@@ -5,6 +5,7 @@ import {
   JOB_CREDIT_EXPIRY,
   JOB_DATA_RETENTION,
   JOB_EXPIRY_NOTICE,
+  JOB_ACCOUNT_ANONYMIZATION,
   JOB_LIABILITY_SNAPSHOT,
   JOB_OUTBOX_DISPATCH,
   JOB_RECONCILIATION,
@@ -14,6 +15,7 @@ import type { AdminRewardRulesService } from "../admin/admin-reward-rules.servic
 import type { DataRetentionService } from "./data-retention.service";
 import type { ExpiryNoticeService } from "./expiry-notice.service";
 import type { PointLiabilityService } from "../reporting/point-liability.service";
+import type { AccountAnonymizationService } from "../accounts/account-anonymization.service";
 import type { OutboxService } from "../outbox/outbox.service";
 
 function build(overrides: {
@@ -23,6 +25,7 @@ function build(overrides: {
   retention?: Partial<DataRetentionService>;
   expiryNotice?: Partial<ExpiryNoticeService>;
   pointLiability?: Partial<PointLiabilityService>;
+  anonymization?: Partial<AccountAnonymizationService>;
   kv?: InMemoryKeyValueStore;
 } = {}) {
   const kv = overrides.kv ?? new InMemoryKeyValueStore();
@@ -54,6 +57,13 @@ function build(overrides: {
     ...overrides.pointLiability,
   } as unknown as PointLiabilityService;
 
+  const anonymization = {
+    anonymizeClosedAccounts: jest
+      .fn()
+      .mockResolvedValue({ anonymizedAccounts: 0, anonymizedIdentities: 0, skippedReason: "disabled" }),
+    ...overrides.anonymization,
+  } as unknown as AccountAnonymizationService;
+
   const registry = new SchedulerRegistry();
   const service = new SchedulerService(
     registry,
@@ -63,9 +73,10 @@ function build(overrides: {
     retention,
     expiryNotice,
     pointLiability,
+    anonymization,
     kv,
   );
-  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, pointLiability, kv };
+  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, pointLiability, anonymization, kv };
 }
 
 describe("SchedulerService", () => {
@@ -88,6 +99,7 @@ describe("SchedulerService", () => {
       expect(registry.getCronJob(JOB_DATA_RETENTION)).toBeDefined();
       expect(registry.getCronJob(JOB_EXPIRY_NOTICE)).toBeDefined();
       expect(registry.getCronJob(JOB_LIABILITY_SNAPSHOT)).toBeDefined();
+      expect(registry.getCronJob(JOB_ACCOUNT_ANONYMIZATION)).toBeDefined();
 
       service.onModuleDestroy();
       // 停止後はタイマーが残らない (プロセスが終了できる)
@@ -175,6 +187,12 @@ describe("SchedulerService", () => {
       expect(pointLiability.captureMonthEndSnapshot).toHaveBeenCalledWith(
         expect.stringMatching(/^\d{4}-\d{2}$/),
       );
+    });
+
+    it("runs the account anonymization job", async () => {
+      const { service, anonymization } = build();
+      await expect(service.runAccountAnonymization()).resolves.toBe(true);
+      expect(anonymization.anonymizeClosedAccounts).toHaveBeenCalledTimes(1);
     });
 
     it("メンテナンス中はジョブを走らせない", async () => {
