@@ -176,6 +176,25 @@ describe("SchedulerService", () => {
         expect.stringMatching(/^\d{4}-\d{2}$/),
       );
     });
+
+    it("メンテナンス中はジョブを走らせない", async () => {
+      // 定期ジョブはすべて書き込み。メンテナンスが更新を止める目的である以上、
+      // 裏で書き続けては意味が無い (特にマイグレーション中のDBへの書き込み)。
+      const original = process.env.MAINTENANCE_MODE;
+      try {
+        for (const mode of ["readonly", "full"]) {
+          process.env.MAINTENANCE_MODE = mode;
+          const { service, rewardRules, retention } = build();
+          await expect(service.runCreditExpiry()).resolves.toBe(false);
+          await expect(service.runDataRetention()).resolves.toBe(false);
+          expect(rewardRules.runExpiryBatch).not.toHaveBeenCalled();
+          expect(retention.purgeExpiredData).not.toHaveBeenCalled();
+        }
+      } finally {
+        if (original === undefined) delete process.env.MAINTENANCE_MODE;
+        else process.env.MAINTENANCE_MODE = original;
+      }
+    });
   });
 
   describe("多重実行の防止と異常系", () => {

@@ -20,7 +20,7 @@
 | `expiry-notice` | `0 1 * * *` | 毎日 10:00 | `ExpiryNoticeService.createExpiryNotices()` |
 | `liability-snapshot` | `0 0 2 * *` | 毎月2日 09:00 | `PointLiabilityService.captureMonthEndSnapshot()` |
 
-`expiry-notice` を除き、いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
+`expiry-notice` と `liability-snapshot` を除き、いずれも**管理画面の手動実行と同じサービスメソッド**を呼ぶ。手動と自動で挙動が
 分かれないよう、スケジューラ側にロジックを複製していない。手動実行の入口
 (管理画面のボタン) はこれまで通り残しており、臨時実行に使える。
 
@@ -154,6 +154,19 @@ scheduler is disabled (SCHEDULER_ENABLED=false): credit expiry / reconciliation 
 - ジョブが何度か失敗して月をまたいだ場合、その月のスナップショットは欠けたままになる。
   管理画面の増減表でその月の期首残高が `-` になるので気づける。後から
   `captureMonthEndSnapshot("YYYY-MM")` を実行すれば正しい値で埋められる。
+## メンテナンス中の挙動
+
+`MAINTENANCE_MODE` が設定されている間 (`readonly`/`full` のいずれも)、全ジョブは
+実行を見送る (`docs/deployment.md`「メンテナンスモード」参照)。どのジョブも書き込みを
+伴うため、更新を止めている間に裏で走り続けては意味が無いため。
+
+```
+scheduled job "credit-expiry" skipped: maintenance mode is readonly
+```
+
+見送った分はメンテナンス明けの次回スケジュールで拾われる。日次ジョブのメンテナンスが
+実行時刻をまたいだ場合、その日の実行は飛ぶ (失効・保持期間削除はいずれも1日遅れても
+実害が無い設計)。長時間のメンテナンス後は、必要に応じて管理画面から手動実行する。
 
 ## 異常時の挙動
 

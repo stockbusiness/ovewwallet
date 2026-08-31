@@ -11,6 +11,7 @@ import { CollectiblesModule } from "./collectibles/collectibles.module";
 import { CollectibleClaimsModule } from "./collectible-claims/collectible-claims.module";
 import { csrfProtectionMiddleware } from "./common/csrf-protection.middleware";
 import { KeyValueStoreModule } from "./common/kv-store.module";
+import { maintenanceModeMiddleware } from "./common/maintenance-mode.middleware";
 import { PrismaModule } from "./common/prisma.module";
 import { RepositoriesModule } from "./common/repositories.module";
 import { requestIdMiddleware } from "./common/request-id.middleware";
@@ -53,6 +54,12 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     // CSRF対策はAppModule側で登録する。main.tsのbootstrap()ではなくここに置くことで、
     // AppModuleを起動する全てのe2eテストでも本番と同じ経路が有効になる。
-    consumer.apply(requestIdMiddleware, csrfProtectionMiddleware).forRoutes("*");
+    //
+    // 順序に意味がある。request_idは503のレスポンスにも必要なので先頭。
+    // メンテナンス判定はCSRF検証より前に置く — メンテナンス中に返すのは常に503で、
+    // 「メンテナンス中なのにCSRFの403が返る」という紛らわしい応答を避けるため。
+    consumer
+      .apply(requestIdMiddleware, maintenanceModeMiddleware, csrfProtectionMiddleware)
+      .forRoutes("*");
   }
 }

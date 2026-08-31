@@ -3,6 +3,7 @@ import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import type { KeyValueStore } from "@ove/auth";
 import { KV_STORE } from "../common/kv-store.module";
+import { maintenanceMode } from "../common/maintenance-mode.middleware";
 import { captureException } from "../common/sentry";
 import { AdminService } from "../admin/admin.service";
 import { AdminRewardRulesService } from "../admin/admin-reward-rules.service";
@@ -129,6 +130,16 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    * @returns ロックを取得して実行したなら true、他インスタンス実行中で見送ったなら false
    */
   private async withLock(jobName: string, run: () => Promise<string>): Promise<boolean> {
+    // メンテナンス中は走らせない。定期ジョブは失効・保持期間削除・Outbox送信・通知作成と
+    // いずれも書き込みで、メンテナンスが更新を止める目的である以上、裏で書き続けては
+    // 意味が無い (特にマイグレーション中のDBへの書き込みは壊し方が読みにくい)。
+    // 見送った分は次回のスケジュールで拾われる。
+    const mode = maintenanceMode();
+    if (mode !== "off") {
+      this.logger.log(`scheduled job "${jobName}" skipped: maintenance mode is ${mode}`);
+      return false;
+    }
+
     const key = `scheduler-lock:${jobName}`;
     const holders = await this.kv.incr(key, JOB_LOCK_TTL_SECONDS);
     if (holders !== 1) {
