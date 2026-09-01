@@ -71,13 +71,9 @@ export default function EarnOvePage() {
       )}
 
       <ul className="flex flex-col gap-2">
-        {rules?.map((r) => (
-          <li key={r.rule_code}>
-            <button
-              type="button"
-              onClick={() => showComingSoon(SERVICE_CODE_LABEL[r.source_service] ?? r.source_service)}
-              className="flex w-full items-start gap-3 rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-left transition-colors active:bg-sengoku-text/5"
-            >
+        {rules?.map((r) => {
+          const body = (
+            <>
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sengoku-green/15 text-sengoku-green">
                 <GiftIcon className="h-5 w-5" />
               </span>
@@ -88,14 +84,46 @@ export default function EarnOvePage() {
                 {r.expiry_days != null && (
                   <p className="mt-1 text-xs text-sengoku-faint">獲得から{r.expiry_days}日で失効します</p>
                 )}
+                {r.already_earned && <p className="mt-1 text-xs text-sengoku-faint">受け取り済み</p>}
+                {r.landing_url && !r.already_earned && (
+                  <p className="mt-1 text-xs font-semibold text-sengoku-gold">参加する →</p>
+                )}
               </span>
               <span className="shrink-0 text-sm font-bold text-sengoku-green">
                 +{Number(r.reward_amount).toLocaleString("ja-JP")}
                 <span className="ml-0.5 text-xs font-medium">ORI</span>
               </span>
-            </button>
-          </li>
-        ))}
+            </>
+          );
+          const className =
+            "flex w-full items-start gap-3 rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-left transition-colors active:bg-sengoku-text/5";
+
+          return (
+            <li key={r.rule_code}>
+              {/* 案内先が設定されていれば実際のリンクにする。未設定のときだけ従来の
+                  「準備中です」を出す (導線の無いサービスもあるため)。 */}
+              {r.landing_url ? (
+                <a
+                  href={`${r.landing_url}${r.landing_url.includes("?") ? "&" : "?"}utm_source=ori_wallet&utm_medium=earn_list`}
+                  target="_blank"
+                  // 遷移先から window.opener 経由でこの画面を操作されないようにする
+                  rel="noopener noreferrer"
+                  className={className}
+                >
+                  {body}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => showComingSoon(SERVICE_CODE_LABEL[r.source_service] ?? r.source_service)}
+                  className={className}
+                >
+                  {body}
+                </button>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <BottomNavigation

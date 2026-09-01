@@ -118,6 +118,31 @@ export default function RewardRulesPage() {
     }
   }
 
+  /**
+   * 参加方法の案内先URL (LINE友だち追加など) を設定する。
+   *
+   * URLはサービス側の都合で変わるため、コードに埋めず運用側で変更できるようにしている
+   * (docs/reward-landing-url.md)。空のまま確定すると未設定に戻せる。
+   */
+  async function editLandingUrl(rule: RewardRuleItem) {
+    const input = window.prompt(
+      `${rule.displayName} の案内先URL\n\nhttps:// で始まるURLを入力してください。空にすると導線を出しません。`,
+      rule.landingUrl ?? "",
+    );
+    if (input === null) return; // キャンセル
+
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/reward-rules/${rule.ruleCode}`, {
+        method: "PATCH",
+        body: JSON.stringify({ landingUrl: input.trim() }),
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "案内先URLの更新に失敗しました");
+    }
+  }
+
   async function toggleStatus(rule: RewardRuleItem) {
     setError(null);
     try {
@@ -197,6 +222,7 @@ export default function RewardRulesPage() {
               <th className="p-3">付与額</th>
               <th className="p-3">上限 (ユーザー/イベント)</th>
               <th className="p-3">有効期限</th>
+              <th className="p-3">案内先URL</th>
               <th className="p-3">累計発行 (額/件数)</th>
               <th className="p-3">状態</th>
               <th className="p-3"></th>
@@ -217,6 +243,18 @@ export default function RewardRulesPage() {
                     {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
                   </td>
                   <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
+                  <td className="max-w-[14rem] p-3">
+                    {r.landingUrl ? (
+                      <span className="block truncate text-xs text-sengoku-text" title={r.landingUrl}>
+                        {r.landingUrl}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-sengoku-faint">未設定 (導線を出さない)</span>
+                    )}
+                    <button onClick={() => editLandingUrl(r)} className="mt-1 text-xs text-sengoku-gold underline">
+                      {r.landingUrl ? "変更" : "設定"}
+                    </button>
+                  </td>
                   <td className="p-3">
                     {summary && summary.totalAmount !== null ? (
                       <>

@@ -79,6 +79,8 @@ export interface RewardRuleItem {
   displayName: string;
   description: string | null;
   expiryDays: number | null;
+  /** 参加方法の案内先URL (LINE友だち追加など)。nullなら利用者側に導線を出さない。 */
+  landingUrl: string | null;
 }
 
 export interface RewardRuleIssuanceSummaryItem {

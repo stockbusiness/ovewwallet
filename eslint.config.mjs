@@ -49,6 +49,7 @@ export default tseslint.config(
             "apps/api/src/integrations/*.test.ts",
             "apps/api/src/notices/*.test.ts",
             "apps/api/src/referrals/*.test.ts",
+            "apps/api/src/rewards/*.test.ts",
             "apps/api/src/scheduler/*.test.ts",
             "apps/api/src/wallets/*.test.ts",
             "apps/api/vitest.config.ts",
