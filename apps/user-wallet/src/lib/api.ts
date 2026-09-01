@@ -241,4 +241,8 @@ export interface RewardRulePublic {
   reward_amount: string;
   source_service: string;
   expiry_days: number | null;
+  /** 参加方法の案内先 (LINE友だち追加など)。未設定なら導線を出さない。 */
+  landing_url: string | null;
+  /** この利用者が既に受け取っているか。1回限りの特典を「もらえます」と出し続けないための判定。 */
+  already_earned: boolean;
 }

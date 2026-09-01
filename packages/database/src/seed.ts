@@ -144,6 +144,8 @@ async function main() {
       status: "ACTIVE",
       displayName: "AIアート教室参加特典",
       description: "AIアート教室への実参加が確認された場合に付与される特典。",
+      // 案内先URL (LINE友だち追加等) は管理画面から設定する。ここでは未設定にしておく
+      // (誤ったURLを既定値として配布しないため。docs/reward-landing-url.md参照)。
     },
   });
 

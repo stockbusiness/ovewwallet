@@ -598,6 +598,10 @@ model RewardRule {
   description        String?
   /// このルール経由で付与されたOVEが何日で失効するか。nullなら失効しない (既定)。
   expiryDays         Int?             @map("expiry_days")
+  /// 参加方法の案内先URL (LINE友だち追加など)。ウォレットの「ORIを貯める」から
+  /// ここへ誘導する。nullなら導線を出さない (docs/reward-landing-url.md参照)。
+  /// URLはサービス側の都合で変わるためコードに埋めず、管理画面から編集できるようにしている。
+  landingUrl         String?          @map("landing_url")
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 

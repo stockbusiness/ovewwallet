@@ -33,7 +33,9 @@ import {
   type DailyBonusStatus,
   type DailyBonusClaimResult,
   type ExpiringCreditsSummary,
+  type RewardRulePublic,
 } from "@/lib/api";
+import { EarnOpportunityCard, pickEarnOpportunity } from "@/components/EarnOpportunityCard";
 
 export default function WalletTopPage() {
   const router = useRouter();
@@ -41,6 +43,7 @@ export default function WalletTopPage() {
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [transactions, setTransactions] = useState<TransactionSummary[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [earnOpportunity, setEarnOpportunity] = useState<RewardRulePublic | null>(null);
   const [holds, setHolds] = useState<WalletHoldItem[]>([]);
   const [dailyBonus, setDailyBonus] = useState<DailyBonusStatus | null>(null);
   const [expiringCredits, setExpiringCredits] = useState<ExpiringCreditsSummary | null>(null);
@@ -79,6 +82,13 @@ export default function WalletTopPage() {
         setHolds(await apiFetch<WalletHoldItem[]>("/api/v1/me/wallet/holds"));
       } catch {
         setHolds([]);
+      }
+      try {
+        // 案内先が設定済みで、まだ受け取っていない獲得機会を1件だけ出す
+        // (選び方は`pickEarnOpportunity`のコメント参照)。
+        setEarnOpportunity(pickEarnOpportunity(await apiFetch<RewardRulePublic[]>("/api/v1/rewards/public")));
+      } catch {
+        setEarnOpportunity(null);
       }
       try {
         setDailyBonus(await apiFetch<DailyBonusStatus>("/api/v1/me/daily-bonus/status"));
@@ -236,6 +246,8 @@ export default function WalletTopPage() {
             { icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", href: "/wallet/services" },
           ]}
         />
+
+        {earnOpportunity && <EarnOpportunityCard rule={earnOpportunity} />}
 
         {notices.length > 0 && (
           <InfoCard

@@ -21,6 +21,8 @@ export const CreateRewardRuleSchema = z.object({
   endsAt: z.string().datetime().optional(),
   approvalType: z.enum(approvalTypeValues).optional(),
   expiryDays: z.number().int().positive().optional(),
+  /** 参加方法の案内先URL。httpsのみ (`rewards/landing-url.ts`で検証)。 */
+  landingUrl: z.string().optional(),
 });
 
 export const UpdateRewardRuleSchema = z.object({
@@ -38,4 +40,6 @@ export const UpdateRewardRuleSchema = z.object({
   endsAt: z.string().datetime().nullable().optional(),
   approvalType: z.enum(approvalTypeValues).optional(),
   expiryDays: z.number().int().positive().nullable().optional(),
+  /** 参加方法の案内先URL。空文字を送ると未設定に戻せる。 */
+  landingUrl: z.string().nullable().optional(),
 });

@@ -4,7 +4,7 @@ import { RewardGrantRequestSchema, type RewardGrantRequest } from "@ove/shared-t
 import { RewardsService } from "./rewards.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ExternalApiAuthGuard, type AuthenticatedServiceRequest } from "../common/external-api-auth.guard";
-import { SessionAuthGuard } from "../common/session-auth.guard";
+import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
 import { ApiAccessLogInterceptor } from "../common/api-access-log.interceptor";
 import { ExternalApiExceptionFilter } from "../common/external-api-exception.filter";
 
@@ -28,7 +28,7 @@ export class RewardsController {
   /** GET /api/v1/rewards/public — ウォレット画面「OVEを貯める」向け。公開安全なフィールドのみ返す。 */
   @Get("public")
   @UseGuards(SessionAuthGuard)
-  async listPublic() {
-    return this.rewards.listPublicRules();
+  async listPublic(@Req() req: AuthenticatedUserRequest) {
+    return this.rewards.listPublicRules(req.account.id);
   }
 }

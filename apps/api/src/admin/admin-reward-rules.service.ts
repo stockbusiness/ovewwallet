@@ -1,9 +1,26 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { generateId, type PrismaClient, type TransactionType } from "@ove/database";
 import { expireDueCreditLots, previewExpiringCreditLots } from "@ove/ledger";
 import { PRISMA } from "../common/prisma.module";
 import { RULE_CODE_BY_TRANSACTION_TYPE } from "../rewards/rewards.service";
 import { RewardRuleRepository } from "../rewards/reward-rule.repository";
+import { InvalidLandingUrlError, normalizeLandingUrl } from "../rewards/landing-url";
+
+/**
+ * 案内先URLを検証して保存できる形にする。不正な値は400で返す
+ * (管理画面の入力ミスであり、サーバー側の異常ではないため)。
+ */
+function toLandingUrl(input: string | null | undefined): string | null | undefined {
+  if (input === undefined) return undefined;
+  try {
+    return normalizeLandingUrl(input);
+  } catch (error) {
+    if (error instanceof InvalidLandingUrlError) {
+      throw new BadRequestException("案内先URLは https:// で始まる有効なURLを入力してください。");
+    }
+    throw error;
+  }
+}
 
 export interface CreateRewardRuleParams {
   ruleCode: string;
@@ -22,6 +39,8 @@ export interface CreateRewardRuleParams {
   approvalType?: string;
   /** このルール経由で付与されたOVEが何日で失効するか。未指定なら失効しない (docs/credit-expiry.md参照)。 */
   expiryDays?: number;
+  /** 参加方法の案内先URL (docs/reward-landing-url.md参照)。 */
+  landingUrl?: string;
 }
 
 export interface UpdateRewardRuleParams {
@@ -39,6 +58,8 @@ export interface UpdateRewardRuleParams {
   endsAt?: string | null;
   approvalType?: string;
   expiryDays?: number | null;
+  /** 参加方法の案内先URL。空文字・nullで未設定に戻す。 */
+  landingUrl?: string | null;
 }
 
 /**
@@ -117,6 +138,7 @@ export class AdminRewardRulesService {
       approvalType: (params.approvalType as never) ?? "AUTOMATIC",
       status: "ACTIVE",
       expiryDays: params.expiryDays,
+      landingUrl: toLandingUrl(params.landingUrl),
     });
   }
 
@@ -139,6 +161,8 @@ export class AdminRewardRulesService {
       endsAt: params.endsAt === undefined ? undefined : params.endsAt ? new Date(params.endsAt) : null,
       approvalType: params.approvalType as never,
       expiryDays: params.expiryDays,
+      // 未指定(undefined)は据え置き。空文字・nullは未設定に戻す。
+      landingUrl: params.landingUrl === undefined ? undefined : toLandingUrl(params.landingUrl),
     });
   }
 
