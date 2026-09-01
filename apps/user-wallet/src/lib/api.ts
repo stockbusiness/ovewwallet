@@ -164,6 +164,17 @@ export interface TermsConsentStatus {
  */
 export const TERMS_CONSENT_REQUIRED_CODE = "terms_consent_required";
 
+/**
+ * 利用できるログイン方法 (`GET /api/v1/auth/methods`)。
+ * ログイン画面が「どのボタンを出すか」をこれで決める。
+ */
+export interface LoginMethodAvailability {
+  line: boolean;
+  email: boolean;
+  sengoku_passport: boolean;
+  agency: boolean;
+}
+
 export interface MeFeatureFlags {
   digital_collection_enabled: boolean;
 }

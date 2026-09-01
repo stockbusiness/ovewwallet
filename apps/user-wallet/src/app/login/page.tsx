@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon, WalletLogo } from "@ove/shared-ui";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, type LoginMethodAvailability } from "@/lib/api";
 import { sanitizeInternalReturnPath } from "@/lib/claim-return-path";
 import {
   isLiffConfigured,
@@ -58,6 +58,10 @@ function LoginPageContent() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"line" | "email" | "sengoku" | null>(null);
+  // どのログイン方法を出すかはサーバーが決める (docs/login-methods.md)。
+  // 稼働開始時点で使えるのはLINEのみで、メール・SSOは実装/接続が未了。
+  // 取得できるまでは何も出さない (使えない選択肢を一瞬でも見せないため)。
+  const [methods, setMethods] = useState<LoginMethodAvailability | null>(null);
   // LINEアプリ経由での結合試験(2026-07-18)で発生した不具合の調査用。開発者ツールが
   // 使えない環境でも状況を把握できるよう、画面に直接表示する (恒久的な機能ではない)。
   const [debugLog, setDebugLog] = useState<string[]>([]);
@@ -134,6 +138,22 @@ function LoginPageContent() {
         // ここでは送信待ちを消さない (上記コメント参照)。
       } finally {
         if (!cancelled) setLoading(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch<LoginMethodAvailability>("/api/v1/auth/methods");
+        if (!cancelled) setMethods(res);
+      } catch {
+        // 取得に失敗してもログインの道は残す。唯一使える方法であるLINEだけを出す。
+        if (!cancelled) setMethods({ line: true, email: false, sengoku_passport: false, agency: false });
       }
     })();
     return () => {
@@ -245,36 +265,42 @@ function LoginPageContent() {
               <h2 className="text-lg font-bold text-sengoku-text">千ノ国ウォレットへようこそ</h2>
               <p className="mt-1 text-sm text-sengoku-muted">千の物語と活動を、ひとつにつなぐ</p>
             </div>
-            <AuthButton
-              variant="line"
-              icon={<ChatBubbleIcon className="h-4 w-4" />}
-              onClick={loginWithLine}
-              disabled={loading !== null}
-            >
-              {loading === "line" ? "ログイン中..." : "LINEでログイン"}
-            </AuthButton>
-            <AuthButton
-              variant="email"
-              icon={<MailIcon className="h-4 w-4" />}
-              onClick={() => {
-                setError(null);
-                setView("email-request");
-              }}
-              disabled={loading !== null}
-            >
-              メールでログイン
-            </AuthButton>
-            <AuthButton
-              variant="sengoku"
-              icon={<IdCardIcon className="h-4 w-4" />}
-              onClick={() => {
-                setError(null);
-                setView("sengoku");
-              }}
-              disabled={loading !== null}
-            >
-              千ノ国パスポートIDでログイン
-            </AuthButton>
+            {methods?.line && (
+              <AuthButton
+                variant="line"
+                icon={<ChatBubbleIcon className="h-4 w-4" />}
+                onClick={loginWithLine}
+                disabled={loading !== null}
+              >
+                {loading === "line" ? "ログイン中..." : "LINEでログイン"}
+              </AuthButton>
+            )}
+            {methods?.email && (
+              <AuthButton
+                variant="email"
+                icon={<MailIcon className="h-4 w-4" />}
+                onClick={() => {
+                  setError(null);
+                  setView("email-request");
+                }}
+                disabled={loading !== null}
+              >
+                メールでログイン
+              </AuthButton>
+            )}
+            {methods?.sengoku_passport && (
+              <AuthButton
+                variant="sengoku"
+                icon={<IdCardIcon className="h-4 w-4" />}
+                onClick={() => {
+                  setError(null);
+                  setView("sengoku");
+                }}
+                disabled={loading !== null}
+              >
+                千ノ国パスポートIDでログイン
+              </AuthButton>
+            )}
             <TermsCheckbox checked={termsAccepted} onChange={setTermsAccepted} />
             <Link href="/terms" className="text-center text-xs font-medium text-sengoku-gold underline underline-offset-2">
               ログインに関するヘルプ

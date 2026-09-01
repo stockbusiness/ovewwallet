@@ -63,6 +63,9 @@ jobs:
           COOKIE_DOMAIN=localhost
           ENCRYPTION_KEY=test-only-insecure-encryption-key
           SCHEDULER_ENABLED=false
+          ENABLE_EMAIL_LOGIN=true
+          ENABLE_SENGOKU_PASSPORT_LOGIN=true
+          ENABLE_AGENCY_LOGIN=true
           EOF
 
       - name: Apply migrations to the test database
