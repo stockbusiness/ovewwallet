@@ -139,19 +139,12 @@ jobs:
     env:
       TARGET: ${{ inputs.target || 'staging' }}
       RUN_SEED_ON_BOOT: ${{ github.event_name == 'workflow_dispatch' && inputs.run_seed_on_boot || false }}
-    outputs:
-      api_url: ${{ steps.domain.outputs.api_url }}
-      # APP_URL / ADMIN_URL を実際に設定したかどうか。後段のジョブの実行条件に使う。
-      cors_urls_set: ${{ steps.service-vars.outputs.cors_urls_set }}
-      # 実際にデプロイした先 (staging / production)。後段のジョブが同じ
-      # GitHub Environment = 同じRailwayプロジェクトを選ぶために使う。
-      target: ${{ steps.service-vars.outputs.target }}
     steps:
       - uses: actions/checkout@v4
 
       # 本番は起動時に APP_URL / ADMIN_URL を必須とする (assertProductionEnvSafe)。
-      # 未指定のままデプロイすると、CORS設定を更新する後段のジョブに辿り着く前に
-      # APIが起動時エラーで落ちるため、ここで先に止めて理由を示す。
+      # 未指定のままデプロイするとAPIが起動時エラーで落ちるため、
+      # ここで先に止めて理由を示す。
       #
       # Secretの有無もここで確かめる。Production Environment が未作成のまま実行すると
       # GitHubが空のEnvironmentを自動生成し、`railway whoami` が認証エラーで落ちる等の
@@ -497,7 +490,6 @@ jobs:
           else
             echo "cors_urls_set=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
 
           echo "設定する変数: ${#VARS[@]}件 (1回のAPI呼び出しにまとめます)"
           # --json の出力はキー名と成否のみで、値は含まれない。
@@ -596,84 +588,39 @@ jobs:
           railway logs --service api --deployment --lines 200 --latest || true
           exit 1
 
-  # APP_URL / ADMIN_URL は1つ目のジョブがデプロイ前に設定済み (production では未設定だと
-  # 起動に失敗するため)。このジョブは同じ値を再適用して再起動する念のための後処理だが、
-  # 「CORSヘッダーが実際に新しいオリジンを返すまで待つ」ステップを持つのはここだけで、
-  # デプロイの入れ替わりを外側から確かめられる唯一の経路でもある。
-  #
-  # 実行条件は `inputs` を直接見ず、1つ目のジョブが実際にURLを設定したかどうかの
-  # 出力を見る。URLを指定した手動実行 (run #51) でも、1つ目のジョブのステップ内では
-  # `${{ inputs.app_url }}` に値が入っていた (APP_URL/ADMIN_URL が設定された) のに、
-  # 同じ式を書いたこのジョブの `if` は false と評価されて skip されていたため。
-  # `needs` の出力なら、値を実際に見たシェルの判断がそのまま条件になる。
-  update-api-cors:
-    needs: deploy-api
-    if: ${{ needs.deploy-api.outputs.cors_urls_set == 'true' }}
-    runs-on: ubuntu-latest
-    # 1つ目のジョブと同じEnvironment (同じSecret群 = 同じRailwayプロジェクト) を使う。
-    # ここも `inputs.target` ではなく1つ目のジョブの出力を見る。取り違えると
-    # 本番向けのAPP_URL/ADMIN_URLを検証環境のプロジェクトへ書き込むことになる。
-    environment: ${{ needs.deploy-api.outputs.target == 'production' && 'Production' || 'RAILWAY' }}
-    steps:
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Update APP_URL / ADMIN_URL and restart API
+      # デプロイ**前**に APP_URL / ADMIN_URL を設定しているので、上で稼働を確認した
+      # コンテナはすでに新しい許可オリジンを持っているはず。それを実際のCORSヘッダーで
+      # 確かめる。/health のコミット一致だけでは「どのビルドか」しか分からず、
+      # 許可オリジンが意図どおりかまでは分からない。
+      #
+      # 以前はこの確認を update-api-cors という別ジョブで行っていたが、
+      # ジョブレベルの `if` が (inputs でも needs の出力でも) false と評価されて
+      # 常に skip されており、確認が一度も行われていなかった。原因は特定できなかったため、
+      # ジョブレベルの条件分岐に依存しない形へ移した。ステップの `if` は steps コンテキストを
+      # 見るだけで、同じジョブ内で確実に評価される。
+      #
+      # 別ジョブでやっていた APP_URL/ADMIN_URL の再設定と `railway up` も廃止した。
+      # デプロイ前に設定済みである以上、同じ値を入れ直して2回目のデプロイを走らせる
+      # 意味がない (デプロイが二重になる分だけ無用な断が伸びる)。
+      - name: Verify CORS headers reflect APP_URL / ADMIN_URL
+        if: ${{ steps.service-vars.outputs.cors_urls_set == 'true' }}
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
           set -e
-          # 1つ目のジョブと同じプロジェクトを選ぶ。Environmentが同じなので
-          # RAILWAY_PROJECT_ID も同じ値を指す。
-          railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
-
-          # 1つ目のジョブと同じプロジェクトに繋がったことを、apiサービスの公開URLの
-          # 一致で確かめる。Environmentの解決を取り違えると、本番のURLを検証環境の
-          # プロジェクトへ書き込む (またはその逆) ことになり、気付きにくい。
-          EXPECTED_API_URL="${{ needs.deploy-api.outputs.api_url }}"
-          railway domain list --service api --json > linked-domains.json 2>&1 || true
-          if ! grep -qF "${EXPECTED_API_URL#https://}" linked-domains.json; then
-            echo "::error::リンク先のプロジェクトが1つ目のジョブと一致しません。"
-            echo "1つ目のジョブのAPI URL: $EXPECTED_API_URL"
-            echo "リンク先のドメイン一覧:"
-            cat linked-domains.json
-            echo "GitHub Environment (RAILWAY / Production) の RAILWAY_PROJECT_ID を確認してください。"
-            exit 1
-          fi
-
-          # ブラウザのOriginヘッダーは末尾スラッシュを含まないため、CORSの許可リストと
-          # 比較するURLも末尾スラッシュを除去しておく(付いたままだと一致せず、
-          # Access-Control-Allow-Originが返らずCORSエラーになる)。
+          API_URL="${{ steps.domain.outputs.api_url }}"
+          # ブラウザのOriginヘッダーは末尾スラッシュを含まないため、比較する側も揃える
+          # (付いたままだと一致せず、Access-Control-Allow-Originが返らずCORSエラーになる)。
           APP_URL="${{ inputs.app_url }}"
           ADMIN_URL="${{ inputs.admin_url }}"
           APP_URL="${APP_URL%/}"
           ADMIN_URL="${ADMIN_URL%/}"
+          echo "確認先: $API_URL"
           echo "APP_URL=$APP_URL"
           echo "ADMIN_URL=$ADMIN_URL"
-          # 両方とも--skip-deploysで設定してから、railway upで明示的に再デプロイする。
-          # (railway service restartは「Deployment is not restartable」で失敗する
-          # ケースがあり信頼できなかったため、deploy-apiジョブと同じ確実な経路である
-          # railway upに統一した)
-          railway variable set "APP_URL=$APP_URL" --service api --skip-deploys --json
-          railway variable set "ADMIN_URL=$ADMIN_URL" --service api --skip-deploys --json
-          railway up --service api --ci --detach
-          echo "app_url=$APP_URL" >> "$GITHUB_ENV"
-          echo "admin_url=$ADMIN_URL" >> "$GITHUB_ENV"
-
-      - name: Wait for the new deployment's CORS headers to go live
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-        run: |
-          set -e
-          # `railway up --ci --detach`はビルド完了を待たずに戻るため、直後の
-          # /healthチェックは(新しいデプロイではなく)まだ稼働中の古いインスタンスに
-          # 当たって200を返してしまい、正しく待てていなかった。ここでは
-          # /healthではなく実際にCORSヘッダーがAPP_URL/ADMIN_URLを反映しているかを
-          # 新デプロイが有効になるまでリトライし続けることで、確実に入れ替わりを待つ。
-          API_URL="${{ needs.deploy-api.outputs.api_url }}"
           for i in $(seq 1 30); do
             OK=true
-            for ORIGIN in "$app_url" "$admin_url"; do
+            for ORIGIN in "$APP_URL" "$ADMIN_URL"; do
               HEADERS=$(curl -sS -i -X OPTIONS \
                 -H "Origin: $ORIGIN" \
                 -H "Access-Control-Request-Method: GET" \
@@ -683,19 +630,20 @@ jobs:
               fi
             done
             if [ "$OK" = "true" ]; then
-              echo "試行 $i: 新しいCORS設定が反映されました"
+              echo "試行 $i: CORSの許可オリジンが反映されています"
+              {
+                echo "### CORS設定を確認しました"
+                echo "- API: $API_URL"
+                echo "- APP_URL: $APP_URL"
+                echo "- ADMIN_URL: $ADMIN_URL"
+              } >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-            echo "試行 $i: まだ古いインスタンスが応答しています。10秒待って再試行します"
+            echo "試行 $i: まだ反映されていません。10秒待って再試行します"
             sleep 10
           done
-          echo "5分待っても新しいCORS設定が反映されませんでした。直近のデプロイログ:"
+          echo "::error::5分待ってもCORSの許可オリジンが反映されませんでした。"
+          echo "APP_URL/ADMIN_URL の値と、APIのCORS設定 (apps/api/src/main.ts) を確認してください。"
+          echo "直近のデプロイ(ランタイム)ログ:"
           railway logs --service api --deployment --lines 100 --latest || true
           exit 1
-
-      - name: Summary
-        run: |
-          echo "### CORS設定を更新しました" >> "$GITHUB_STEP_SUMMARY"
-          echo "- API: ${{ needs.deploy-api.outputs.api_url }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- APP_URL: $app_url" >> "$GITHUB_STEP_SUMMARY"
-          echo "- ADMIN_URL: $admin_url" >> "$GITHUB_STEP_SUMMARY"

@@ -226,9 +226,8 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 3. フロントエンドのVercel URLが決まったら (下記参照)、同じワークフローを
    `app_url`/`admin_url` 入力欄にそれぞれのURLを指定して再実行する。
    `deploy-api` がデプロイ**前**に `APP_URL`/`ADMIN_URL` (CORS許可オリジン) を
-   設定し、続く `update-api-cors` が同じ値を再適用したうえで、実際にCORSヘッダーが
-   新しいオリジンを返すまで待つ。設定の正本は `deploy-api` 側で、
-   `update-api-cors` は反映を外側から確認するための後処理。
+   設定し、稼働確認のあと、実際にCORSヘッダーが新しいオリジンを返すかを
+   同じジョブの最後のステップで確かめる。
    (本番は `NODE_ENV=production` の起動ガードが両者を必須とするため、
    デプロイ後に設定するのでは初回起動に間に合わない。)
 
@@ -240,13 +239,20 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 | GitHub Environment | `RAILWAY` | `Production` |
 | `NODE_ENV` | `staging` | `production` |
 | `RUN_SEED_ON_BOOT` | `false` 固定 | 実行時に選択 (初回のみ`true`推奨) |
-| `APP_URL`/`ADMIN_URL` | 変更しない (Railway側の既存値を維持) | 入力必須。`deploy-api`が設定し`update-api-cors`が反映を確認 |
+| `APP_URL`/`ADMIN_URL` | 変更しない (Railway側の既存値を維持) | 入力必須。デプロイ前に設定し、最後にCORSヘッダーで反映を確認 |
 | Railwayプロジェクト | `api-production-d504.up.railway.app` | `api-production-9abf.up.railway.app` (`api.sennokuni-wallet.com`) |
 
 `RAILWAY` と `Production` の各GitHub Environmentは**別々のRailwayプロジェクト**を
 指している (上表の公開ドメインで確認できる)。したがってマージによる自動デプロイが
-本番に反映されることはない。`update-api-cors` は `railway link` の直後に、
-繋がった先のドメインが `deploy-api` のものと一致するかを検証して取り違えを防いでいる。
+本番に反映されることはない。
+
+なお以前は CORS の確認を `update-api-cors` という別ジョブで行っていたが、
+ジョブレベルの `if` が (`inputs` でも `needs` の出力でも) false と評価されて
+常に skip されており、確認が一度も行われていなかった。原因は特定できなかったため、
+確認を `deploy-api` の最後のステップへ移し、ジョブレベルの条件分岐をなくした。
+同時に、別ジョブが行っていた `APP_URL`/`ADMIN_URL` の再設定と2回目の
+`railway up` も廃止した (デプロイ前に設定済みのため不要で、デプロイが二重になる分だけ
+無用な断が伸びる)。
 
 **本番を自動にしていない理由**: `apps/api/docker-entrypoint.sh` がコンテナ起動時に
 `prisma migrate deploy` を実行するため、マージがそのままDBマイグレーションの実行に
