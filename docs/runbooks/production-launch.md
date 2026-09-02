@@ -48,7 +48,7 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 
 | Secret | 内容 |
 |---|---|
-| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (Railwayアカウント全体のトークンのため) |
+| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (アカウント全体のトークンのため)。分からなければ下記を参照 |
 | `RAILWAY_PROJECT_ID` | **手順1で作った本番プロジェクトのID**。検証用プロジェクトを指さないこと |
 | `SESSION_SECRET` | `openssl rand -hex 32`。検証用と**別の値** |
 | `ENCRYPTION_KEY` | `openssl rand -hex 32`。検証用と**別の値** |
@@ -57,6 +57,24 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 
 `VERCEL_TOKEN` はこのワークフローでは使わない (フロントエンドはVercelのGit連携で
 デプロイする、`docs/deployment.md`)。
+
+#### `RAILWAY_API_TOKEN` の取り方
+
+GitHubのSecretは登録後に値を読み出せないため、検証用の値が手元にない場合は
+**新しく発行する**。既存のトークンは無効にならないので、検証環境には影響しない。
+
+1. Railway の **Account Settings → Tokens** (<https://railway.com/account/tokens>)
+2. トークン名を入力して作成する (例: `github-actions-production`)
+3. **プロジェクトがチーム(Workspace)に属している場合は、そのチームを選んで発行する。**
+   個人スコープのトークンではチームのプロジェクトが見えず、`railway link` が失敗する
+4. 表示は1回だけなのでその場でコピーし、`Production` Environment に登録する
+
+> **Project token と間違えないこと。** プロジェクト設定側で発行できるトークンは
+> 環境変数名が `RAILWAY_TOKEN` で、単一プロジェクトに固定される別物。ここで必要なのは
+> アカウント/チームレベルのトークン (`RAILWAY_API_TOKEN`)。
+
+トークンが正しいかは、デプロイの `Authenticate` ステップ (`railway whoami`) が
+実行直後に判定する。誤っていればそこで止まるので、他の設定には波及しない。
 
 > **`ENCRYPTION_KEY` を後から変えるときは、値の差し替えだけでは足りない。**
 > 管理者MFAシークレット等が旧鍵で暗号化されたまま復号できなくなる。
@@ -86,6 +104,86 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 独自ドメインを使う場合はDNSとVercel側の設定を先に済ませ、確定したURLを渡す。
 暫定的にVercelの本番URLで開始することもできる (後から再実行して差し替え可能)。
 
+**Vercelの本番URLはAPIより先に決まっている**ので、順番で詰まることはない。
+Vercelダッシュボードで各プロジェクトの Production Deployment のURLを控える
+(`https://<project>.vercel.app` 形式)。
+
+#### 独自ドメイン (`sennokuni-wallet.com`) の割り当て
+
+| ホスト | 向き先 | 設定場所 |
+|---|---|---|
+| `sennokuni-wallet.com` | Vercel `ovewwallet-user-wallet` | Vercel > Settings > Domains |
+| `admin.sennokuni-wallet.com` | Vercel `ovewwallet-admin-wallet` | 同上 |
+| `api.sennokuni-wallet.com` | Railway の `api` サービス | Railway > api > Settings > Networking |
+
+ドメイン名自体が「wallet」なので、利用者向けは `wallet.` を足さず**apex (裸ドメイン)** を
+使う。`www` は apex へリダイレクトさせておく (Vercelが設定を案内する)。
+
+APIをサブドメインにするのは **admin-wallet のCookieを同一サイトにする**ため。
+user-wallet は `next.config.mjs` の `rewrites()` で `/api/*` を同一オリジンに
+見せかけて転送するのでAPIのホスト名はブラウザから見えないが、**admin-wallet には
+この仕組みがなく** `NEXT_PUBLIC_API_URL` を絶対URLとして直接呼ぶ
+(`apps/admin-wallet/src/lib/api.ts`)。Railwayの `*.up.railway.app` のままでも
+稼働はできるが、クロスサイトCookie (`SameSite=None`) に依存し続けることになる。
+
+そのため各URLは次の値になる。
+
+| 入力 / 変数 | 値 |
+|---|---|
+| `app_url` | `https://sennokuni-wallet.com` |
+| `admin_url` | `https://admin.sennokuni-wallet.com` |
+| `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+
+### 3-2. フロントエンド側の環境変数 (Vercel)
+
+APIを立てただけではフロントエンドは本番APIを見ない。**Vercel側の設定が必要**で、
+これが漏れると画面は表示されるのにログインできない、という分かりにくい形で失敗する。
+
+Vercelの各プロジェクト > **Settings > Environment Variables** で、
+**Environment に `Production` を選んで**登録する
+(`Preview` と分けておけば、PRのプレビューは検証用APIを向いたまま残せる)。
+
+対象プロジェクトは **`ovewwallet-user-wallet`** と **`ovewwallet-admin-wallet`** の2つ。
+Vercelには `user-wallet` / `admin-wallet` という**Git連携の切れた古いプロジェクト**も
+残っているので取り違えないこと。
+
+| プロジェクト | 変数 | 値 |
+|---|---|---|
+| `ovewwallet-user-wallet` | `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+| `ovewwallet-user-wallet` | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID (`2010749243-Zu7AV5nR`。`docs/roadmap.md` P0-3.6) |
+| `ovewwallet-admin-wallet` | `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+
+APIに独自ドメインを割り当てない場合は、手順4のログに出るRailwayのURLを使う。
+
+> **`NEXT_PUBLIC_*` はビルド時に埋め込まれる。** 値を変えたら**再デプロイが必要**で、
+> 環境変数を保存しただけでは反映されない。
+
+既存のVercelプロジェクトをそのまま使う場合、**いまの検証用フロントエンドが
+本番フロントエンドになる**。検証用APIを画面から触りたければ、`Preview` スコープに
+検証用APIのURLを残しておけばPRプレビューから引き続き使える。完全に分けたい場合は
+Vercelプロジェクトを別に作る (その場合は `app_url`/`admin_url` にも新しい方のURLを渡す)。
+
+#### `NEXT_PUBLIC_LINE_LIFF_ID` が未設定だとログインできない
+
+未設定の場合、`apps/user-wallet/src/lib/liff.ts` の `isLiffConfigured()` が false を返し、
+ログイン画面は**モック実装** (`mock.<疑似ID>` を送信) に切り替わる
+(`docs/authentication.md`)。一方 本番APIは `AUTH_MODE=production` で
+`LineIdTokenVerifier` が実チャネルのIDトークンを検証するため、モックのトークンは
+必ず拒否される。**稼働開始時点で使えるログイン方法はLINEのみ**なので、
+これは「誰もログインできない」状態になる。
+
+`api.sennokuni-wallet.com` を先にRailwayへ割り当てておけば、APIのURLは手順4の前に
+確定するので後追いにならない。Railwayの発行URLを使う場合だけ、手順4を実行して
+URLを得てから設定し、Vercelで再デプロイする。
+
+#### LINE Developers 側
+
+LIFFアプリの **Endpoint URL** を **`https://sennokuni-wallet.com/login`** に更新する。
+
+**ここを忘れるとLINEログインが失敗する。** Endpoint URL以外のリダイレクト先を渡すと
+トークン交換が落ちることを実チャネルで確認済み (`docs/authentication.md`)。
+LIFF SDKは登録済みのEndpoint URLをそのままOAuthの `redirect_uri` として使う。
+
 ### 4. デプロイする
 
 GitHub Actions → **Deploy (Railway API)** → Run workflow
@@ -93,8 +191,8 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 | 入力 | 値 |
 |---|---|
 | `target` | `production` |
-| `app_url` | user-walletのURL |
-| `admin_url` | admin-walletのURL |
+| `app_url` | `https://sennokuni-wallet.com` |
+| `admin_url` | `https://admin.sennokuni-wallet.com` |
 | `run_seed_on_boot` | **初回は `true`** |
 
 ワークフローが PostgreSQL / Redis / api サービスを作り、環境変数を設定してデプロイし、
@@ -108,9 +206,11 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 3. **`run_seed_on_boot` を `false` にして再実行する**
    起動のたびにseedを走らせる必要はなく、`SEED_ADMIN_PASSWORD` を環境変数に
    置き続けないため
-4. **LINE Developers のコールバックURLを本番ドメインに登録する**
-5. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
-6. **バックアップの対象を本番に切り替える** — 下記
+4. **Vercelに `NEXT_PUBLIC_API_URL` を設定して再デプロイする** (手順3-2)
+   本番APIのURLは手順4のログに出る。設定しないとフロントは検証用APIを向いたまま
+5. **LINE Developers のコールバックURLを本番ドメインに登録する** (手順3-2)
+6. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
+7. **バックアップの対象を本番に切り替える** — 下記
 
 ### 5-2. バックアップの対象を切り替える (忘れやすい)
 
@@ -138,6 +238,7 @@ artifactのサイズを確認する。
 | `GET /health` | 200 |
 | `GET /api/v1/auth/methods` | `{"line":true,"email":false,"sengoku_passport":false,"agency":false}` |
 | ログイン画面 | LINEボタンのみ表示される |
+| LINEログイン | 実際にLINEへ遷移して戻り、ウォレット画面が表示される (モックに落ちていない) |
 | `POST /api/v1/auth/sso/sengoku/dev-issue` | 404 (本番で無効) |
 | 起動ログ | 7つの定期ジョブが登録されている (`docs/runbooks/scheduled-jobs.md`) |
 
