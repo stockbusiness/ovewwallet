@@ -141,6 +141,11 @@ jobs:
       RUN_SEED_ON_BOOT: ${{ github.event_name == 'workflow_dispatch' && inputs.run_seed_on_boot || false }}
     outputs:
       api_url: ${{ steps.domain.outputs.api_url }}
+      # APP_URL / ADMIN_URL を実際に設定したかどうか。後段のジョブの実行条件に使う。
+      cors_urls_set: ${{ steps.service-vars.outputs.cors_urls_set }}
+      # 実際にデプロイした先 (staging / production)。後段のジョブが同じ
+      # GitHub Environment = 同じRailwayプロジェクトを選ぶために使う。
+      target: ${{ steps.service-vars.outputs.target }}
     steps:
       - uses: actions/checkout@v4
 
@@ -346,6 +351,7 @@ jobs:
           exit 1
 
       - name: Read DATABASE_URL / REDIS_URL and set API service variables
+        id: service-vars
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
@@ -487,7 +493,11 @@ jobs:
             ADMIN_URL="${{ inputs.admin_url }}"
             # ブラウザのOriginヘッダーは末尾スラッシュを含まないため揃える
             VARS+=("APP_URL=${APP_URL%/}" "ADMIN_URL=${ADMIN_URL%/}")
+            echo "cors_urls_set=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cors_urls_set=false" >> "$GITHUB_OUTPUT"
           fi
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
 
           echo "設定する変数: ${#VARS[@]}件 (1回のAPI呼び出しにまとめます)"
           # --json の出力はキー名と成否のみで、値は含まれない。
@@ -587,14 +597,23 @@ jobs:
           exit 1
 
   # APP_URL / ADMIN_URL は1つ目のジョブがデプロイ前に設定済み (production では未設定だと
-  # 起動に失敗するため)。このジョブは同じ値を再適用して再起動する念のための後処理で、
-  # 設定の正本ではない。フロントのURLだけを後から差し替えたい場合にも使える。
+  # 起動に失敗するため)。このジョブは同じ値を再適用して再起動する念のための後処理だが、
+  # 「CORSヘッダーが実際に新しいオリジンを返すまで待つ」ステップを持つのはここだけで、
+  # デプロイの入れ替わりを外側から確かめられる唯一の経路でもある。
+  #
+  # 実行条件は `inputs` を直接見ず、1つ目のジョブが実際にURLを設定したかどうかの
+  # 出力を見る。URLを指定した手動実行 (run #51) でも、1つ目のジョブのステップ内では
+  # `${{ inputs.app_url }}` に値が入っていた (APP_URL/ADMIN_URL が設定された) のに、
+  # 同じ式を書いたこのジョブの `if` は false と評価されて skip されていたため。
+  # `needs` の出力なら、値を実際に見たシェルの判断がそのまま条件になる。
   update-api-cors:
     needs: deploy-api
-    if: ${{ inputs.app_url != '' && inputs.admin_url != '' }}
+    if: ${{ needs.deploy-api.outputs.cors_urls_set == 'true' }}
     runs-on: ubuntu-latest
-    # 1つ目のジョブと同じEnvironment (同じSecret群) を使う
-    environment: ${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}
+    # 1つ目のジョブと同じEnvironment (同じSecret群 = 同じRailwayプロジェクト) を使う。
+    # ここも `inputs.target` ではなく1つ目のジョブの出力を見る。取り違えると
+    # 本番向けのAPP_URL/ADMIN_URLを検証環境のプロジェクトへ書き込むことになる。
+    environment: ${{ needs.deploy-api.outputs.target == 'production' && 'Production' || 'RAILWAY' }}
     steps:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
@@ -607,6 +626,21 @@ jobs:
           # 1つ目のジョブと同じプロジェクトを選ぶ。Environmentが同じなので
           # RAILWAY_PROJECT_ID も同じ値を指す。
           railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+
+          # 1つ目のジョブと同じプロジェクトに繋がったことを、apiサービスの公開URLの
+          # 一致で確かめる。Environmentの解決を取り違えると、本番のURLを検証環境の
+          # プロジェクトへ書き込む (またはその逆) ことになり、気付きにくい。
+          EXPECTED_API_URL="${{ needs.deploy-api.outputs.api_url }}"
+          railway domain list --service api --json > linked-domains.json 2>&1 || true
+          if ! grep -qF "${EXPECTED_API_URL#https://}" linked-domains.json; then
+            echo "::error::リンク先のプロジェクトが1つ目のジョブと一致しません。"
+            echo "1つ目のジョブのAPI URL: $EXPECTED_API_URL"
+            echo "リンク先のドメイン一覧:"
+            cat linked-domains.json
+            echo "GitHub Environment (RAILWAY / Production) の RAILWAY_PROJECT_ID を確認してください。"
+            exit 1
+          fi
+
           # ブラウザのOriginヘッダーは末尾スラッシュを含まないため、CORSの許可リストと
           # 比較するURLも末尾スラッシュを除去しておく(付いたままだと一致せず、
           # Access-Control-Allow-Originが返らずCORSエラーになる)。
