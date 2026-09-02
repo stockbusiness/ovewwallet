@@ -16,6 +16,8 @@ export interface ConfirmReferralParams {
   canonicalReferralToken: string;
   commonUserId: string | null;
   walletUserId: string;
+  /** 登録が完了した時刻。再送しても値が変わらないよう、送信時刻ではなく登録時刻を渡す。 */
+  occurredAt?: Date;
 }
 
 export interface ConfirmReferralResult {
@@ -79,12 +81,26 @@ export class AgencyReferralAdapter {
       baseUrl: config.baseUrl,
       path: "/api/referrals/confirm",
       apiKey: config.apiKey,
+      // 代理店システムの受け口が求める項目名 (`referral_token` / `source_system_key` /
+      // `source_user_id` / `event_type` / `occurred_at`) と、共通実装契約5章の
+      // 項目名 (`canonical_referral_token` / `system_key` / `external_user_id`) の
+      // 両方を送る。同じ値を2つの名前で送るだけなので、連携先がどちらの版を
+      // 実装していても受け取れる (`docs/integration/AGENCY_POINT_AWARD.md` 2章)。
+      //
+      // `wallet_address`は送らない。このウォレットはORIの台帳残高であって
+      // ブロックチェーン上のアドレスを持たないため (`BlockchainMigration`は
+      // 将来のデータ構造のみで、利用者に発行されるアドレスは存在しない)。
       body: {
         system_key: config.systemKey,
+        source_system_key: config.systemKey,
         referral_session_key: params.referralSessionKey,
         canonical_referral_token: params.canonicalReferralToken,
+        referral_token: params.canonicalReferralToken,
         common_user_id: params.commonUserId ?? undefined,
         external_user_id: params.walletUserId,
+        source_user_id: params.walletUserId,
+        event_type: "wallet.registration.completed",
+        occurred_at: (params.occurredAt ?? new Date()).toISOString(),
       },
       responseSchema: ConfirmReferralResponseSchema,
       logger: this.logger,

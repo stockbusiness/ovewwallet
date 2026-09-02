@@ -11,6 +11,7 @@ import { CommonUserResolvedHandler } from "./handlers/common-user-resolved.handl
 import { CustomerAssignmentChangedHandler } from "./handlers/customer-assignment-changed.handler";
 import { EntitlementGrantedHandler } from "./handlers/entitlement-granted.handler";
 import { EntitlementRevokedHandler } from "./handlers/entitlement-revoked.handler";
+import { PointAwardWalletDeliveryHandler } from "./handlers/point-award-wallet-delivery.handler";
 import { ReferralConfirmedHandler } from "./handlers/referral-confirmed.handler";
 import { RewardGrantedHandler } from "./handlers/reward-granted.handler";
 import { RewardReversedHandler } from "./handlers/reward-reversed.handler";
@@ -34,6 +35,7 @@ export class CommonEventHandlersService implements OnModuleInit {
     private readonly commonUserMerged: CommonUserMergedHandler,
     private readonly customerAssignmentChanged: CustomerAssignmentChangedHandler,
     private readonly referralConfirmed: ReferralConfirmedHandler,
+    private readonly pointAwardWalletDelivery: PointAwardWalletDeliveryHandler,
     private readonly rewardGranted: RewardGrantedHandler,
     private readonly rewardReversed: RewardReversedHandler,
     private readonly entitlementGranted: EntitlementGrantedHandler,
@@ -46,6 +48,7 @@ export class CommonEventHandlersService implements OnModuleInit {
     this.registry.register(this.commonUserMerged);
     this.registry.register(this.customerAssignmentChanged);
     this.registry.register(this.referralConfirmed);
+    this.registry.register(this.pointAwardWalletDelivery);
     this.registry.register(this.rewardGranted);
     this.registry.register(this.rewardReversed);
     this.registry.register(this.entitlementGranted);

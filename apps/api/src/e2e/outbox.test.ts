@@ -265,6 +265,7 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_COMMON_USER_BALANCE_API: false,
       ENABLE_ACCOUNT_ANONYMIZATION: false,
       ENABLE_LINKED_SERVICES: false,
+      ENABLE_AGENCY_POINT_AWARD_INBOX: false,
     });
   });
 
