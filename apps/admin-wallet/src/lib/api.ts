@@ -38,6 +38,55 @@ export interface AdminMe {
   mfaEnabled: boolean;
 }
 
+/**
+ * 管理者パスワードの最小長。入力前に気づけるようにする画面側のヒントで、
+ * 実際の強制は API 側 (`apps/api/src/admin/dto/admin-users.dto.ts` の
+ * `ADMIN_PASSWORD_MIN_LENGTH`) が行う。値を変えるときは両方を揃えること。
+ */
+export const ADMIN_PASSWORD_MIN_LENGTH = 12;
+
+export const ADMIN_ROLES = [
+  "SUPER_ADMIN",
+  "OVE_OPERATOR",
+  "INTEGRATION_ADMIN",
+  "EVENT_OPERATOR",
+  "AUDITOR",
+  "VIEWER",
+] as const;
+
+export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+/** ロールの日本語表記。APIが返すのは英語の列挙値のみのため、表示側で対応付ける。 */
+export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  SUPER_ADMIN: "スーパー管理者",
+  OVE_OPERATOR: "ORI運用",
+  INTEGRATION_ADMIN: "連携管理",
+  EVENT_OPERATOR: "イベント運用",
+  AUDITOR: "監査",
+  VIEWER: "閲覧のみ",
+};
+
+/** GET /api/v1/admin/admins の1件。`ADMIN_USER_FIELDS` (apps/api) と対応する。 */
+export interface AdminUser {
+  id: string;
+  adminCode: string;
+  email: string;
+  role: AdminRole;
+  status: "ACTIVE" | "SUSPENDED";
+  displayName: string;
+  mfaEnabled: boolean;
+  mfaEnrolledAt: string | null;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** POST /api/v1/admin/admins の応答。初期パスワードはこの1回だけ返る。 */
+export interface CreatedAdminUser {
+  admin: AdminUser;
+  initialPassword: string;
+}
+
 export interface DashboardStats {
   totalAccounts: number;
   todayCredited: string;

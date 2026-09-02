@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import HelpPanel from "@/components/HelpPanel";
-import { apiFetch, ApiError, type AdminMe } from "@/lib/api";
+import { apiFetch, ApiError, ADMIN_PASSWORD_MIN_LENGTH, type AdminMe } from "@/lib/api";
 
 export default function SecuritySettingsPage() {
   const router = useRouter();
@@ -14,6 +14,10 @@ export default function SecuritySettingsPage() {
   const [disableCode, setDisableCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   async function loadMe() {
     try {
@@ -78,6 +82,36 @@ export default function SecuritySettingsPage() {
     } catch {
       // ApiError.messageはバックエンドの英語メッセージのため使わず、常に日本語文言を表示する。
       setError("パスワードまたはコードが正しくありません");
+    }
+  }
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    if (newPassword !== newPasswordConfirm) {
+      setError("新しいパスワードが一致しません");
+      return;
+    }
+    if (newPassword.length < ADMIN_PASSWORD_MIN_LENGTH) {
+      setError(`新しいパスワードは${ADMIN_PASSWORD_MIN_LENGTH}文字以上にしてください`);
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await apiFetch("/api/v1/admin/password", {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      setMessage("パスワードを変更しました。");
+    } catch {
+      // ApiError.messageはバックエンドの英語メッセージのため使わず、常に日本語文言を表示する。
+      setError("現在のパスワードが正しくありません");
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -207,6 +241,57 @@ export default function SecuritySettingsPage() {
               </button>
             </form>
           )}
+        </section>
+
+        <section className="mt-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-5">
+          <h2 className="mb-4 text-sm font-semibold">パスワード変更</h2>
+          <p className="mb-3 text-sm text-sengoku-muted">
+            初期パスワード (`SEED_ADMIN_PASSWORD` に設定した値) のまま運用しないでください。
+            変更してもログイン中のセッションは維持されます。
+          </p>
+          <form onSubmit={changePassword} className="flex max-w-md flex-col gap-3">
+            <label className="text-sm font-medium">
+              現在のパスワード
+              <input
+                type="password"
+                autoComplete="current-password"
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-sengoku-border px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm font-medium">
+              新しいパスワード ({ADMIN_PASSWORD_MIN_LENGTH}文字以上)
+              <input
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-sengoku-border px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm font-medium">
+              新しいパスワード (確認)
+              <input
+                type="password"
+                autoComplete="new-password"
+                required
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                className="mt-1 w-full rounded-md border border-sengoku-border px-3 py-2 text-sm"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="rounded-md bg-sengoku-gold px-4 py-2 text-sm font-semibold text-sengoku-navy-deep disabled:opacity-50"
+            >
+              {changingPassword ? "変更中..." : "パスワードを変更する"}
+            </button>
+          </form>
         </section>
       </>  );
 }
