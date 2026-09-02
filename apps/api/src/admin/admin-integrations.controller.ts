@@ -4,7 +4,12 @@ import { z } from "zod";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
-import { ServiceIntegrationActionSchema, CommonUserHubConfigUpdateSchema } from "./dto/admin-integrations.dto";
+import {
+  AgencyLinkManualLinkSchema,
+  AgencyLinkUnlinkSchema,
+  ServiceIntegrationActionSchema,
+  CommonUserHubConfigUpdateSchema,
+} from "./dto/admin-integrations.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
@@ -125,5 +130,40 @@ export class AdminIntegrationsController {
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
   async agencyLinkDetail(@Param("id") id: string): Promise<unknown> {
     return this.agencyLinks.detail(id);
+  }
+
+  /**
+   * 代理店の担当者とORIアカウントを手動で紐付ける。通常はSSOログインが作る紐付けだが、
+   * SSOが未接続の間や、担当者がLINEログインで先にウォレットを作った場合に
+   * 同期のみの`PENDING`が残り、その担当者宛の付与が404になり続けるため
+   * (`docs/integration/AGENCY_POINT_AWARD.md` 4章)。
+   *
+   * 残高の行き先を決める操作なので、閲覧専用のAUDITORには開けない。
+   */
+  @Post("agency-links/:id/link")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async linkAgencyLink(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(AgencyLinkManualLinkSchema)) body: z.infer<typeof AgencyLinkManualLinkSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ): Promise<unknown> {
+    return this.agencyLinks.linkManually({
+      id,
+      account: body.account,
+      adminId: req.admin.id,
+      reason: body.reason,
+    });
+  }
+
+  @Post("agency-links/:id/unlink")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async unlinkAgencyLink(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(AgencyLinkUnlinkSchema)) body: z.infer<typeof AgencyLinkUnlinkSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ): Promise<unknown> {
+    return this.agencyLinks.unlink({ id, adminId: req.admin.id, reason: body.reason });
   }
 }

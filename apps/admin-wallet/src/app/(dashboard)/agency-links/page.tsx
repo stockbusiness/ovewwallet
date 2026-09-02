@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import AgencyLinkActions from "@/components/agency/AgencyLinkActions";
 import HelpPanel from "@/components/HelpPanel";
-import { apiFetch, ApiError, type AgencyLinkItem } from "@/lib/api";
+import { apiFetch, ApiError, type AdminMe, type AgencyLinkItem } from "@/lib/api";
 
 const STATUS_LABEL: Record<AgencyLinkItem["status"], string> = {
   PENDING: "未紐付け(同期のみ)",
@@ -25,6 +26,7 @@ function metaString(metadata: Record<string, unknown> | null, key: string): stri
 export default function AgencyLinksPage() {
   const router = useRouter();
   const [items, setItems] = useState<AgencyLinkItem[]>([]);
+  const [me, setMe] = useState<AdminMe | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,8 +34,12 @@ export default function AgencyLinksPage() {
   const load = useCallback(async () => {
     try {
       const query = statusFilter ? `?status=${statusFilter}` : "";
-      const list = await apiFetch<AgencyLinkItem[]>(`/api/v1/admin/agency-links${query}`);
+      const [list, admin] = await Promise.all([
+        apiFetch<AgencyLinkItem[]>(`/api/v1/admin/agency-links${query}`),
+        apiFetch<AdminMe>("/api/v1/admin/me"),
+      ]);
       setItems(list);
+      setMe(admin);
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -48,25 +54,29 @@ export default function AgencyLinksPage() {
     load();
   }, [load]);
 
+  // AUDITORは閲覧専用ロールなので、APIと同じ範囲でボタン自体を出さない
+  // (押してから403になるより、最初から見えない方が分かりやすい)。
+  const canEdit = me?.role === "SUPER_ADMIN" || me?.role === "INTEGRATION_ADMIN";
+
   return (
     <>
         <h1 className="mb-1 text-xl font-bold">代理店連携状態一覧</h1>
         <p className="mb-4 text-xs text-sengoku-muted">
-          戦国経済圏代理店システム (sengoku-ai.com) から受信した同期データと、SSOログインによる
-          ORIアカウントとの紐付け状態。「未紐付け」は同期のみ受信済みで、まだSSOログインが
-          行われていない状態 (詳細は docs/agency-integration.md 参照)。
+          戦国経済圏代理店システム (sengoku-ai.com) から受信した同期データと、ORIアカウントとの
+          紐付け状態。「未紐付け」は同期のみ受信済みで、まだSSOログインが行われていない状態。
+          SSOが使えない場合は「詳細」から手動で紐付けられます (詳細は docs/agency-integration.md 参照)。
         </p>
 
         <HelpPanel storageKey="agency-links" title="このページについて・使い方">
           <p>
             代理店システム(sengoku-ai.com)から連携されている顧客が、ORIウォレットのアカウントと
-            正しく紐付いているかを確認するための画面です。設定項目はなく、状況確認・問い合わせ対応専用です。
+            正しく紐付いているかを確認・修正するための画面です。
           </p>
           <div>
             <p className="font-semibold text-sengoku-text">状態の意味</p>
             <ul className="ml-4 list-disc">
               <li><span className="text-sengoku-gold-soft">未紐付け(同期のみ)</span>: 代理店システムからの顧客情報は届いているが、その顧客がまだORIウォレットへSSOログインしていない</li>
-              <li><span className="text-sengoku-green">紐付け済み</span>: SSOログイン済みで、ORIアカウントと紐付いている</li>
+              <li><span className="text-sengoku-green">紐付け済み</span>: ORIアカウントと紐付いている (SSOログイン済み、または管理者が手動で紐付けた)</li>
               <li><span className="text-sengoku-faint">解除済み</span>: 代理店システム側でその顧客が退会・削除された等により、連携が自動的に解除された</li>
             </ul>
           </div>
@@ -78,8 +88,22 @@ export default function AgencyLinksPage() {
               「詳細」を開くと、共通ID・紹介トークンなど、より詳しい情報を確認できます。
             </p>
           </div>
+          <div>
+            <p className="font-semibold text-sengoku-text">手動で紐付ける</p>
+            <p>
+              代理店SSOがまだ使えない場合や、その担当者がLINEログインで先にウォレットを作ってしまった場合、
+              「未紐付け」のままではその人宛のORI付与が届きません。「詳細」を開き、ORIアカウントのコード
+              (OVE-ACC-…) と理由を入れて「紐付ける」を押すと解消できます。
+              <strong className="text-sengoku-gold-soft">付与の宛先そのものを決める操作</strong>なので、
+              本人のアカウントであることを必ず確認してください。誰がいつ何をなぜ変えたかは監査ログに残ります。
+            </p>
+            <p>
+              間違えた場合は同じ画面から解除できます。ただし<strong>解除しても、それまでに入った付与は取り消されません</strong>
+              (台帳を遡って書き換えないため)。返金が必要な場合はウォレット詳細から減算してください。
+            </p>
+          </div>
           <p>
-            このページ自体に何かを設定・変更する機能はありません。連携先の追加・変更が必要な場合はエンジニアへ相談してください。
+            連携先そのものの追加・変更が必要な場合はエンジニアへ相談してください。
           </p>
         </HelpPanel>
 
@@ -166,6 +190,11 @@ export default function AgencyLinksPage() {
                           <dd>{item.linkMethod}</dd>
                         </div>
                       </dl>
+                      {canEdit && (
+                        <div className="mt-3 border-t border-sengoku-border pt-3">
+                          <AgencyLinkActions item={item} onDone={load} />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}

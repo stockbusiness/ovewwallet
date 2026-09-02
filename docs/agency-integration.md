@@ -42,6 +42,8 @@
   での絞り込み
 - 各行の「詳細」展開で `parent_external_id` / `common_user_id` /
   `referral_token` / ロール / 同期ステータス / 連携方法を確認
+- 各行の「詳細」展開から、**ORIアカウントとの手動での紐付け・解除**
+  (下記「手動での紐付け」)
 
 以下はできない (今後の課題、または他の理由で意図的に対象外)。
 
@@ -66,7 +68,8 @@
   - まだOVEアカウントと紐付いていない（=同期は受信したがSSOログインは
     未実施）場合、`status = PENDING` / `ove_account_id = null`。
   - SSOログインが行われた時点で `status = ACTIVE` / `ove_account_id` に
-    ログインで解決されたOVEアカウントを設定する。
+    ログインで解決されたOVEアカウントを設定する。管理者が手動で紐付けた場合も
+    同じ状態になり、`link_method` が `ADMIN_MANUAL` になる (下記)。
   - `metadata` (JSON) に `parent_external_id` / `common_user_id` /
     `referral_token` / 氏名・連絡先・ロール等、仕様書のフィールドをそのまま
     保存する（将来のフィールド追加にも耐えられるよう `rawPayload` も含める）。
@@ -119,6 +122,39 @@ SSOログインは常に失敗する（起動時にエラーにはしない安�
 `service_integrations` 行と、そのAPIキー（ログにのみ表示、ハッシュ化して保存）を
 作成する。このAPIキーをsengoku-ai.com側の管理画面に登録してもらう
 (仕様書17章「外部システム受信用APIキー」に相当)。
+
+## 手動での紐付け
+
+```
+POST /api/v1/admin/agency-links/:id/link    { "account": "OVE-ACC-...", "reason": "..." }
+POST /api/v1/admin/agency-links/:id/unlink  { "reason": "..." }
+```
+
+代理店の担当者とORIアカウントの紐付けは、通常は代理店SSOログインが作る。ただし
+次の場合はSSOを通らないため `PENDING` (同期のみ) のまま残り、**その担当者宛の
+ORI付与イベントが 404 になり続ける** (`docs/integration/AGENCY_POINT_AWARD.md` 4章)。
+
+- 代理店SSOがまだ接続されていない (`SENGOKU_AI_SSO_*` 未設定 / `ENABLE_AGENCY_LOGIN` が無効)
+- その担当者がLINEログインで先にウォレットを作ってしまった
+
+管理画面 `/agency-links` の「詳細」から、ORIアカウントのコード (`OVE-ACC-...`) と
+理由を入れて紐付けられる。内部IDでも指定できる。
+
+権限は `SUPER_ADMIN` / `INTEGRATION_ADMIN`。**閲覧専用の `AUDITOR` には開けていない**
+(残高の行き先を決める操作のため)。誰がいつどの紐付けをなぜ変えたかは
+`AGENCY_LINK_MANUAL_LINK` / `AGENCY_LINK_MANUAL_UNLINK` として監査ログに残る
+(連携先の生ペイロードは残さない)。
+
+次の場合は受け付けない。
+
+| 状況 | 応答 | 理由 |
+|---|---|---|
+| `REVOKED` の連携 | 400 | 代理店システム側が「退会・削除された」と言っている状態。ウォレット側から復活させると正本と食い違う |
+| 既に別の `external_id` へ紐付いているORIアカウント | 409 | 別々の担当者宛の付与がすべて同じ残高へ入ってしまう |
+| `ACTIVE` でないORIアカウント | 400 | 付与先が既に存在しない残高になる |
+
+**解除しても、それまでに入った付与は取り消されない** (台帳を遡って書き換えないため)。
+返金が必要な場合は管理画面のウォレット詳細から減算する。
 
 ## JWT検証の詳細 (SSOログイン)
 
