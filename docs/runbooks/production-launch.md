@@ -197,6 +197,10 @@ LIFF SDKは登録済みのEndpoint URLをそのままOAuthの `redirect_uri` と
 
 ### 4. デプロイする
 
+**本番デプロイは手動実行のみ。** `claude/ove-wallet-platform` へのpushで自動デプロイ
+されるのは検証環境 (`RAILWAY` Environment) だけで、本番は下記の手順を踏まないと
+反映されない (`docs/deployment.md`「自動デプロイと手動デプロイの境目」)。
+
 GitHub Actions → **Deploy (Railway API)** → Run workflow
 
 | 入力 | 値 |

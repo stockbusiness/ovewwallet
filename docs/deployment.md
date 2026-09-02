@@ -183,8 +183,9 @@ prune機能によるさらなる最小化は今回のスコープでは行って
 
 ## デプロイ構成 (Railway API + Vercel フロントエンド)
 
-APIは GitHub Actions (`.github/workflows/deploy.yml`, `workflow_dispatch` による
-手動実行) からRailwayへデプロイする。フロントエンド (`apps/user-wallet` /
+APIは GitHub Actions (`.github/workflows/deploy.yml`) からRailwayへデプロイする。
+**検証環境は `claude/ove-wallet-platform` へのpushで自動、本番は手動実行のみ**
+(下記「自動デプロイと手動デプロイの境目」)。フロントエンド (`apps/user-wallet` /
 `apps/admin-wallet`) はVercel CLIによるCI経由デプロイを試みたが、pnpmモノレポとの
 相性問題 (依存関係トレース失敗、`vercel deploy`のアップロード範囲がカレント
 ディレクトリ配下に限定される問題等) を繰り返し起こしたため、**Vercelダッシュボードの
@@ -226,6 +227,36 @@ CLIでデプロイすることができない。そのため、実際のデプ�
    `app_url`/`admin_url` 入力欄にそれぞれのURLを指定して再実行する。
    `update-api-cors` ジョブが走り、API側の `APP_URL`/`ADMIN_URL` (CORS許可オリジン)
    を更新してAPIを再起動する。
+
+#### 自動デプロイと手動デプロイの境目
+
+| | 検証環境 (staging) | 本番 (production) |
+|---|---|---|
+| 起動方法 | `claude/ove-wallet-platform` へのpush | Actionsからの手動実行のみ |
+| GitHub Environment | `RAILWAY` | `Production` |
+| `NODE_ENV` | `staging` | `production` |
+| `RUN_SEED_ON_BOOT` | `false` 固定 | 実行時に選択 (初回のみ`true`推奨) |
+| `APP_URL`/`ADMIN_URL` | 変更しない (Railway側の既存値を維持) | 入力必須。`update-api-cors`で更新 |
+
+**本番を自動にしていない理由**: `apps/api/docker-entrypoint.sh` がコンテナ起動時に
+`prisma migrate deploy` を実行するため、マージがそのままDBマイグレーションの実行に
+なる。検証環境で同じマイグレーションを先に通してから本番へ入れられるようにしている。
+
+**自動実行される条件**: pushの変更ファイルがAPIのビルドに関わるパス
+(`apps/api/**`, `packages/**`, `package.json`, `pnpm-lock.yaml`,
+`pnpm-workspace.yaml`, `tsconfig.base.json`, `railway.json`,
+`.github/workflows/deploy.yml`) を含むときだけ走る。フロントエンドだけの変更で
+APIコンテナを再起動しても意味がなく、短時間とはいえ無用な断が生じるため。
+フロントエンドはVercelのGit連携で別途自動デプロイされる。
+
+**CIの成功を待つ**: 自動実行のときは `wait-for-ci` ジョブが同じコミットに対する
+CI (`ci.yml` の `test`) の完了を最大20分待ち、成功したときだけデプロイへ進む。
+CIが失敗していればRailwayのビルドを始める前に中止する。
+手動実行ではこの待ち合わせを行わない (CIが赤でも入れ直したい障害対応の経路のため)。
+
+**同時実行しない**: `concurrency` でデプロイ先ごとに直列化している。
+進行中のデプロイは打ち切らない (マイグレーション途中で止めるとDBが中途半端な
+状態で残るため)、後続のデプロイが待機する。
 
 ### フロントエンドのデプロイ (Vercelダッシュボード)
 
