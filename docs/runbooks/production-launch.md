@@ -242,6 +242,26 @@ artifactのサイズを確認する。
 > 定期実行 (schedule) には実行時の入力を渡せないため、`deploy.yml` の `target` 入力
 > とは別に永続的な変数で切り替える。
 
+### 5-3. ビルドがrailpackで失敗する場合
+
+Railwayの既定のビルド方法は **railpack による自動判定**で、このモノレポは
+「Nx workspace with a Next.js app」と誤認される。初回デプロイで
+`RAILPACK_NX_APP を設定してください` というエラーが出た場合はこれが原因。
+
+ワークフローは api サービスに次の変数を設定してDockerfileビルドに固定するので、
+通常は意識しなくてよい。
+
+| 変数 | 値 |
+|---|---|
+| `RAILWAY_DOCKERFILE_PATH` | `apps/api/Dockerfile` |
+
+手動で直す場合は Railway の api サービス > **Variables** に同じ変数を追加し、
+再デプロイする。
+
+> リポジトリルートの `railway.json` も `builder: "DOCKERFILE"` を指定しているが、
+> 空サービスとして作った service には効かなかった。Config as Code (railway.json)
+> 自体も2026-12-01で廃止予定という警告が出るため、サービス変数で明示する。
+
 ### 6. 動作確認
 
 | 確認項目 | 期待 |
