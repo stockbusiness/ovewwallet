@@ -166,39 +166,85 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
           set -e
-          EXISTING=$(railway service list --json 2>/dev/null || echo "[]")
-          echo "既存サービス: $EXISTING"
+          # サービス名だけを1行1件で取り出す。一覧取得に失敗した場合は空を返し、
+          # 「1件も無い」ではなく後段の待機ループで再試行させる。
+          service_names() {
+            railway service list --json 2>/dev/null | node -e "
+              let d='';
+              process.stdin.on('data', (c) => { d += c; });
+              process.stdin.on('end', () => {
+                try {
+                  const s = JSON.parse(d);
+                  if (Array.isArray(s)) s.forEach((x) => console.log(x.name));
+                } catch (e) {
+                  // 一覧が取れなかった場合は何も出力しない (待機ループが再試行する)
+                }
+              });
+            "
+          }
 
-          if ! echo "$EXISTING" | grep -qi "postgres"; then
-            echo "PostgreSQLを追加します"
-            railway add --database postgres --json | tee postgres-output.json
-          else
+          NAMES=$(service_names)
+          echo "既存サービス: $(echo "$NAMES" | tr '\n' ' ')"
+
+          if echo "$NAMES" | grep -qi "postgres"; then
             echo "PostgreSQLは既に存在します"
+          else
+            echo "PostgreSQLを追加します"
+            railway add --database postgres --json
           fi
 
-          if ! echo "$EXISTING" | grep -qi "redis"; then
-            echo "Redisを追加します"
-            railway add --database redis --json | tee redis-output.json
-          else
+          if echo "$NAMES" | grep -qi "redis"; then
             echo "Redisは既に存在します"
+          else
+            echo "Redisを追加します"
+            railway add --database redis --json
           fi
 
           # railway up --service api で後からデプロイできるよう、空のサービスを先に作る
-          # (railway variable set --service api は、サービスが存在しないと失敗するため)
-          if ! echo "$EXISTING" | node -e "
-            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-              const s = JSON.parse(d);
-              process.exit(s.some(x => x.name === 'api') ? 0 : 1);
-            });
-          "; then
+          # (railway variable set --service api は、サービスが存在しないと失敗するため)。
+          # 名前は完全一致で判定する ("api" を含む別サービスを誤検出しないため)。
+          if echo "$NAMES" | grep -qx "api"; then
+            echo "apiサービスは既に存在します"
+          else
             echo "apiサービスを追加します"
             railway add --service api --json
-          else
-            echo "apiサービスは既に存在します"
           fi
 
-      - name: Wait for database services to be ready
-        run: sleep 20
+      # `railway add` が戻ってきても、そのサービスが `railway service list` に現れる
+      # までに時間差がある。本番の初回デプロイで、Redisを作成した21秒後の一覧にまだ
+      # 現れず「redis service not found」で失敗した (Postgresとapiは現れていた)。
+      # 固定の sleep ではなく、3つとも一覧に現れるまで待つ。
+      - name: Wait for the services to appear
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          set -e
+          for i in $(seq 1 30); do
+            NAMES=$(railway service list --json 2>/dev/null | node -e "
+              let d='';
+              process.stdin.on('data', (c) => { d += c; });
+              process.stdin.on('end', () => {
+                try {
+                  const s = JSON.parse(d);
+                  if (Array.isArray(s)) s.forEach((x) => console.log(x.name));
+                } catch (e) {}
+              });
+            ")
+            MISSING=""
+            echo "$NAMES" | grep -qi "postgres" || MISSING="$MISSING postgres"
+            echo "$NAMES" | grep -qi "redis" || MISSING="$MISSING redis"
+            echo "$NAMES" | grep -qx "api" || MISSING="$MISSING api"
+            if [ -z "$MISSING" ]; then
+              echo "試行 $i: 3サービスとも確認できました ($(echo "$NAMES" | tr '\n' ' '))"
+              exit 0
+            fi
+            echo "試行 $i: 未反映 ->$MISSING (現在: $(echo "$NAMES" | tr '\n' ' '))。10秒待ちます"
+            sleep 10
+          done
+          echo "::error::5分待ってもサービスが揃いませんでした ->$MISSING"
+          echo "Railwayのダッシュボードでプロジェクトの状態を確認してください。"
+          echo "同名のサービスが重複していないかも合わせて確認してください。"
+          exit 1
 
       - name: Read DATABASE_URL / REDIS_URL and set API service variables
         env:
@@ -223,21 +269,41 @@ jobs:
           echo "postgres service: $POSTGRES_SERVICE"
           echo "redis service: $REDIS_SERVICE"
 
-          DATABASE_URL=$(railway variable list --service "$POSTGRES_SERVICE" --json | node -e "
-            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-              const v = JSON.parse(d);
-              console.log(v.DATABASE_URL || v.DATABASE_PUBLIC_URL || '');
-            });
-          ")
-          REDIS_URL=$(railway variable list --service "$REDIS_SERVICE" --json | node -e "
-            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-              const v = JSON.parse(d);
-              console.log(v.REDIS_URL || v.REDIS_PUBLIC_URL || '');
-            });
-          ")
+          # サービスが一覧に現れても、接続情報の変数が入るまでにさらに時間差がある。
+          # 揃うまで待ってから先へ進む (空のまま進むとAPIが起動時に落ちるため)。
+          read_var() {
+            railway variable list --service "$1" --json 2>/dev/null | node -e "
+              let d='';
+              process.stdin.on('data', (c) => { d += c; });
+              process.stdin.on('end', () => {
+                try {
+                  const v = JSON.parse(d);
+                  console.log(v['$2'] || v['$3'] || '');
+                } catch (e) {
+                  console.log('');
+                }
+              });
+            "
+          }
+
+          for i in $(seq 1 24); do
+            DATABASE_URL=$(read_var "$POSTGRES_SERVICE" DATABASE_URL DATABASE_PUBLIC_URL)
+            REDIS_URL=$(read_var "$REDIS_SERVICE" REDIS_URL REDIS_PUBLIC_URL)
+            if [ -n "$DATABASE_URL" ] && [ -n "$REDIS_URL" ]; then
+              echo "試行 $i: DATABASE_URL と REDIS_URL を取得しました"
+              break
+            fi
+            MISSING=""
+            [ -n "$DATABASE_URL" ] || MISSING="$MISSING DATABASE_URL"
+            [ -n "$REDIS_URL" ] || MISSING="$MISSING REDIS_URL"
+            echo "試行 $i: 未取得 ->$MISSING。10秒待ちます"
+            sleep 10
+          done
 
           if [ -z "$DATABASE_URL" ] || [ -z "$REDIS_URL" ]; then
-            echo "DATABASE_URL または REDIS_URL の取得に失敗しました"
+            echo "::error::4分待っても DATABASE_URL / REDIS_URL を取得できませんでした。"
+            echo "Railwayのダッシュボードで Postgres / Redis サービスが正常に"
+            echo "起動しているか確認してください。"
             exit 1
           fi
 
