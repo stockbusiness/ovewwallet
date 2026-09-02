@@ -64,17 +64,28 @@ GitHubのSecretは登録後に値を読み出せないため、検証用の値�
 **新しく発行する**。既存のトークンは無効にならないので、検証環境には影響しない。
 
 1. Railway の **Account Settings → Tokens** (<https://railway.com/account/tokens>)
-2. トークン名を入力して作成する (例: `github-actions-production`)
-3. **プロジェクトがチーム(Workspace)に属している場合は、そのチームを選んで発行する。**
-   個人スコープのトークンではチームのプロジェクトが見えず、`railway link` が失敗する
+2. トークン名を入力する (例: `github-actions-production`)
+3. **Workspace (Team) の欄は空のままにする。**
+   ここでワークスペースを選ぶと**チームスコープのトークン**になり、`railway whoami` が
+   `Unauthorized` で失敗する。whoamiはアカウント情報を読むコマンドで、チームトークンには
+   そのアカウント情報が紐づいていないため。**必要なのはアカウントスコープのトークン**で、
+   それはWorkspaceを選ばずに発行したものを指す
 4. 表示は1回だけなのでその場でコピーし、`Production` Environment に登録する
 
-> **Project token と間違えないこと。** プロジェクト設定側で発行できるトークンは
-> 環境変数名が `RAILWAY_TOKEN` で、単一プロジェクトに固定される別物。ここで必要なのは
-> アカウント/チームレベルのトークン (`RAILWAY_API_TOKEN`)。
+> Workspaceの欄は「自分のプロジェクトがあるワークスペース」を選びたくなるが、**選んではいけない**。
+> 空のままがアカウントスコープになる。
+
+#### トークンは3種類ある
+
+| 種類 | 発行場所 | 環境変数名 | このワークフロー |
+|---|---|---|---|
+| **アカウントスコープ** | Account Settings > Tokens (Workspace欄は空) | `RAILWAY_API_TOKEN` | **これを使う** |
+| チームスコープ | Account Settings > Tokens (Workspaceを選択) | `RAILWAY_API_TOKEN` | `whoami` が失敗する |
+| プロジェクトトークン | プロジェクトの Settings > Tokens | `RAILWAY_TOKEN` | 変数名が違うので使えない |
 
 トークンが正しいかは、デプロイの `Authenticate` ステップ (`railway whoami`) が
-実行直後に判定する。誤っていればそこで止まるので、他の設定には波及しない。
+実行直後に判定する。誤っていればそこで止まるので、他の設定には波及しない
+(Railway側には何も作られない)。
 
 > **`ENCRYPTION_KEY` を後から変えるときは、値の差し替えだけでは足りない。**
 > 管理者MFAシークレット等が旧鍵で暗号化されたまま復号できなくなる。

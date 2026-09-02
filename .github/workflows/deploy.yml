@@ -103,10 +103,33 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      # ここで落ちる原因はほぼ「トークンのスコープ違い」で、値の打ち間違いではない。
+      # Railwayのトークン発行画面はWorkspace欄を選ばせようとするが、選ぶと
+      # **チームスコープ**のトークンになり、アカウント情報を読む `whoami` は
+      # Unauthorized になる。必要なのはWorkspace欄を空のまま発行した
+      # **アカウントスコープ**のトークン (docs/runbooks/production-launch.md)。
       - name: Authenticate
-        run: railway whoami
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: |
+          if railway whoami; then
+            exit 0
+          fi
+          echo "::error::RAILWAY_API_TOKEN で認証できませんでした。"
+          echo "--------------------------------------------------------------"
+          echo "多いのはトークンの種類違いです。以下を確認してください。"
+          echo ""
+          echo "1. https://railway.com/account/tokens で発行したものか"
+          echo "   (プロジェクトのSettings側で発行するトークンは別物で、"
+          echo "    変数名も RAILWAY_TOKEN です)"
+          echo "2. 発行時に **Workspace(Team)の欄を空のまま** にしたか"
+          echo "   ワークスペースを選ぶとチームスコープになり、アカウント情報を読む"
+          echo "   whoami は Unauthorized になります。空のまま発行したものが"
+          echo "   アカウントスコープのトークンです"
+          echo "3. 前後に空白や改行が混ざっていないか"
+          echo ""
+          echo "詳細: docs/runbooks/production-launch.md"
+          exit 1
 
       - name: Link or create Railway project
         id: link
