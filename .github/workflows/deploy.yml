@@ -477,6 +477,10 @@ jobs:
           # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、
           # コンテナは正常に起動していても「service unavailable」になる。
           railway variable set "PORT=4000" --service api --skip-deploys --json
+          # 稼働中のコンテナがどのビルドかを /health から判別できるようにする。
+          # これが無いと、`railway up --detach` の直後にまだ動いている旧コンテナが
+          # 200を返し、入れ替わる前にデプロイ成功と判定してしまう (run #39 で発生)。
+          railway variable set "GIT_COMMIT_SHA=${{ github.sha }}" --service api --skip-deploys --json
 
       - name: Deploy API service
         env:
@@ -524,26 +528,35 @@ jobs:
         run: |
           set -e
           URL="${{ steps.domain.outputs.api_url }}/health"
+          # /health が返す短縮SHA (health.controller.ts) と突き合わせる。
+          # 200を返したかどうかだけでは、まだ動いている**旧コンテナ**の応答と
+          # 区別できない (`railway up --detach` はビルド完了を待たずに戻るため)。
+          EXPECTED=$(echo "${{ github.sha }}" | cut -c1-7)
           echo "確認先: $URL"
+          echo "このデプロイのコミット: $EXPECTED"
           ATTEMPTS=120
           for i in $(seq 1 $ATTEMPTS); do
             CODE=$(curl -sS -o /tmp/health-body.txt -w "%{http_code}" "$URL" || echo "000")
+            ACTUAL=""
             case "$CODE" in
-              200) NOTE="" ;;
+              200)
+                ACTUAL=$(jq -r '.commit // ""' /tmp/health-body.txt 2>/dev/null || echo "")
+                if [ "$ACTUAL" = "$EXPECTED" ]; then
+                  echo "新しいビルドが稼働しています:"
+                  cat /tmp/health-body.txt
+                  exit 0
+                fi
+                NOTE=" (まだ旧いコンテナが応答しています: commit=${ACTUAL:-未設定})"
+                ;;
               404) NOTE=" (稼働中のデプロイがまだ無い。ビルド中か、ビルド失敗)" ;;
               502|503) NOTE=" (コンテナがまだ応答していない。起動中か、起動に失敗)" ;;
               000) NOTE=" (接続できず)" ;;
               *) NOTE="" ;;
             esac
             echo "試行 $i/$ATTEMPTS ($((i * 10))秒経過): HTTP $CODE$NOTE"
-            if [ "$CODE" = "200" ]; then
-              echo "ヘルスチェック成功:"
-              cat /tmp/health-body.txt
-              exit 0
-            fi
             sleep 10
           done
-          echo "::error::20分待っても200になりませんでした。"
+          echo "::error::20分待っても新しいビルド ($EXPECTED) が稼働しませんでした。"
           echo "Railwayのダッシュボードで api サービスの Deployments を確認してください。"
           echo "ビルド中のまま20分を超えている場合は、そのまま完了を待ってから"
           echo "/health を直接開けば稼働状況が分かります。"

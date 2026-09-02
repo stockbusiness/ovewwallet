@@ -64,6 +64,9 @@ Issueが表示されることを確認済み。データを変更しない安全
 - `railway.json` の `healthcheckPath` に設定済みで、Railwayが自動的にこのエンドポイントを
   ポーリングし、失敗が続くとデプロイを失敗扱いにする/`restartPolicyType: ON_FAILURE`で
   再起動する。
+- 応答の `commit` は稼働中のビルドの短縮SHA (`GIT_COMMIT_SHA` 由来、デプロイ時に
+  ワークフローが設定する)。「今どのビルドが動いているか」をログイン無しで確認できる。
+  デプロイの待ち合わせもこの値で入れ替わりを判定している (`docs/deployment.md`)。
 
 **残作業 (人手が必要)**:
 - 外部の死活監視 (UptimeRobot / Better Uptime 等) に `GET /health` を登録し、
