@@ -13,14 +13,25 @@ name: Deploy (Railway API)
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: "デプロイ先。production は本番ガードが有効になり、別のRailwayプロジェクトを使う"
+        type: choice
+        options:
+          - staging
+          - production
+        default: staging
       app_url:
-        description: "user-walletのVercel本番URL (CORS更新用。空なら更新しない)"
+        description: "user-walletのURL (production では必須)"
         type: string
         default: ""
       admin_url:
-        description: "admin-walletのVercel本番URL (CORS更新用。空なら更新しない)"
+        description: "admin-walletのURL (production では必須)"
         type: string
         default: ""
+      run_seed_on_boot:
+        description: "起動のたびにseedを実行するか。本番は初回のみtrue、以後falseを推奨"
+        type: boolean
+        default: true
 
 jobs:
   deploy-api:
@@ -30,6 +41,29 @@ jobs:
       api_url: ${{ steps.domain.outputs.api_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # 本番は起動時に APP_URL / ADMIN_URL を必須とする (assertProductionEnvSafe)。
+      # 未指定のままデプロイすると、CORS設定を更新する後段のジョブに辿り着く前に
+      # APIが起動時エラーで落ちるため、ここで先に止めて理由を示す。
+      - name: Validate inputs
+        run: |
+          set -e
+          if [ "${{ inputs.target }}" = "production" ]; then
+            if [ -z "${{ inputs.app_url }}" ] || [ -z "${{ inputs.admin_url }}" ]; then
+              echo "::error::production では app_url と admin_url が必須です。"
+              echo "NODE_ENV=production では assertProductionEnvSafe() が両者を必須にしており、"
+              echo "未設定のままだとAPIが起動時に失敗します (apps/api/src/common/assert-production-env.ts)。"
+              exit 1
+            fi
+            if [ -z "${{ secrets.RAILWAY_PRODUCTION_PROJECT_ID }}" ]; then
+              echo "::error::production では RAILWAY_PRODUCTION_PROJECT_ID (GitHub Secret) が必須です。"
+              echo "検証環境とDBを共有しないよう、本番は別プロジェクトを使います。"
+              echo "Railwayでプロジェクトを作成し、そのIDをSecretに登録してから再実行してください。"
+              echo "(自動作成にしないのは、再実行のたびに本番プロジェクトが増えるのを防ぐためです)"
+              exit 1
+            fi
+          fi
+          echo "target=${{ inputs.target }}"
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
@@ -44,10 +78,21 @@ jobs:
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
-          if [ -n "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
-            echo "既存プロジェクトにリンクします: ${{ secrets.RAILWAY_PROJECT_ID }}"
-            railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+          set -e
+          # 本番と検証は**別のRailwayプロジェクト**を使う。同じDBを共有すると、検証中に
+          # 作られたアカウント・取引が本番の会計数値に混ざる (ove_transactions は
+          # DBトリガーで削除できないため、後から取り除けない)。
+          if [ "${{ inputs.target }}" = "production" ]; then
+            PROJECT_ID="${{ secrets.RAILWAY_PRODUCTION_PROJECT_ID }}"
           else
+            PROJECT_ID="${{ secrets.RAILWAY_PROJECT_ID }}"
+          fi
+
+          if [ -n "$PROJECT_ID" ]; then
+            echo "既存プロジェクトにリンクします: $PROJECT_ID"
+            railway link --project "$PROJECT_ID" --environment production
+          else
+            # productionはValidate inputsで既に弾いているため、ここへ来るのはstagingのみ。
             echo "新規プロジェクトを作成します (初回のみ)"
             railway init --name ove-wallet-api --json | tee init-output.json
             echo "=================================================================="
@@ -144,18 +189,44 @@ jobs:
           railway variable set "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" --service api --skip-deploys --json
           railway variable set "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" --service api --skip-deploys --json
           railway variable set "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}" --service api --skip-deploys --json
-          railway variable set "RUN_SEED_ON_BOOT=true" --service api --skip-deploys --json
+          # 起動のたびにseedを走らせるか。本番は初回だけtrueにし、初期管理者を作ったら
+          # falseへ戻すことを推奨する (SEED_ADMIN_PASSWORDを環境変数に置き続けない、
+          # 意図せぬ再作成を避ける、起動時間を伸ばさない、の3点のため)。
+          railway variable set "RUN_SEED_ON_BOOT=${{ inputs.run_seed_on_boot }}" --service api --skip-deploys --json
+          # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認済み。
+          # LINE_CHANNEL_IDと合わせてLineIdTokenVerifierが使われる (docs/authentication.md)。
           railway variable set "AUTH_MODE=production" --service api --skip-deploys --json
-          # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認できたため、
-          # AUTH_MODE=productionに切り替え済み(LINE_CHANNEL_ID設定と合わせてLineIdTokenVerifier
-          # が使われる、docs/authentication.md参照)。戦国パスポート/代理店SSOは元々モック/未接続の
-          # ままのため、この環境は依然として「検証用デプロイ」の位置づけ。
-          # DockerfileはENV NODE_ENV=productionを設定しているが、本番ガード
-          # (assertAuthModeSafeForProduction)はNODE_ENV=production + AUTH_MODE!==productionの
-          # 組み合わせのみを拒否する。AUTH_MODE=productionへ切り替えた今はこの組み合わせに
-          # 該当しないため理論上NODE_ENV=stagingの上書きは不要になったが、他の未検証の
-          # 本番判定分岐への影響を避けるため、この検証用デプロイでは引き続きstagingのままにする。
-          railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
+
+          # NODE_ENV=production で本番ガードが有効になる:
+          #   - assertProductionEnvSafe(): REDIS_URL/ENCRYPTION_KEY/LINE_CHANNEL_ID/
+          #     APP_URL/ADMIN_URL が未設定なら起動を中止する
+          #   - assertAuthModeSafeForProduction(): AUTH_MODE=production を必須にする
+          #   - 千ノ国パスポートSSOのモック発行エンドポイントが404になる
+          #   - メールOTPの devCode を応答に含めなくなる
+          # stagingではこれらが素通りするため、検証用デプロイは staging のままにする。
+          if [ "${{ inputs.target }}" = "production" ]; then
+            railway variable set "NODE_ENV=production" --service api --skip-deploys --json
+          else
+            railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
+          fi
+
+          # 稼働開始時点で使えるログイン方法はLINEのみ (docs/login-methods.md)。
+          # メールは送信基盤が未実装、SSOは未接続のため、明示的に閉じておく
+          # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
+          railway variable set "ENABLE_EMAIL_LOGIN=false" --service api --skip-deploys --json
+          railway variable set "ENABLE_SENGOKU_PASSPORT_LOGIN=false" --service api --skip-deploys --json
+          railway variable set "ENABLE_AGENCY_LOGIN=false" --service api --skip-deploys --json
+
+          # APP_URL / ADMIN_URL は本番ガードの必須項目であり、CORSとCSRFの許可オリジンの
+          # 唯一の入力でもある。後段のジョブではなく**デプロイ前**に設定する
+          # (production では未設定だと初回起動に失敗するため)。
+          if [ -n "${{ inputs.app_url }}" ] && [ -n "${{ inputs.admin_url }}" ]; then
+            APP_URL="${{ inputs.app_url }}"
+            ADMIN_URL="${{ inputs.admin_url }}"
+            # ブラウザのOriginヘッダーは末尾スラッシュを含まないため揃える
+            railway variable set "APP_URL=${APP_URL%/}" --service api --skip-deploys --json
+            railway variable set "ADMIN_URL=${ADMIN_URL%/}" --service api --skip-deploys --json
+          fi
           railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
           # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
           # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
@@ -226,6 +297,9 @@ jobs:
           railway logs --service api --deployment --lines 200 --latest || true
           exit 1
 
+  # APP_URL / ADMIN_URL は1つ目のジョブがデプロイ前に設定済み (production では未設定だと
+  # 起動に失敗するため)。このジョブは同じ値を再適用して再起動する念のための後処理で、
+  # 設定の正本ではない。フロントのURLだけを後から差し替えたい場合にも使える。
   update-api-cors:
     needs: deploy-api
     if: ${{ inputs.app_url != '' && inputs.admin_url != '' }}
@@ -240,7 +314,12 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
         run: |
           set -e
-          railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+          # 1つ目のジョブと同じプロジェクトを選ぶ (本番と検証で別プロジェクトのため)。
+          if [ "${{ inputs.target }}" = "production" ]; then
+            railway link --project "${{ secrets.RAILWAY_PRODUCTION_PROJECT_ID }}" --environment production
+          else
+            railway link --project "${{ secrets.RAILWAY_PROJECT_ID }}" --environment production
+          fi
           # ブラウザのOriginヘッダーは末尾スラッシュを含まないため、CORSの許可リストと
           # 比較するURLも末尾スラッシュを除去しておく(付いたままだと一致せず、
           # Access-Control-Allow-Originが返らずCORSエラーになる)。
