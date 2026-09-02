@@ -1,10 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { CreateRewardRuleSchema, UpdateRewardRuleSchema } from "./dto/admin-rewards.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
-import { AdminAuthGuard } from "../common/admin-auth.guard";
+import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
 
 @ApiTags("admin-rewards")
@@ -43,8 +43,9 @@ export class AdminRewardsController {
   async updateRewardRule(
     @Param("ruleCode") ruleCode: string,
     @Body(new ZodValidationPipe(UpdateRewardRuleSchema)) body: z.infer<typeof UpdateRewardRuleSchema>,
+    @Req() req: AuthenticatedAdminRequest,
   ) {
-    return this.rewardRules.update(ruleCode, body);
+    return this.rewardRules.update(ruleCode, body, req.admin.id);
   }
 
   /** OVE有効期限バッチの手動実行 (docs/credit-expiry.md参照)。 */
