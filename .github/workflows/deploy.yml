@@ -396,6 +396,15 @@ jobs:
           echo "api_url=$DOMAIN_URL" >> "$GITHUB_OUTPUT"
           echo "API URL: $DOMAIN_URL"
 
+      # `railway up --detach` はビルド完了を待たずに戻る。ここで待つのは
+      # 「イメージのビルド → プッシュ → コンテナ起動 → prisma migrate deploy →
+      # (初回のみ) seed → listen」の全部で、**初回はDockerのレイヤキャッシュが
+      # 無いぶん特に長い**。本番の初回デプロイは5分では足りず、404のまま
+      # タイムアウトした (実際にはビルド中だった) ため20分まで待つ。
+      #
+      # 404はRailwayのエッジが「稼働中のデプロイが無い」ときに返す。つまり
+      # ビルド中か、ビルドに失敗している。502/503はコンテナが起動していない、
+      # 000は到達自体できていない、を意味するので、切り分け用に表示を分ける。
       - name: Wait for API to become healthy
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
@@ -403,9 +412,17 @@ jobs:
           set -e
           URL="${{ steps.domain.outputs.api_url }}/health"
           echo "確認先: $URL"
-          for i in $(seq 1 30); do
+          ATTEMPTS=120
+          for i in $(seq 1 $ATTEMPTS); do
             CODE=$(curl -sS -o /tmp/health-body.txt -w "%{http_code}" "$URL" || echo "000")
-            echo "試行 $i: HTTP $CODE"
+            case "$CODE" in
+              200) NOTE="" ;;
+              404) NOTE=" (稼働中のデプロイがまだ無い。ビルド中か、ビルド失敗)" ;;
+              502|503) NOTE=" (コンテナがまだ応答していない。起動中か、起動に失敗)" ;;
+              000) NOTE=" (接続できず)" ;;
+              *) NOTE="" ;;
+            esac
+            echo "試行 $i/$ATTEMPTS ($((i * 10))秒経過): HTTP $CODE$NOTE"
             if [ "$CODE" = "200" ]; then
               echo "ヘルスチェック成功:"
               cat /tmp/health-body.txt
@@ -413,7 +430,12 @@ jobs:
             fi
             sleep 10
           done
-          echo "5分待っても200になりませんでした。直近のビルドログ:"
+          echo "::error::20分待っても200になりませんでした。"
+          echo "Railwayのダッシュボードで api サービスの Deployments を確認してください。"
+          echo "ビルド中のまま20分を超えている場合は、そのまま完了を待ってから"
+          echo "/health を直接開けば稼働状況が分かります。"
+          echo "=================================================="
+          echo "直近のビルドログ:"
           railway logs --service api --build --lines 100 --latest || true
           echo "=================================================="
           echo "直近のデプロイ(ランタイム)ログ:"
