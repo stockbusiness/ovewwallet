@@ -49,6 +49,37 @@ export class AdminIntegrationsController {
   }
 
   /**
+   * APIキーの再発行。**生成した鍵は応答のこの1回しか取得できない**
+   * (DBにはハッシュのみ保存する)。旧APIキーは即座に無効になる。
+   *
+   * 従来は `pnpm --filter @ove/database issue-service-integration --rotate` を
+   * 本番DBに対して実行する必要があった。運用でサーバーを触らずに済むよう、
+   * 同じ処理を管理画面から行えるようにしている。
+   */
+  @Post("service-integrations/:id/rotate-api-key")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async rotateServiceIntegrationApiKey(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(ServiceIntegrationActionSchema)) body: z.infer<typeof ServiceIntegrationActionSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.serviceIntegrations.rotateApiKey(id, req.admin.id, body.reason);
+  }
+
+  /** HMAC署名シークレットの再発行。APIキーとは別に回せる。 */
+  @Post("service-integrations/:id/rotate-signing-secret")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async rotateServiceIntegrationSigningSecret(
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(ServiceIntegrationActionSchema)) body: z.infer<typeof ServiceIntegrationActionSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.serviceIntegrations.rotateSigningSecret(id, req.admin.id, body.reason);
+  }
+
+  /**
    * 代理店システム内共通顧客HUBへの送信設定 (外部開発者向け連携ガイド9章)。
    * APIキーの生値は返さない (末尾4文字のみのマスク表示)。
    */
