@@ -1,5 +1,6 @@
 "use client";
 
+import { toStoredCode } from "@ove/shared-ui";
 import Link from "next/link";
 import { useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
@@ -23,7 +24,11 @@ export default function AccountMergePage() {
     try {
       const res = await apiFetch<MergeRequestResult>("/api/v1/admin/accounts/merge", {
         method: "POST",
-        body: JSON.stringify({ sourceAccountCode, targetAccountCode, reason }),
+        body: JSON.stringify({
+          sourceAccountCode: toStoredCode(sourceAccountCode),
+          targetAccountCode: toStoredCode(targetAccountCode),
+          reason,
+        }),
       });
       setResult(res);
       setConfirming(false);
@@ -52,7 +57,7 @@ export default function AccountMergePage() {
             <input
               value={sourceAccountCode}
               onChange={(e) => setSourceAccountCode(e.target.value)}
-              placeholder="OVE-ACC-00000001"
+              placeholder="ORI-ACC-00000001"
               className="mt-1 block w-full rounded-md border border-sengoku-border px-2 py-1 text-sm"
             />
           </label>
@@ -61,7 +66,7 @@ export default function AccountMergePage() {
             <input
               value={targetAccountCode}
               onChange={(e) => setTargetAccountCode(e.target.value)}
-              placeholder="OVE-ACC-00000002"
+              placeholder="ORI-ACC-00000002"
               className="mt-1 block w-full rounded-md border border-sengoku-border px-2 py-1 text-sm"
             />
           </label>

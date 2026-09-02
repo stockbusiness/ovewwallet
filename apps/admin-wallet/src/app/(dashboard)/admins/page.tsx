@@ -1,5 +1,6 @@
 "use client";
 
+import { toDisplayCode } from "@ove/shared-ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import HelpPanel from "@/components/HelpPanel";
@@ -220,7 +221,7 @@ export default function AdminUsersPage() {
           <tbody>
             {admins.map((a) => (
               <tr key={a.id} className="border-b border-sengoku-border/50 last:border-0">
-                <td className="px-4 py-3 font-mono text-xs">{a.adminCode}</td>
+                <td className="px-4 py-3 font-mono text-xs">{toDisplayCode(a.adminCode)}</td>
                 <td className="px-4 py-3">{a.email}</td>
                 <td className="px-4 py-3">{a.displayName}</td>
                 <td className="px-4 py-3 text-xs">{ADMIN_ROLE_LABELS[a.role] ?? a.role}</td>

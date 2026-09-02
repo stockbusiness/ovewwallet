@@ -15,7 +15,9 @@ test.describe("user-wallet: LINEモックログイン→ウォレット表示→
     await page.getByRole("button", { name: "LINEでログイン" }).click();
 
     await page.waitForURL(/\/wallet$/, { timeout: NAV_TIMEOUT });
-    await expect(page.getByText(/OVE-WLT-/)).toBeVisible();
+    // 保存値は OVE-WLT-... のままだが、画面には ORI- で出す
+    // (packages/shared-ui/src/business-code.ts)。
+    await expect(page.getByText(/ORI-WLT-/)).toBeVisible();
 
     await page.getByRole("link", { name: "履歴", exact: true }).click();
     await page.waitForURL(/\/wallet\/transactions$/, { timeout: NAV_TIMEOUT_SHORT });

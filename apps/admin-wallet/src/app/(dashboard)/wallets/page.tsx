@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError, type WalletListItem } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 export default function WalletsPage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function WalletsPage() {
           <tbody>
             {wallets.map((w) => (
               <tr key={w.id} className="border-t border-sengoku-border">
-                <td className="p-3">{w.walletCode}</td>
+                <td className="p-3">{toDisplayCode(w.walletCode)}</td>
                 <td className="p-3">{w.status}</td>
                 <td className="p-3">{Number(w.availableBalance).toLocaleString("ja-JP")} ORI</td>
                 <td className="p-3">{Number(w.heldBalance).toLocaleString("ja-JP")} ORI</td>

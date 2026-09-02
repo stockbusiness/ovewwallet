@@ -9,6 +9,13 @@ PostgreSQL + Prisma。スキーマ定義は `packages/database/prisma/schema.pri
 - 表示用コード (`account_code`, `wallet_code`, `transaction_code`) は
   `code_counters` テーブルを `UPDATE ... RETURNING` で原子的にインクリメントして採番する
   (`packages/database/src/codes.ts`)。例: `OVE-ACC-00000001`。
+- **保存値の接頭辞は `OVE-` のままで、画面に出すときだけ `ORI-` へ読み替える**
+  (`packages/shared-ui/src/business-code.ts` の `toDisplayCode`)。これらのコードは
+  監査ログ・外部連携・エクスポート・過去の問い合わせ記録から参照されており、値そのものを
+  書き換えると追跡可能性を壊すため。逆変換 (`toStoredCode`) を管理画面の検索欄に通して
+  いるので、運用担当者は利用者から聞いた `ORI-` のコードをそのまま貼れる。
+  **user-wallet と admin-wallet の両方で同じ変換を通すこと**。片方だけ変えると、
+  利用者が読み上げたコードで管理画面を検索しても見つからなくなる。
 
 ## 指示書7章で指定された必須テーブル (13)
 

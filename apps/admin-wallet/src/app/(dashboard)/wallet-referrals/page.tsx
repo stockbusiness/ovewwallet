@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, type FeatureFlags, type WalletReferralItem } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 const STATUS_LABEL: Record<WalletReferralItem["status"], string> = {
   CAPTURED: "受付済み(登録前)",
@@ -147,7 +148,7 @@ export default function WalletReferralsPage() {
                       <span className={STATUS_CLASS[item.status]}>{STATUS_LABEL[item.status]}</span>
                     </td>
                     <td className="p-3">
-                      {item.account ? `${item.account.accountCode} (${item.account.displayName ?? "-"})` : "-"}
+                      {item.account ? `${toDisplayCode(item.account.accountCode)} (${item.account.displayName ?? "-"})` : "-"}
                     </td>
                     <td className="p-3">{item.agencyId ?? "-"}</td>
                     <td className="p-3">

@@ -137,7 +137,7 @@ ORI付与イベントが 404 になり続ける** (`docs/integration/AGENCY_POIN
 - 代理店SSOがまだ接続されていない (`SENGOKU_AI_SSO_*` 未設定 / `ENABLE_AGENCY_LOGIN` が無効)
 - その担当者がLINEログインで先にウォレットを作ってしまった
 
-管理画面 `/agency-links` の「詳細」から、ORIアカウントのコード (`OVE-ACC-...`) と
+管理画面 `/agency-links` の「詳細」から、ORIアカウントのコード (`ORI-ACC-...`) と
 理由を入れて紐付けられる。内部IDでも指定できる。
 
 権限は `SUPER_ADMIN` / `INTEGRATION_ADMIN`。**閲覧専用の `AUDITOR` には開けていない**

@@ -1,5 +1,6 @@
 "use client";
 
+import { toStoredCode } from "@ove/shared-ui";
 import { useState } from "react";
 import { apiFetch, ApiError, type AgencyLinkItem } from "@/lib/api";
 
@@ -55,7 +56,7 @@ export default function AgencyLinkActions({ item, onDone }: Props) {
       <p className="text-xs text-sengoku-muted">
         {linked
           ? "紐付け先を間違えている場合は、理由を書いて解除してください。解除前に入った付与は取り消されません。"
-          : "この担当者のORIアカウントを、アカウントコード (OVE-ACC-...) で指定します。付与の宛先になるので、本人のものか必ず確認してください。"}
+          : "この担当者のORIアカウントを、アカウントコード (ORI-ACC-...) で指定します。付与の宛先になるので、本人のものか必ず確認してください。"}
       </p>
 
       <div className="flex flex-wrap items-end gap-2">
@@ -64,7 +65,7 @@ export default function AgencyLinkActions({ item, onDone }: Props) {
             <span className="mb-1 block text-sengoku-faint">ORIアカウント</span>
             <input
               className="rounded border border-sengoku-border px-2 py-1"
-              placeholder="OVE-ACC-..."
+              placeholder="ORI-ACC-..."
               value={account}
               onChange={(e) => setAccount(e.target.value)}
             />
@@ -93,7 +94,7 @@ export default function AgencyLinkActions({ item, onDone }: Props) {
           <button
             type="button"
             disabled={busy || account.trim() === "" || reason.trim() === ""}
-            onClick={() => run("link", { account, reason })}
+            onClick={() => run("link", { account: toStoredCode(account), reason })}
             className="rounded border border-sengoku-border px-3 py-1 text-xs text-sengoku-gold disabled:opacity-40"
           >
             紐付ける

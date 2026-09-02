@@ -21,6 +21,7 @@ import {
   MenuIcon,
   ThemeToggle,
   RankBadge,
+  toDisplayCode,
 } from "@ove/shared-ui";
 import {
   apiFetch,
@@ -175,7 +176,7 @@ export default function WalletTopPage() {
       />
 
       <div className="flex flex-col gap-6 px-4">
-        <p className="-mt-4 text-xs text-sengoku-muted">{balance.wallet_code}</p>
+        <p className="-mt-4 text-xs text-sengoku-muted">{toDisplayCode(balance.wallet_code)}</p>
 
         <BalanceCard
           amount={Number(balance.available_balance).toLocaleString("ja-JP")}

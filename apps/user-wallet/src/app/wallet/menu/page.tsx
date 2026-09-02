@@ -10,6 +10,7 @@ import {
   GiftIcon,
   CartIcon,
   MenuIcon,
+  toDisplayCode,
 } from "@ove/shared-ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -116,8 +117,8 @@ export default function WalletMenuPage() {
 
       <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4">
         <p className="text-sm font-bold text-sengoku-text">{account?.displayName || "表示名未設定"}</p>
-        <p className="mt-1 text-xs text-sengoku-muted">{account?.accountCode}</p>
-        {balance && <p className="mt-0.5 text-xs text-sengoku-muted">{balance.wallet_code}</p>}
+        <p className="mt-1 text-xs text-sengoku-muted">{toDisplayCode(account?.accountCode)}</p>
+        {balance && <p className="mt-0.5 text-xs text-sengoku-muted">{toDisplayCode(balance.wallet_code)}</p>}
       </section>
 
       {referralStatus?.referred && (

@@ -57,6 +57,8 @@ export default tseslint.config(
             "packages/auth/src/*.test.ts",
             "packages/auth/vitest.config.ts",
             "packages/ledger/src/*.test.ts",
+            "packages/shared-ui/src/*.test.ts",
+            "packages/shared-ui/vitest.config.ts",
             "packages/ledger/vitest.config.ts",
           ],
           // 上限に達するとlintがパースエラー (=CI失敗) になる。テストファイルが増える

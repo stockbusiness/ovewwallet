@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError, type AccountDetailItem } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 export default function AccountDetailPage() {
   const params = useParams<{ accountId: string }>();
@@ -91,7 +92,7 @@ export default function AccountDetailPage() {
 
   return (
     <>
-      <h1 className="mb-1 text-xl font-bold">{account.accountCode}</h1>
+      <h1 className="mb-1 text-xl font-bold">{toDisplayCode(account.accountCode)}</h1>
         <p className="mb-6 text-sm text-sengoku-muted">
           {account.displayName ?? account.primaryEmail ?? "-"} ・ 状態: {account.status} ・ 登録日:{" "}
           {new Date(account.createdAt).toLocaleDateString("ja-JP")}
@@ -101,7 +102,7 @@ export default function AccountDetailPage() {
           <p className="mb-4 rounded-md bg-sengoku-gold-soft/10 p-3 text-sm text-sengoku-gold-soft">
             このアカウントは{" "}
             <Link href={`/accounts/${account.mergedIntoAccount.id}`} className="underline">
-              {account.mergedIntoAccount.accountCode}
+              {toDisplayCode(account.mergedIntoAccount.accountCode)}
             </Link>{" "}
             に統合済みです。
           </p>
@@ -127,7 +128,7 @@ export default function AccountDetailPage() {
               <dd>
                 {account.wallet ? (
                   <Link href={`/wallets/${account.wallet.id}`} className="text-sengoku-gold underline">
-                    {account.wallet.walletCode} (
+                    {toDisplayCode(account.wallet.walletCode)} (
                     {Number(account.wallet.availableBalance).toLocaleString("ja-JP")} ORI)
                   </Link>
                 ) : (

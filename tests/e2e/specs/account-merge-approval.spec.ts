@@ -33,8 +33,8 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
     await login(requesterPage, requester.email, requester.password);
 
     await requesterPage.goto(`${ADMIN_URL}/accounts/merge`);
-    await requesterPage.getByPlaceholder("OVE-ACC-00000001").fill(source.accountCode);
-    await requesterPage.getByPlaceholder("OVE-ACC-00000002").fill(target.accountCode);
+    await requesterPage.getByPlaceholder("ORI-ACC-00000001").fill(source.accountCode);
+    await requesterPage.getByPlaceholder("ORI-ACC-00000002").fill(target.accountCode);
     await requesterPage.getByLabel("理由").fill("Playwright E2E: 重複アカウント");
     await requesterPage.getByRole("button", { name: "内容を確認する" }).click();
     await requesterPage.getByRole("button", { name: "申請する" }).click();

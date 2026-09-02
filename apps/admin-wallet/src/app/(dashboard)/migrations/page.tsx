@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError, type AccountListItem } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 interface MigrationRequestResult {
   result: "PENDING_APPROVAL";
@@ -173,7 +174,7 @@ export default function MigrationsPage() {
               <tbody>
                 {reviewingAccounts.map((a) => (
                   <tr key={a.id} className="border-t border-sengoku-gold-soft/30">
-                    <td className="py-1">{a.accountCode}</td>
+                    <td className="py-1">{toDisplayCode(a.accountCode)}</td>
                     <td className="py-1">{a.primaryEmail ?? "-"}</td>
                     <td className="py-1">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
                     <td className="py-1">

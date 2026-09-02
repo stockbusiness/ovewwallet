@@ -1,5 +1,6 @@
 "use client";
 
+import { toDisplayCode } from "@ove/shared-ui";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -113,7 +114,7 @@ export default function CollectibleHoldingDetailPage() {
           <Row label="保有ID" value={holding.id} mono />
           <Row
             label="保有アカウント"
-            value={holding.account?.accountCode ?? holding.oveAccountId}
+            value={toDisplayCode(holding.account?.accountCode) ?? holding.oveAccountId}
             mono
           />
           <Row

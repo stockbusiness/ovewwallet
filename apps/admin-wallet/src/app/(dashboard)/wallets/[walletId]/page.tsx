@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 interface WalletDetail {
   id: string;
@@ -103,9 +104,9 @@ export default function WalletDetailPage() {
 
   return (
     <>
-        <h1 className="mb-1 text-xl font-bold">{wallet.walletCode}</h1>
+        <h1 className="mb-1 text-xl font-bold">{toDisplayCode(wallet.walletCode)}</h1>
         <p className="mb-6 text-sm text-sengoku-muted">
-          {wallet.account.accountCode} ・ {wallet.account.displayName ?? wallet.account.primaryEmail ?? "-"} ・ 状態: {wallet.status}
+          {toDisplayCode(wallet.account.accountCode)} ・ {wallet.account.displayName ?? wallet.account.primaryEmail ?? "-"} ・ 状態: {wallet.status}
         </p>
 
         <div className="mb-6 grid grid-cols-4 gap-4 text-sm">
