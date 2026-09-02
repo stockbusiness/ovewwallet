@@ -359,6 +359,20 @@ jobs:
           # クライアント側にも露出する値のため直接埋め込む)。上記でAUTH_MODE=productionへ
           # 切り替えたため、この値がLineIdTokenVerifierの検証先として実際に参照される。
           railway variable set "LINE_CHANNEL_ID=2010749243" --service api --skip-deploys --json
+          # ビルド方法をDockerfileに固定する。Railwayの既定はrailpackによる自動判定で、
+          # このモノレポでは「Nx workspace with a Next.js app」と誤認して
+          # `RAILPACK_NX_APP を設定してください` というエラーでビルドに失敗した
+          # (本番の初回デプロイ, run #38)。
+          #
+          # リポジトリルートの `railway.json` は builder=DOCKERFILE を指定しているが、
+          # 空サービスとして作った service には効かなかった (Config as Code自体も
+          # 2026-12-01で廃止予定という警告が出ている)。サービス変数で明示するのが
+          # 現在の推奨方法なので、ワークフロー側で必ず設定する。
+          # https://docs.railway.com/builds/dockerfiles
+          #
+          # パスはリポジトリルートからの相対。Dockerfile側もルートをビルド
+          # コンテキストとして想定している (apps/api/Dockerfile 冒頭のコメント)。
+          railway variable set "RAILWAY_DOCKERFILE_PATH=apps/api/Dockerfile" --service api --skip-deploys --json
           # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
           # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
           # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、
