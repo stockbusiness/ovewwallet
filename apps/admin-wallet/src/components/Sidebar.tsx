@@ -75,7 +75,10 @@ const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: "設定",
-    links: [{ href: "/security", label: "セキュリティ設定" }],
+    links: [
+      { href: "/security", label: "セキュリティ設定" },
+      { href: "/admins", label: "管理者アカウント" },
+    ],
   },
 ];
 

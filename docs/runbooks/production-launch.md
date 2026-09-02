@@ -211,17 +211,37 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 
 ### 5. 初回デプロイ後にやること
 
-1. **初期管理者でログインし、パスワードを変更する**
-   (`SEED_ADMIN_PASSWORD` の値をそのまま使い続けない)
-2. **管理者MFAを有効化する** (`docs/authentication.md`「管理画面MFA」)
-3. **`run_seed_on_boot` を `false` にして再実行する**
+1. **初期管理者でログインする**
+
+   | 項目 | 値 |
+   |---|---|
+   | メールアドレス | `admin@ovewallet.local` (`packages/database/src/seed.ts` の固定値) |
+   | パスワード | `Production` Environment の `SEED_ADMIN_PASSWORD` |
+
+2. **自分のメールアドレスの管理者に置き換える**
+
+   初期管理者のメールアドレスは実在しないドメインで、**メールアドレスは後から変更できない**
+   (`UpdateAdminUserSchema` が受け付けるのは表示名・ロール・状態のみ)。管理画面の
+   **設定 > 管理者アカウント**で以下を行う。
+
+   1. 自分のメールアドレスでスーパー管理者を追加する
+   2. 表示された初期パスワードを控える (**この1回しか表示されない**)
+   3. ログアウトし、追加したアカウントでログインし直す
+   4. **設定 > セキュリティ設定**でパスワードを変更する
+   5. 初期管理者 (`admin@ovewallet.local`) を停止する
+
+   > 最後の有効なスーパー管理者は停止・降格できないようAPI側で保護されている
+   > (`admin-users.test.ts`)。順番を間違えても締め出されることはない。
+
+3. **管理者MFAを有効化する** (設定 > セキュリティ設定、`docs/authentication.md`)
+4. **`run_seed_on_boot` を `false` にして再実行する**
    起動のたびにseedを走らせる必要はなく、`SEED_ADMIN_PASSWORD` を環境変数に
    置き続けないため
-4. **Vercelに `NEXT_PUBLIC_API_URL` を設定して再デプロイする** (手順3-2)
+5. **Vercelに `NEXT_PUBLIC_API_URL` を設定して再デプロイする** (手順3-2)
    本番APIのURLは手順4のログに出る。設定しないとフロントは検証用APIを向いたまま
-5. **LINE Developers のコールバックURLを本番ドメインに登録する** (手順3-2)
-6. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
-7. **バックアップの対象を本番に切り替える** — 下記
+6. **LINE Developers のコールバックURLを本番ドメインに登録する** (手順3-2)
+7. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
+8. **バックアップの対象を本番に切り替える** — 下記
 
 ### 5-2. バックアップの対象を切り替える (忘れやすい)
 
