@@ -270,6 +270,13 @@ $ curl -s https://api.sennokuni-wallet.com/health
 {"status":"ok","timestamp":"...","commit":"db819d7"}
 ```
 
+**Railway APIのレート制限**: サービス変数は**1回のコマンドにまとめて**設定している
+(`railway variable set` はKEY=VALUEを複数受け取れる)。1変数につき1コマンドで20回叩いて
+いた頃、短時間にデプロイを繰り返すと
+`You are being ratelimited. Try again in about 17 minutes` に当たり、**本番デプロイが
+変数設定の途中で止まった** (run #49)。当たった場合はメッセージが示す時間だけ待って
+再実行すればよい (変数は再実行で設定し直される)。
+
 **同時実行しない**: `concurrency` でデプロイ先ごとに直列化している。
 進行中のデプロイは打ち切らない (マイグレーション途中で止めるとDBが中途半端な
 状態で残るため)、後続のデプロイが待機する。

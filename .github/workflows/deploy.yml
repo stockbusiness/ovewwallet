@@ -406,18 +406,65 @@ jobs:
             exit 1
           fi
 
-          railway variable set "DATABASE_URL=$DATABASE_URL" --service api --skip-deploys --json
-          railway variable set "REDIS_URL=$REDIS_URL" --service api --skip-deploys --json
-          railway variable set "SESSION_SECRET=${{ secrets.SESSION_SECRET }}" --service api --skip-deploys --json
-          railway variable set "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" --service api --skip-deploys --json
-          railway variable set "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}" --service api --skip-deploys --json
-          # 起動のたびにseedを走らせるか。本番は初回だけtrueにし、初期管理者を作ったら
-          # falseへ戻すことを推奨する (SEED_ADMIN_PASSWORDを環境変数に置き続けない、
-          # 意図せぬ再作成を避ける、起動時間を伸ばさない、の3点のため)。
-          railway variable set "RUN_SEED_ON_BOOT=$RUN_SEED_ON_BOOT" --service api --skip-deploys --json
-          # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認済み。
-          # LINE_CHANNEL_IDと合わせてLineIdTokenVerifierが使われる (docs/authentication.md)。
-          railway variable set "AUTH_MODE=production" --service api --skip-deploys --json
+          # 変数は**1回のコマンドにまとめて**設定する。`railway variable set` は
+          # KEY=VALUE を複数受け取れる (`railway variable set --help`)。
+          #
+          # 1変数につき1コマンドで20回叩いていた頃、Railway APIのレート制限
+          # ("You are being ratelimited. Try again in about 17 minutes") に当たり、
+          # 本番デプロイが LINE_CHANNEL_ID の設定中で止まった (run #49)。しかも
+          # 途中まで変数が書き換わった状態で終わるため、後始末も分かりにくかった。
+          VARS=(
+            "DATABASE_URL=$DATABASE_URL"
+            "REDIS_URL=$REDIS_URL"
+            "SESSION_SECRET=${{ secrets.SESSION_SECRET }}"
+            "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}"
+            "SEED_ADMIN_PASSWORD=${{ secrets.SEED_ADMIN_PASSWORD }}"
+            # 起動のたびにseedを走らせるか。本番は初回だけtrueにし、初期管理者を作ったら
+            # falseへ戻すことを推奨する (SEED_ADMIN_PASSWORDを環境変数に置き続けない、
+            # 意図せぬ再作成を避ける、起動時間を伸ばさない、の3点のため)。
+            "RUN_SEED_ON_BOOT=$RUN_SEED_ON_BOOT"
+            # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認済み。
+            # LINE_CHANNEL_IDと合わせてLineIdTokenVerifierが使われる (docs/authentication.md)。
+            "AUTH_MODE=production"
+            # 稼働開始時点で使えるログイン方法はLINEのみ (docs/login-methods.md)。
+            # メールは送信基盤が未実装、SSOは未接続のため、明示的に閉じておく
+            # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
+            "ENABLE_EMAIL_LOGIN=false"
+            "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
+            "ENABLE_AGENCY_LOGIN=false"
+            "HIGH_VALUE_THRESHOLD=50000"
+            # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
+            # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
+            # 挙動なので、シークレット未登録でもデプロイ自体は失敗しない。
+            "SENTRY_DSN=${{ secrets.SENTRY_DSN }}"
+            # LINE Developersで発行したチャネルID (シークレットではない、LIFF初期化等で
+            # クライアント側にも露出する値のため直接埋め込む)。上記でAUTH_MODE=productionへ
+            # 切り替えたため、この値がLineIdTokenVerifierの検証先として実際に参照される。
+            "LINE_CHANNEL_ID=2010749243"
+            # ビルド方法をDockerfileに固定する。Railwayの既定はrailpackによる自動判定で、
+            # このモノレポでは「Nx workspace with a Next.js app」と誤認して
+            # `RAILPACK_NX_APP を設定してください` というエラーでビルドに失敗した
+            # (本番の初回デプロイ, run #38)。
+            #
+            # リポジトリルートの `railway.json` は builder=DOCKERFILE を指定しているが、
+            # 空サービスとして作った service には効かなかった (Config as Code自体も
+            # 2026-12-01で廃止予定という警告が出ている)。サービス変数で明示するのが
+            # 現在の推奨方法なので、ワークフロー側で必ず設定する。
+            # https://docs.railway.com/builds/dockerfiles
+            #
+            # パスはリポジトリルートからの相対。Dockerfile側もルートをビルド
+            # コンテキストとして想定している (apps/api/Dockerfile 冒頭のコメント)。
+            "RAILWAY_DOCKERFILE_PATH=apps/api/Dockerfile"
+            # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
+            # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
+            # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、
+            # コンテナは正常に起動していても「service unavailable」になる。
+            "PORT=4000"
+            # 稼働中のコンテナがどのビルドかを /health から判別できるようにする。
+            # これが無いと、`railway up --detach` の直後にまだ動いている旧コンテナが
+            # 200を返し、入れ替わる前にデプロイ成功と判定してしまう (run #39 で発生)。
+            "GIT_COMMIT_SHA=${{ github.sha }}"
+          )
 
           # NODE_ENV=production で本番ガードが有効になる:
           #   - assertProductionEnvSafe(): REDIS_URL/ENCRYPTION_KEY/LINE_CHANNEL_ID/
@@ -427,17 +474,10 @@ jobs:
           #   - メールOTPの devCode を応答に含めなくなる
           # stagingではこれらが素通りするため、検証用デプロイは staging のままにする。
           if [ "$TARGET" = "production" ]; then
-            railway variable set "NODE_ENV=production" --service api --skip-deploys --json
+            VARS+=("NODE_ENV=production")
           else
-            railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
+            VARS+=("NODE_ENV=staging")
           fi
-
-          # 稼働開始時点で使えるログイン方法はLINEのみ (docs/login-methods.md)。
-          # メールは送信基盤が未実装、SSOは未接続のため、明示的に閉じておく
-          # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
-          railway variable set "ENABLE_EMAIL_LOGIN=false" --service api --skip-deploys --json
-          railway variable set "ENABLE_SENGOKU_PASSPORT_LOGIN=false" --service api --skip-deploys --json
-          railway variable set "ENABLE_AGENCY_LOGIN=false" --service api --skip-deploys --json
 
           # APP_URL / ADMIN_URL は本番ガードの必須項目であり、CORSとCSRFの許可オリジンの
           # 唯一の入力でもある。後段のジョブではなく**デプロイ前**に設定する
@@ -446,41 +486,19 @@ jobs:
             APP_URL="${{ inputs.app_url }}"
             ADMIN_URL="${{ inputs.admin_url }}"
             # ブラウザのOriginヘッダーは末尾スラッシュを含まないため揃える
-            railway variable set "APP_URL=${APP_URL%/}" --service api --skip-deploys --json
-            railway variable set "ADMIN_URL=${ADMIN_URL%/}" --service api --skip-deploys --json
+            VARS+=("APP_URL=${APP_URL%/}" "ADMIN_URL=${ADMIN_URL%/}")
           fi
-          railway variable set "HIGH_VALUE_THRESHOLD=50000" --service api --skip-deploys --json
-          # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
-          # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
-          # 挙動なので、シークレット未登録でもデプロイ自体は失敗しない。
-          railway variable set "SENTRY_DSN=${{ secrets.SENTRY_DSN }}" --service api --skip-deploys --json
-          # LINE Developersで発行したチャネルID (シークレットではない、LIFF初期化等で
-          # クライアント側にも露出する値のため直接埋め込む)。上記でAUTH_MODE=productionへ
-          # 切り替えたため、この値がLineIdTokenVerifierの検証先として実際に参照される。
-          railway variable set "LINE_CHANNEL_ID=2010749243" --service api --skip-deploys --json
-          # ビルド方法をDockerfileに固定する。Railwayの既定はrailpackによる自動判定で、
-          # このモノレポでは「Nx workspace with a Next.js app」と誤認して
-          # `RAILPACK_NX_APP を設定してください` というエラーでビルドに失敗した
-          # (本番の初回デプロイ, run #38)。
-          #
-          # リポジトリルートの `railway.json` は builder=DOCKERFILE を指定しているが、
-          # 空サービスとして作った service には効かなかった (Config as Code自体も
-          # 2026-12-01で廃止予定という警告が出ている)。サービス変数で明示するのが
-          # 現在の推奨方法なので、ワークフロー側で必ず設定する。
-          # https://docs.railway.com/builds/dockerfiles
-          #
-          # パスはリポジトリルートからの相対。Dockerfile側もルートをビルド
-          # コンテキストとして想定している (apps/api/Dockerfile 冒頭のコメント)。
-          railway variable set "RAILWAY_DOCKERFILE_PATH=apps/api/Dockerfile" --service api --skip-deploys --json
-          # RailwayはPORTを自動注入しないため、Dockerfileの`EXPOSE 4000`と
-          # main.tsのリッスンポートに合わせて明示的に設定する。これが無いと
-          # Railwayのエッジ/ヘルスチェックがどのポートに到達すればよいか分からず、
-          # コンテナは正常に起動していても「service unavailable」になる。
-          railway variable set "PORT=4000" --service api --skip-deploys --json
-          # 稼働中のコンテナがどのビルドかを /health から判別できるようにする。
-          # これが無いと、`railway up --detach` の直後にまだ動いている旧コンテナが
-          # 200を返し、入れ替わる前にデプロイ成功と判定してしまう (run #39 で発生)。
-          railway variable set "GIT_COMMIT_SHA=${{ github.sha }}" --service api --skip-deploys --json
+
+          echo "設定する変数: ${#VARS[@]}件 (1回のAPI呼び出しにまとめます)"
+          # --json の出力はキー名と成否のみで、値は含まれない。
+          if ! railway variable set "${VARS[@]}" --service api --skip-deploys --json; then
+            echo "::error::サービス変数の設定に失敗しました。"
+            echo "出力に 'You are being ratelimited' が出ている場合はRailway APIの"
+            echo "レート制限です。短時間にデプロイを繰り返すと当たります。"
+            echo "メッセージが示す時間だけ待ってから、このワークフローを再実行してください"
+            echo "(変数は再実行で設定し直されるため、途中まで進んでいても問題ありません)。"
+            exit 1
+          fi
 
       - name: Deploy API service
         env:
