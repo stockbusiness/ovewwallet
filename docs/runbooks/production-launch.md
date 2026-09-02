@@ -283,6 +283,21 @@ Railwayの既定のビルド方法は **railpack による自動判定**で、�
 | バックアップの確認 | 手順5-2で `BACKUP_TARGET=production` にした上で1回手動実行する |
 | 代理店連携の有効化 | APIキー発行 + `ENABLE_AGENCY_REFERRAL_SYNC=true` (`docs/agency-integration.md`) |
 | 匿名化の有効化 | 法務の回答後 (`docs/account-anonymization.md`)。**既定OFFなので何も消えない** |
+| 連携サービス画面の公開 | 連携先とサービス名が確定したら `ENABLE_LINKED_SERVICES=true` (下記) |
+
+## 連携サービス画面を隠している
+
+稼働開始時点では連携先がすべて「未連携」で、サービス名 (`SENGOKU_EC` 等) も確定して
+いないため、`/wallet/services` とその導線 (ホームのタイル・メニュー) を
+**`ENABLE_LINKED_SERVICES` で隠している**。他のFeature Flagと同様に既定OFF。
+
+隠しているのは**画面だけ**で、連携そのもの (`/api/v1/me/linked-services` や外部サービス
+連携の実処理) は動いている。
+
+公開するときは Railway の api サービスに `ENABLE_LINKED_SERVICES=true` を設定する。
+フロントエンドは `GET /api/v1/me/feature-flags` の応答だけを見て出し分けるため、
+**Vercelの再デプロイは不要**で、APIの再起動だけで反映される。
+
 
 ## 検証用デプロイは残す
 

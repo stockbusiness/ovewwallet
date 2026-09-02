@@ -177,6 +177,7 @@ export interface LoginMethodAvailability {
 
 export interface MeFeatureFlags {
   digital_collection_enabled: boolean;
+  linked_services_enabled: boolean;
 }
 
 export type CollectibleHoldingStatus =

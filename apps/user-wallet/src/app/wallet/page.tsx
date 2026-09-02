@@ -34,6 +34,7 @@ import {
   type DailyBonusClaimResult,
   type ExpiringCreditsSummary,
   type RewardRulePublic,
+  type MeFeatureFlags,
 } from "@/lib/api";
 import { EarnOpportunityCard, pickEarnOpportunity } from "@/components/EarnOpportunityCard";
 
@@ -47,6 +48,7 @@ export default function WalletTopPage() {
   const [holds, setHolds] = useState<WalletHoldItem[]>([]);
   const [dailyBonus, setDailyBonus] = useState<DailyBonusStatus | null>(null);
   const [expiringCredits, setExpiringCredits] = useState<ExpiringCreditsSummary | null>(null);
+  const [linkedServicesEnabled, setLinkedServicesEnabled] = useState(false);
   const [claimingBonus, setClaimingBonus] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +101,14 @@ export default function WalletTopPage() {
         setExpiringCredits(await apiFetch<ExpiringCreditsSummary>("/api/v1/me/wallet/expiring-credits"));
       } catch {
         setExpiringCredits(null);
+      }
+      // Feature Flag取得の失敗は導線を隠すだけにして、ホーム画面自体は止めない
+      // (メニュー画面と同じ扱い)。
+      try {
+        const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
+        setLinkedServicesEnabled(flags.linked_services_enabled);
+      } catch {
+        setLinkedServicesEnabled(false);
       }
     })();
   }, [router]);
@@ -243,7 +253,9 @@ export default function WalletTopPage() {
             { icon: <GiftIcon className="h-6 w-6" />, label: "ORIを貯める", href: "/wallet/earn" },
             { icon: <CartIcon className="h-6 w-6" />, label: "ORIを使う", href: "/wallet/use" },
             { icon: <ClockIcon className="h-6 w-6" />, label: "取引履歴", href: "/wallet/transactions" },
-            { icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", href: "/wallet/services" },
+            ...(linkedServicesEnabled
+              ? [{ icon: <LinkIcon className="h-6 w-6" />, label: "連携サービス", href: "/wallet/services" }]
+              : []),
           ]}
         />
 

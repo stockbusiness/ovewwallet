@@ -43,6 +43,17 @@ export const FEATURE_FLAG_KEYS = [
    * (`GET /api/v1/admin/accounts/anonymization-preview`) で対象件数を確認すること。
    */
   "ENABLE_ACCOUNT_ANONYMIZATION",
+  /**
+   * 連携サービス一覧 (`/wallet/services`) とその導線を表示する。
+   *
+   * 稼働開始時点では連携先がすべて未連携で、サービス名も確定していないため、
+   * 利用者には「未連携」ばかりが並ぶ意味の無い画面になる。他のFlagと同様に既定OFFで
+   * 隠し、連携先とサービス名が固まってから有効化する。
+   *
+   * OFFでも連携そのもの (`/api/v1/me/linked-services` や外部サービス連携の実処理) は
+   * 止めない。画面の出し分けだけを行う。
+   */
+  "ENABLE_LINKED_SERVICES",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

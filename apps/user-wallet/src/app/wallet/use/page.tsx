@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomNavigation, CartIcon, ArrowLeftIcon, HomeIcon, ClockIcon, GiftIcon, MenuIcon } from "@ove/shared-ui";
-import { apiFetch, ApiError, type LinkedService, type WalletBalance } from "@/lib/api";
+import { apiFetch, ApiError, type LinkedService, type MeFeatureFlags, type WalletBalance } from "@/lib/api";
 
 export default function UseOvePage() {
   const router = useRouter();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [services, setServices] = useState<LinkedService[] | null>(null);
+  const [linkedServicesEnabled, setLinkedServicesEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -28,6 +29,14 @@ export default function UseOvePage() {
           return;
         }
         setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
+        return;
+      }
+      // 空状態の文面を出し分けるためだけに使うので、取得失敗は画面を止めない。
+      try {
+        const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
+        setLinkedServicesEnabled(flags.linked_services_enabled);
+      } catch {
+        setLinkedServicesEnabled(false);
       }
     })();
   }, [router]);
@@ -70,11 +79,19 @@ export default function UseOvePage() {
       {!error && services === null && <p className="text-sm text-sengoku-muted">読み込み中...</p>}
       {services?.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
-          利用可能な連携サービスがまだありません。まずは
-          <Link href="/wallet/services" className="text-sengoku-gold underline underline-offset-2">
-            連携サービス
-          </Link>
-          をご確認ください。
+          {/* 連携サービス画面を隠しているときにそこへ誘導すると行き止まりになるため、
+              文面を出し分ける (ENABLE_LINKED_SERVICES)。 */}
+          {linkedServicesEnabled ? (
+            <>
+              利用可能な連携サービスがまだありません。まずは
+              <Link href="/wallet/services" className="text-sengoku-gold underline underline-offset-2">
+                連携サービス
+              </Link>
+              をご確認ください。
+            </>
+          ) : (
+            "利用可能な連携サービスがまだありません。準備ができ次第、お知らせでご案内します。"
+          )}
         </p>
       )}
 
