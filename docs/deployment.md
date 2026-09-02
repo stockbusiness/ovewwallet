@@ -209,6 +209,10 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 | `ENCRYPTION_KEY` | MFAシークレット・外部API署名シークレットの暗号化キー (`openssl rand -hex 32`) |
 | `SEED_ADMIN_PASSWORD` | 初期SUPER_ADMINのパスワード (任意の強いパスワード) |
 
+これらは `RAILWAY` という **GitHub Environment** に登録されている。本番環境は
+`PRODUCTION` という別のEnvironmentに**同じ名前で別の値**を登録し、ワークフローの
+`target` 入力で切り替える (`docs/runbooks/production-launch.md`)。
+
 #### 実行フロー
 
 1. **初回実行**: `RAILWAY_PROJECT_ID` 未設定の状態で実行すると、`deploy-api` ジョブが

@@ -28,18 +28,47 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 **ワークフローに自動作成させない。** 再実行のたびに本番プロジェクトが増えるのを防ぐため、
 `target=production` では既存プロジェクトIDを必須にしてある。
 
-### 2. GitHub Secrets を登録する
+### 2. `PRODUCTION` という GitHub Environment を作る
+
+検証用のSecretは `RAILWAY` という **GitHub Environment** に入っている
+(Settings > Environments > RAILWAY)。本番のSecretを**同じEnvironmentに入れてはいけない**。
+1つのEnvironmentは1つの名前につき1つの値しか持てないため、同じ場所に入れると
+`SESSION_SECRET` と `ENCRYPTION_KEY` が検証用と同じ値になってしまう。
+検証環境の値が漏れたとき、本番のセッションと暗号化データまで影響が及ぶ。
+
+そこで**もう1つEnvironmentを作る**。Secret名は検証用とまったく同じで、値だけが違う。
+ワークフローは `target` に応じて参照するEnvironmentを切り替える。
+
+**Settings > Environments > New environment** で `PRODUCTION` という名前で作成し、
+`Environment secrets` に以下を登録する。
 
 | Secret | 内容 |
 |---|---|
-| `RAILWAY_PRODUCTION_PROJECT_ID` | 手順1で作ったプロジェクトのID (**本番用。検証用の`RAILWAY_PROJECT_ID`とは別**) |
-| `SESSION_SECRET` | 32文字以上。検証用と**別の値**にする |
-| `ENCRYPTION_KEY` | 検証用と**別の値**にする (`openssl rand -base64 32`) |
+| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (Railwayアカウント全体のトークンのため) |
+| `RAILWAY_PROJECT_ID` | **手順1で作った本番プロジェクトのID**。検証用プロジェクトを指さないこと |
+| `SESSION_SECRET` | `openssl rand -hex 32`。検証用と**別の値** |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32`。検証用と**別の値** |
 | `SEED_ADMIN_PASSWORD` | 初期管理者のパスワード。初回デプロイ後に変更する |
 | `SENTRY_DSN` | 未登録でもデプロイは通る (`initSentry()` が空なら何もしない) |
 
-> `SESSION_SECRET` と `ENCRYPTION_KEY` を検証用と共有しないこと。検証環境の値が漏れた
-> 場合に本番のセッションと暗号化データまで影響が及ぶ。
+`VERCEL_TOKEN` はこのワークフローでは使わない (フロントエンドはVercelのGit連携で
+デプロイする、`docs/deployment.md`)。
+
+> **`ENCRYPTION_KEY` を後から変えるときは、値の差し替えだけでは足りない。**
+> 管理者MFAシークレット等が旧鍵で暗号化されたまま復号できなくなる。
+> `pnpm --filter @ove/database rotate-encryption-key` で全件を再暗号化する手順が
+> 必要 (`docs/deployment.md`「ENCRYPTION_KEYのローテーション」)。
+> 稼働開始前に確定させておくほうが手間がない。
+>
+> 値の形式に制約はない (`scryptSync` で32byte鍵を導出するため、base64でもhexでもよい)。
+
+登録漏れは `Validate inputs` ステップが**名前を挙げて**止める (すべての不足を
+1回で報告するので、1つずつ再実行する必要はない)。
+
+#### 誤操作を防ぎたい場合
+
+`PRODUCTION` Environment に **Required reviewers** を設定すると、本番デプロイの前に
+承認ステップが入る。検証用の `RAILWAY` には影響しない。
 
 ### 3. フロントエンドのURLを決める
 
@@ -77,6 +106,25 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
    置き続けないため
 4. **LINE Developers のコールバックURLを本番ドメインに登録する**
 5. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
+6. **バックアップの対象を本番に切り替える** — 下記
+
+### 5-2. バックアップの対象を切り替える (忘れやすい)
+
+`backup-db.yml` (日次) と `restore-drill.yml` (月次) は、**リポジトリ変数
+`BACKUP_TARGET`** で対象を決める。未設定だと検証環境のDBをバックアップし続け、
+**本番のDBは一度もバックアップされない**。
+
+**Settings > Secrets and variables > Actions > Variables** タブで:
+
+| Variable | 値 |
+|---|---|
+| `BACKUP_TARGET` | `production` |
+
+切り替えたら `backup-db.yml` を手動実行し、ログの「対象: production」と
+artifactのサイズを確認する。
+
+> 定期実行 (schedule) には実行時の入力を渡せないため、`deploy.yml` の `target` 入力
+> とは別に永続的な変数で切り替える。
 
 ### 6. 動作確認
 
@@ -95,7 +143,7 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 | 外形監視の契約 | `/health` はレート制限の対象外 |
 | ログドレインの契約 | 定期ジョブの結果が全てログに出る |
 | Sentryアラートルール | `SENTRY_DSN` 設定後 |
-| バックアップの確認 | `.github/workflows/backup-db.yml` / `restore-drill.yml` |
+| バックアップの確認 | 手順5-2で `BACKUP_TARGET=production` にした上で1回手動実行する |
 | 代理店連携の有効化 | APIキー発行 + `ENABLE_AGENCY_REFERRAL_SYNC=true` (`docs/agency-integration.md`) |
 | 匿名化の有効化 | 法務の回答後 (`docs/account-anonymization.md`)。**既定OFFなので何も消えない** |
 

@@ -43,6 +43,11 @@
 - `deploy.yml`と同じくRailway CLI経由でその場で本番PostgreSQLの接続情報を取得するため、
   **新しいシークレットは追加していない** (`deploy.yml`が既に使っている
   `RAILWAY_API_TOKEN`/`RAILWAY_PROJECT_ID`をそのまま再利用する)。
+
+  対象の環境はリポジトリ変数 `BACKUP_TARGET` で決まる (`production` なら
+  `PRODUCTION` Environment、未設定なら検証用の `RAILWAY` Environment)。
+  **本番稼働を始めたら `production` に変えること。** 変えるまで本番のDBは
+  バックアップされない (`docs/runbooks/production-launch.md` 手順5-2)。
 - 取得したバックアップはGitHub Actionsのartifact (30日保持) としてアップロードする。
   これによりアプリ本体と同じコンテナ/ディスクに保存する状態は解消されるが、
   **恒久的なオブジェクトストレージ(S3等)への保存ではない** (下記残作業2.参照)。
