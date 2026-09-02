@@ -210,7 +210,7 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 | `SEED_ADMIN_PASSWORD` | 初期SUPER_ADMINのパスワード (任意の強いパスワード) |
 
 これらは `RAILWAY` という **GitHub Environment** に登録されている。本番環境は
-`PRODUCTION` という別のEnvironmentに**同じ名前で別の値**を登録し、ワークフローの
+`Production` という別のEnvironmentに**同じ名前で別の値**を登録し、ワークフローの
 `target` 入力で切り替える (`docs/runbooks/production-launch.md`)。
 
 #### 実行フロー

@@ -28,7 +28,7 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 **ワークフローに自動作成させない。** 再実行のたびに本番プロジェクトが増えるのを防ぐため、
 `target=production` では既存プロジェクトIDを必須にしてある。
 
-### 2. `PRODUCTION` という GitHub Environment を作る
+### 2. `Production` という GitHub Environment を作る
 
 検証用のSecretは `RAILWAY` という **GitHub Environment** に入っている
 (Settings > Environments > RAILWAY)。本番のSecretを**同じEnvironmentに入れてはいけない**。
@@ -39,8 +39,12 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 そこで**もう1つEnvironmentを作る**。Secret名は検証用とまったく同じで、値だけが違う。
 ワークフローは `target` に応じて参照するEnvironmentを切り替える。
 
-**Settings > Environments > New environment** で `PRODUCTION` という名前で作成し、
+**Settings > Environments > New environment** で `Production` という名前で作成し、
 `Environment secrets` に以下を登録する。
+
+> 名前は**ワークフローの記述と完全に一致させる**こと (`Production`)。
+> 変えたい場合は `deploy.yml` / `backup-db.yml` / `restore-drill.yml` の
+> `environment:` 式も同時に直す。
 
 | Secret | 内容 |
 |---|---|
@@ -67,7 +71,7 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 
 #### 誤操作を防ぎたい場合
 
-`PRODUCTION` Environment に **Required reviewers** を設定すると、本番デプロイの前に
+`Production` Environment に **Required reviewers** を設定すると、本番デプロイの前に
 承認ステップが入る。検証用の `RAILWAY` には影響しない。
 
 ### 3. フロントエンドのURLを決める
@@ -114,7 +118,8 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 `BACKUP_TARGET`** で対象を決める。未設定だと検証環境のDBをバックアップし続け、
 **本番のDBは一度もバックアップされない**。
 
-**Settings > Secrets and variables > Actions > Variables** タブで:
+**Settings > Secrets and variables > Actions** の **Variables** タブで登録する
+(Environment側の `Environment variables` ではなく、**リポジトリ変数**):
 
 | Variable | 値 |
 |---|---|

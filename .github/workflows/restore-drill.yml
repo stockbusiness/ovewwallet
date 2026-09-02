@@ -22,11 +22,11 @@ jobs:
     # 訓練対象にし続け、本番のDBは対象外のままになる。
     # 定期実行 (schedule) には入力を渡せないため、実行のたびに選ぶ deploy.yml とは
     # 違って永続的な変数で切り替える。
-    environment: ${{ vars.BACKUP_TARGET == 'production' && 'PRODUCTION' || 'RAILWAY' }}
+    environment: ${{ vars.BACKUP_TARGET == 'production' && 'Production' || 'RAILWAY' }}
     steps:
       - uses: actions/checkout@v4
 
-      # BACKUP_TARGET が production でも PRODUCTION Environment が未整備だと
+      # BACKUP_TARGET が production でも Production Environment が未整備だと
       # RAILWAY_PROJECT_ID が空になり、`railway link` が分かりにくいエラーで落ちる。
       # どのDBを対象にしているかを毎回ログに残し、未設定なら理由を名指しして止める。
       - name: Confirm target
@@ -35,7 +35,7 @@ jobs:
         run: |
           set -e
           TARGET="${{ vars.BACKUP_TARGET || 'staging' }}"
-          echo "対象: $TARGET (GitHub Environment=${{ vars.BACKUP_TARGET == 'production' && 'PRODUCTION' || 'RAILWAY' }})"
+          echo "対象: $TARGET (GitHub Environment=${{ vars.BACKUP_TARGET == 'production' && 'Production' || 'RAILWAY' }})"
           if [ -z "$RAILWAY_PROJECT_ID" ]; then
             echo "::error::RAILWAY_PROJECT_ID が空です。対象EnvironmentにSecretが登録されていません。"
             echo "docs/runbooks/production-launch.md の手順を確認してください。"

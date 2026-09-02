@@ -40,7 +40,7 @@ jobs:
     # SESSION_SECRET と ENCRYPTION_KEY が検証用と同じ値になり、検証環境の値が
     # 漏れたとき本番のセッションと暗号化データまで影響が及ぶ。Environmentを
     # 分ければSecret名は同じまま値だけが変わる (docs/runbooks/production-launch.md)。
-    environment: ${{ inputs.target == 'production' && 'PRODUCTION' || 'RAILWAY' }}
+    environment: ${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}
     outputs:
       api_url: ${{ steps.domain.outputs.api_url }}
     steps:
@@ -50,7 +50,7 @@ jobs:
       # 未指定のままデプロイすると、CORS設定を更新する後段のジョブに辿り着く前に
       # APIが起動時エラーで落ちるため、ここで先に止めて理由を示す。
       #
-      # Secretの有無もここで確かめる。PRODUCTION Environment が未作成のまま実行すると
+      # Secretの有無もここで確かめる。Production Environment が未作成のまま実行すると
       # GitHubが空のEnvironmentを自動生成し、`railway whoami` が認証エラーで落ちる等の
       # 分かりにくい失敗になるため、原因を名指しして止める。
       - name: Validate inputs
@@ -63,7 +63,7 @@ jobs:
         run: |
           set -e
           echo "target=${{ inputs.target }}"
-          echo "GitHub Environment=${{ inputs.target == 'production' && 'PRODUCTION' || 'RAILWAY' }}"
+          echo "GitHub Environment=${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}"
 
           if [ "${{ inputs.target }}" != "production" ]; then
             exit 0
@@ -78,7 +78,7 @@ jobs:
             FAILED=true
           fi
 
-          # RAILWAY_PROJECT_ID は Environment ごとに別の値。PRODUCTION Environment には
+          # RAILWAY_PROJECT_ID は Environment ごとに別の値。Production Environment には
           # 本番用プロジェクトのIDを入れる (検証用プロジェクトを指さないこと)。
           REQUIRED="RAILWAY_API_TOKEN RAILWAY_PROJECT_ID SESSION_SECRET ENCRYPTION_KEY"
           if [ "${{ inputs.run_seed_on_boot }}" = "true" ]; then
@@ -86,14 +86,14 @@ jobs:
           fi
           for NAME in $REQUIRED; do
             if [ -z "$(printenv "$NAME" || true)" ]; then
-              echo "::error::production では Secret $NAME が必須ですが、PRODUCTION Environment に登録されていません。"
+              echo "::error::production では Secret $NAME が必須ですが、Production Environment に登録されていません。"
               FAILED=true
             fi
           done
 
           if [ "$FAILED" = "true" ]; then
             echo "--------------------------------------------------------------"
-            echo "Settings > Environments > PRODUCTION に Secret を登録してください。"
+            echo "Settings > Environments > Production に Secret を登録してください。"
             echo "手順は docs/runbooks/production-launch.md にあります。"
             echo "SESSION_SECRET と ENCRYPTION_KEY は検証用 (RAILWAY Environment) と"
             echo "**別の値**にしてください。"
@@ -117,7 +117,7 @@ jobs:
           # 本番と検証は**別のRailwayプロジェクト**を使う。同じDBを共有すると、検証中に
           # 作られたアカウント・取引が本番の会計数値に混ざる (ove_transactions は
           # DBトリガーで削除できないため、後から取り除けない)。
-          # 別プロジェクトを指すのは、Environment (RAILWAY / PRODUCTION) ごとに
+          # 別プロジェクトを指すのは、Environment (RAILWAY / Production) ごとに
           # RAILWAY_PROJECT_ID の値が違うため。ここでの分岐は不要。
           PROJECT_ID="${{ secrets.RAILWAY_PROJECT_ID }}"
 
@@ -131,7 +131,7 @@ jobs:
             echo "=================================================================="
             echo "重要: 上記JSONに含まれるプロジェクトIDを、GitHub Secretsの"
             echo "RAILWAY Environment に RAILWAY_PROJECT_ID として登録してください"
-            echo "(本番用は PRODUCTION Environment 側なので、間違えないこと)。"
+            echo "(本番用は Production Environment 側なので、間違えないこと)。"
             echo "次回以降の実行で同じプロジェクトを再利用するために必要です。"
             echo "=================================================================="
           fi
@@ -339,7 +339,7 @@ jobs:
     if: ${{ inputs.app_url != '' && inputs.admin_url != '' }}
     runs-on: ubuntu-latest
     # 1つ目のジョブと同じEnvironment (同じSecret群) を使う
-    environment: ${{ inputs.target == 'production' && 'PRODUCTION' || 'RAILWAY' }}
+    environment: ${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}
     steps:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
