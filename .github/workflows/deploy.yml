@@ -1,15 +1,23 @@
 name: Deploy (Railway API)
 
-# 手動実行のみ。このセッション(サンドボックス)のネットワークポリシーが
-# backboard.railway.com への直接アクセスを禁止しているため、
-# 実際のデプロイ操作はGitHub Actionsのランナー上で行う。
+# 検証環境(staging)は claude/ove-wallet-platform への push で自動デプロイし、
+# 本番(production)は workflow_dispatch による手動実行のみとする。
+# 本番を手動のままにしているのは、apps/api/docker-entrypoint.sh がコンテナ起動時に
+# `prisma migrate deploy` を実行するため、マージがそのままDBマイグレーションの実行に
+# なるからで、まず検証環境で同じマイグレーションを通してから本番へ入れられるようにする。
 #
-# フロントエンド(user-wallet/admin-wallet)は、Vercel CLIによるCLIデプロイが
-# pnpmモノレポとの相性問題(依存関係トレース失敗、アップロード範囲の制限等)を
-# 繰り返し起こしたため、Vercelダッシュボードの「GitHubリポジトリのインポート」
-# 機能によるGit連携デプロイに切り替えた(docs/deployment.md参照)。そのため
-# このワークフローはAPIのみをデプロイする。フロントエンドのURLが決まったら
-# 下記app_url/admin_urlを指定して再実行し、APIのCORS設定を更新する。
+# 自動実行されるのはAPIのビルドに関わるパスが変わったときだけ (下記 paths)。
+# フロントエンド(user-wallet/admin-wallet)だけの変更でAPIコンテナを再起動しても
+# 意味がなく、短時間とはいえ無用な断が生じるため対象から外している。
+# フロントエンドはVercelのGit連携で自動デプロイされる (docs/deployment.md参照)。
+#
+# 手動実行では app_url / admin_url を指定してAPIのCORS設定を更新できる。
+# 自動実行では両者とも空になり、Railway側の既存値をそのまま残す
+# (URLは初回デプロイで設定済みで、以後変わらないため)。
+#
+# なおデプロイ操作をGitHub Actionsのランナー上で行っているのは、開発コンテナの
+# ネットワークポリシーが backboard.railway.com への直接アクセスを禁止しており、
+# セッション内から railway CLI を実行できないため (docs/deployment.md)。
 on:
   workflow_dispatch:
     inputs:
@@ -32,15 +40,105 @@ on:
         description: "起動のたびにseedを実行するか。本番は初回のみtrue、以後falseを推奨"
         type: boolean
         default: true
+  push:
+    branches:
+      - claude/ove-wallet-platform
+    paths:
+      - "apps/api/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.base.json"
+      - "railway.json"
+      - ".github/workflows/deploy.yml"
+
+# デプロイ同士が重ならないようにする。同じRailwayサービスに対して
+# `railway variable set` と `railway up` が交互に走ると、後から始まった実行の
+# 変数設定が先の実行のデプロイに紛れ込む。デプロイ先ごとに直列化する。
+# 進行中のデプロイは打ち切らない (cancel-in-progress: false)。
+# マイグレーションの途中でジョブを止めると、DBが中途半端な状態のまま残るため。
+concurrency:
+  group: deploy-api-${{ inputs.target || 'staging' }}
+  cancel-in-progress: false
 
 jobs:
+  # 自動デプロイのときだけ、同じコミットに対するCI(test)の成功を待つ。
+  # ci.yml も claude/ove-wallet-platform への push で走るため、待たずに進めると
+  # テストが落ちるコミットでも20分近いRailwayのビルドが走り、
+  # docker-entrypoint.sh の `prisma migrate deploy` まで到達してしまう。
+  #
+  # 手動実行(workflow_dispatch)では待たない。手動実行は「CIの結果に関わらず
+  # 今すぐ入れ直したい」障害対応で使う経路なので、ここで塞ぐと復旧の妨げになる。
+  wait-for-ci:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Wait for the CI workflow to succeed on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          # 同じ head_sha に対する CI ワークフローの実行を探す。
+          #   missing : まだ実行が登録されていない (pushの直後に起こりうる)
+          #   running : 実行中
+          #   それ以外: conclusion (success / failure / cancelled ...)
+          for i in $(seq 1 40); do
+            # APIの一時的な失敗でデプロイを止めないよう、失敗は missing 扱いにして
+            # 再試行に回す (`if !` にすることで set -e の即時終了も避ける)。
+            if ! STATE=$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&event=push" \
+              --jq '[.workflow_runs[] | select(.name == "CI")] | .[0]
+                    | if . == null then "missing"
+                      elif .status != "completed" then "running"
+                      else .conclusion end'); then
+              STATE="missing"
+            fi
+
+            case "$STATE" in
+              success)
+                echo "CIが成功しました (試行 $i)"
+                exit 0
+                ;;
+              missing|running)
+                echo "試行 $i: CIの状態は $STATE です。30秒待って再確認します"
+                sleep 30
+                ;;
+              *)
+                echo "::error::このコミットのCIが $STATE で終了したため、デプロイを中止しました。"
+                echo "CIを直してから再度pushするか、緊急時は Actions から手動実行してください"
+                echo "(手動実行はこの待ち合わせを行いません)。"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "::error::20分待ってもCIが完了しませんでした。デプロイを中止します。"
+          exit 1
+
   deploy-api:
+    # wait-for-ci は手動実行ではスキップされる。needs だけを書くと、
+    # スキップされた依存を持つジョブもスキップされてしまうため、
+    # always() を挟んで「成功 または スキップ」を明示的に許可する。
+    needs: [wait-for-ci]
+    if: ${{ always() && (needs.wait-for-ci.result == 'success' || needs.wait-for-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     # 本番と検証で**別のGitHub Environment**を使う。同じEnvironmentを共有すると
     # SESSION_SECRET と ENCRYPTION_KEY が検証用と同じ値になり、検証環境の値が
     # 漏れたとき本番のセッションと暗号化データまで影響が及ぶ。Environmentを
     # 分ければSecret名は同じまま値だけが変わる (docs/runbooks/production-launch.md)。
     environment: ${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}
+    # push で起動したときは inputs が空になるため、ここで既定値を確定させる。
+    # 以降のステップは inputs ではなくこの env を参照する。
+    #   TARGET            : push は必ず staging (本番は手動実行のみ)
+    #   RUN_SEED_ON_BOOT  : push では false。seedは初回デプロイで済んでおり、
+    #                       毎マージのたびに走らせる必要がない
+    env:
+      TARGET: ${{ inputs.target || 'staging' }}
+      RUN_SEED_ON_BOOT: ${{ github.event_name == 'workflow_dispatch' && inputs.run_seed_on_boot || false }}
     outputs:
       api_url: ${{ steps.domain.outputs.api_url }}
     steps:
@@ -62,10 +160,11 @@ jobs:
           SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
         run: |
           set -e
-          echo "target=${{ inputs.target }}"
+          echo "event=${{ github.event_name }}"
+          echo "target=$TARGET"
           echo "GitHub Environment=${{ inputs.target == 'production' && 'Production' || 'RAILWAY' }}"
 
-          if [ "${{ inputs.target }}" != "production" ]; then
+          if [ "$TARGET" != "production" ]; then
             exit 0
           fi
 
@@ -81,7 +180,7 @@ jobs:
           # RAILWAY_PROJECT_ID は Environment ごとに別の値。Production Environment には
           # 本番用プロジェクトのIDを入れる (検証用プロジェクトを指さないこと)。
           REQUIRED="RAILWAY_API_TOKEN RAILWAY_PROJECT_ID SESSION_SECRET ENCRYPTION_KEY"
-          if [ "${{ inputs.run_seed_on_boot }}" = "true" ]; then
+          if [ "$RUN_SEED_ON_BOOT" = "true" ]; then
             REQUIRED="$REQUIRED SEED_ADMIN_PASSWORD"
           fi
           for NAME in $REQUIRED; do
@@ -315,7 +414,7 @@ jobs:
           # 起動のたびにseedを走らせるか。本番は初回だけtrueにし、初期管理者を作ったら
           # falseへ戻すことを推奨する (SEED_ADMIN_PASSWORDを環境変数に置き続けない、
           # 意図せぬ再作成を避ける、起動時間を伸ばさない、の3点のため)。
-          railway variable set "RUN_SEED_ON_BOOT=${{ inputs.run_seed_on_boot }}" --service api --skip-deploys --json
+          railway variable set "RUN_SEED_ON_BOOT=$RUN_SEED_ON_BOOT" --service api --skip-deploys --json
           # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認済み。
           # LINE_CHANNEL_IDと合わせてLineIdTokenVerifierが使われる (docs/authentication.md)。
           railway variable set "AUTH_MODE=production" --service api --skip-deploys --json
@@ -327,7 +426,7 @@ jobs:
           #   - 千ノ国パスポートSSOのモック発行エンドポイントが404になる
           #   - メールOTPの devCode を応答に含めなくなる
           # stagingではこれらが素通りするため、検証用デプロイは staging のままにする。
-          if [ "${{ inputs.target }}" = "production" ]; then
+          if [ "$TARGET" = "production" ]; then
             railway variable set "NODE_ENV=production" --service api --skip-deploys --json
           else
             railway variable set "NODE_ENV=staging" --service api --skip-deploys --json
