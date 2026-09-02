@@ -104,6 +104,51 @@ GitHubのSecretは登録後に値を読み出せないため、検証用の値�
 独自ドメインを使う場合はDNSとVercel側の設定を先に済ませ、確定したURLを渡す。
 暫定的にVercelの本番URLで開始することもできる (後から再実行して差し替え可能)。
 
+**Vercelの本番URLはAPIより先に決まっている**ので、順番で詰まることはない。
+Vercelダッシュボードで各プロジェクトの Production Deployment のURLを控える
+(`https://<project>.vercel.app` 形式)。
+
+### 3-2. フロントエンド側の環境変数 (Vercel)
+
+APIを立てただけではフロントエンドは本番APIを見ない。**Vercel側の設定が必要**で、
+これが漏れると画面は表示されるのにログインできない、という分かりにくい形で失敗する。
+
+Vercelの各プロジェクト > **Settings > Environment Variables** で、
+**Environment に `Production` を選んで**登録する
+(`Preview` と分けておけば、PRのプレビューは検証用APIを向いたまま残せる)。
+
+| プロジェクト | 変数 | 値 |
+|---|---|---|
+| user-wallet | `NEXT_PUBLIC_API_URL` | 手順4で発行される**本番APIのURL** |
+| user-wallet | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID (`2010749243-Zu7AV5nR`。`docs/roadmap.md` P0-3.6) |
+| admin-wallet | `NEXT_PUBLIC_API_URL` | 同上 |
+
+> **`NEXT_PUBLIC_*` はビルド時に埋め込まれる。** 値を変えたら**再デプロイが必要**で、
+> 環境変数を保存しただけでは反映されない。
+
+既存のVercelプロジェクトをそのまま使う場合、**いまの検証用フロントエンドが
+本番フロントエンドになる**。検証用APIを画面から触りたければ、`Preview` スコープに
+検証用APIのURLを残しておけばPRプレビューから引き続き使える。完全に分けたい場合は
+Vercelプロジェクトを別に作る (その場合は `app_url`/`admin_url` にも新しい方のURLを渡す)。
+
+#### `NEXT_PUBLIC_LINE_LIFF_ID` が未設定だとログインできない
+
+未設定の場合、`apps/user-wallet/src/lib/liff.ts` の `isLiffConfigured()` が false を返し、
+ログイン画面は**モック実装** (`mock.<疑似ID>` を送信) に切り替わる
+(`docs/authentication.md`)。一方 本番APIは `AUTH_MODE=production` で
+`LineIdTokenVerifier` が実チャネルのIDトークンを検証するため、モックのトークンは
+必ず拒否される。**稼働開始時点で使えるログイン方法はLINEのみ**なので、
+これは「誰もログインできない」状態になる。
+
+`NEXT_PUBLIC_API_URL` の順序だけは、APIのURLが手順4で初めて発行されるため後追いになる。
+手順4を実行してAPIのURLを得てから設定し、Vercelで再デプロイすればよい。
+
+#### LINE Developers 側
+
+LIFFアプリの **Endpoint URL** が本番のuser-walletの `/login` を指しているか確認する。
+Vercelの既存URLをそのまま使うなら変更不要。**独自ドメインに変えた場合は要更新**
+(Endpoint URL以外のリダイレクト先を渡すとトークン交換が失敗する、`docs/authentication.md`)。
+
 ### 4. デプロイする
 
 GitHub Actions → **Deploy (Railway API)** → Run workflow
@@ -126,9 +171,11 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 3. **`run_seed_on_boot` を `false` にして再実行する**
    起動のたびにseedを走らせる必要はなく、`SEED_ADMIN_PASSWORD` を環境変数に
    置き続けないため
-4. **LINE Developers のコールバックURLを本番ドメインに登録する**
-5. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
-6. **バックアップの対象を本番に切り替える** — 下記
+4. **Vercelに `NEXT_PUBLIC_API_URL` を設定して再デプロイする** (手順3-2)
+   本番APIのURLは手順4のログに出る。設定しないとフロントは検証用APIを向いたまま
+5. **LINE Developers のコールバックURLを本番ドメインに登録する** (手順3-2)
+6. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
+7. **バックアップの対象を本番に切り替える** — 下記
 
 ### 5-2. バックアップの対象を切り替える (忘れやすい)
 
@@ -156,6 +203,7 @@ artifactのサイズを確認する。
 | `GET /health` | 200 |
 | `GET /api/v1/auth/methods` | `{"line":true,"email":false,"sengoku_passport":false,"agency":false}` |
 | ログイン画面 | LINEボタンのみ表示される |
+| LINEログイン | 実際にLINEへ遷移して戻り、ウォレット画面が表示される (モックに落ちていない) |
 | `POST /api/v1/auth/sso/sengoku/dev-issue` | 404 (本番で無効) |
 | 起動ログ | 7つの定期ジョブが登録されている (`docs/runbooks/scheduled-jobs.md`) |
 
