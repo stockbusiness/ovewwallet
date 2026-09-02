@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { prisma } from "@ove/database";
 import { createTestAdmin, disconnect } from "../support/seed";
 import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
+import { toDisplayCode } from "../support/display-code";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
@@ -50,7 +51,7 @@ test.describe("代理店紹介トークン受け入れ: /invite/{token} → LINE
     await adminPage.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 
     await adminPage.goto(`${ADMIN_URL}/wallet-referrals`);
-    const row = adminPage.locator("tr", { hasText: account.accountCode });
+    const row = adminPage.locator("tr", { hasText: toDisplayCode(account.accountCode) });
     await expect(row).toBeVisible({ timeout: NAV_TIMEOUT_SHORT });
     await expect(row).toContainText("登録済み・確認待ち");
     await expect(row).toContainText("3,000 ORI (PENDING)");

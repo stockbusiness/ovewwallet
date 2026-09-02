@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiFetch, ApiError, type CollectibleHoldingItem, type CollectibleHoldingStatus } from "@/lib/api";
+import { toDisplayCode, toStoredCode } from "@ove/shared-ui";
 
 const STATUS_OPTIONS: Array<CollectibleHoldingStatus | ""> = [
   "",
@@ -36,7 +37,7 @@ export default function CollectibleHoldingsPage() {
     try {
       const params = new URLSearchParams();
       if (commonUserId) params.set("common_user_id", commonUserId);
-      if (accountCode) params.set("account_code", accountCode);
+      if (accountCode) params.set("account_code", toStoredCode(accountCode));
       if (entitlementId) params.set("entitlement_id", entitlementId);
       if (orderId) params.set("order_id", orderId);
       if (productCode) params.set("product_code", productCode);
@@ -138,7 +139,7 @@ export default function CollectibleHoldingsPage() {
             {items.map((h) => (
               <tr key={h.id} className="border-t border-sengoku-border">
                 <td className="p-3">{h.asset.name}</td>
-                <td className="p-3 font-mono text-xs">{h.account?.accountCode ?? h.oveAccountId}</td>
+                <td className="p-3 font-mono text-xs">{toDisplayCode(h.account?.accountCode) ?? h.oveAccountId}</td>
                 <td className="p-3 font-mono text-xs">{h.entitlementId}</td>
                 <td className="p-3">{new Date(h.acquiredAt).toLocaleString("ja-JP")}</td>
                 <td className="p-3">

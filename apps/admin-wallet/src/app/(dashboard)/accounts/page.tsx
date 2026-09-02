@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, ApiError, API_BASE_URL, type AccountListItem } from "@/lib/api";
+import { toDisplayCode, toStoredCode } from "@ove/shared-ui";
 
 const STATUS_OPTIONS = [
   { value: "", label: "すべて" },
@@ -39,7 +40,7 @@ export default function AccountsPage() {
       try {
         const params = new URLSearchParams({ limit: "200" });
         if (status) params.set("status", status);
-        if (appliedSearch) params.set("search", appliedSearch);
+        if (appliedSearch) params.set("search", toStoredCode(appliedSearch));
         const list = await apiFetch<AccountListItem[]>(`/api/v1/admin/accounts?${params.toString()}`);
         // 入力を続けている間に古いリクエストが後から届いて上書きするのを防ぐ。
         if (cancelled) return;
@@ -68,7 +69,7 @@ export default function AccountsPage() {
       // 画面に出ている絞り込みと同じ条件でCSVを出す (表示とCSVの内容がずれないように)。
       const params = new URLSearchParams();
       if (status) params.set("status", status);
-      if (appliedSearch) params.set("search", appliedSearch);
+      if (appliedSearch) params.set("search", toStoredCode(appliedSearch));
       const query = params.toString() ? `?${params.toString()}` : "";
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/accounts/export${query}`, { credentials: "include" });
       if (!res.ok) throw new Error("failed");
@@ -162,7 +163,7 @@ export default function AccountsPage() {
               <tr key={a.id} className="border-t border-sengoku-border">
                 <td className="p-3">
                   <Link href={`/accounts/${a.id}`} className="text-sengoku-gold underline">
-                    {a.accountCode}
+                    {toDisplayCode(a.accountCode)}
                   </Link>
                 </td>
                 <td className="p-3">{a.status}</td>

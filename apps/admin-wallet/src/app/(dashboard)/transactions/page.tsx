@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError, type TransactionItem } from "@/lib/api";
+import { toStoredCode } from "@ove/shared-ui";
 
 const STATUS_OPTIONS = ["", "COMPLETED", "HELD", "REVERSED", "FAILED"];
 const DIRECTION_OPTIONS = ["", "CREDIT", "DEBIT"];
@@ -49,7 +50,7 @@ export default function TransactionsPage() {
   const load = useCallback(async () => {
     try {
       const params = new URLSearchParams();
-      if (accountCode) params.set("accountCode", accountCode);
+      if (accountCode) params.set("accountCode", toStoredCode(accountCode));
       if (status) params.set("status", status);
       if (direction) params.set("direction", direction);
       if (transactionType) params.set("transactionType", transactionType);
@@ -93,7 +94,7 @@ export default function TransactionsPage() {
             <input
               value={accountCode}
               onChange={(e) => setAccountCode(e.target.value)}
-              placeholder="OVE-ACC-00000001"
+              placeholder="ORI-ACC-00000001"
               className="mt-1 block w-48 rounded-md border border-sengoku-border px-2 py-1 text-sm"
             />
           </label>

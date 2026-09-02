@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import AgencyLinkActions from "@/components/agency/AgencyLinkActions";
 import HelpPanel from "@/components/HelpPanel";
 import { apiFetch, ApiError, type AdminMe, type AgencyLinkItem } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 const STATUS_LABEL: Record<AgencyLinkItem["status"], string> = {
   PENDING: "未紐付け(同期のみ)",
@@ -93,7 +94,7 @@ export default function AgencyLinksPage() {
             <p>
               代理店SSOがまだ使えない場合や、その担当者がLINEログインで先にウォレットを作ってしまった場合、
               「未紐付け」のままではその人宛のORI付与が届きません。「詳細」を開き、ORIアカウントのコード
-              (OVE-ACC-…) と理由を入れて「紐付ける」を押すと解消できます。
+              (ORI-ACC-…) と理由を入れて「紐付ける」を押すと解消できます。
               <strong className="text-sengoku-gold-soft">付与の宛先そのものを決める操作</strong>なので、
               本人のアカウントであることを必ず確認してください。誰がいつ何をなぜ変えたかは監査ログに残ります。
             </p>
@@ -145,7 +146,7 @@ export default function AgencyLinksPage() {
                     <span className={STATUS_CLASS[item.status]}>{STATUS_LABEL[item.status]}</span>
                   </td>
                   <td className="p-3">
-                    {item.account ? `${item.account.accountCode} (${item.account.displayName ?? "-"})` : "-"}
+                    {item.account ? `${toDisplayCode(item.account.accountCode)} (${item.account.displayName ?? "-"})` : "-"}
                   </td>
                   <td className="p-3">{metaString(item.metadata, "name")}</td>
                   <td className="p-3">{metaString(item.metadata, "contactEmail")}</td>

@@ -1,6 +1,6 @@
 "use client";
 
-import { TransactionItem, GiftIcon, CartIcon, StatusBadge } from "@ove/shared-ui";
+import { TransactionItem, GiftIcon, CartIcon, StatusBadge, toDisplayCode } from "@ove/shared-ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { RankDistribution } from "./RankDistribution";
@@ -152,7 +152,7 @@ export default function DashboardPage() {
                     <tbody>
                       {reconciliation.mismatched.map((m) => (
                         <tr key={m.walletId} className="border-t border-sengoku-border">
-                          <td className="py-1.5 text-sengoku-text">{m.walletCode}</td>
+                          <td className="py-1.5 text-sengoku-text">{toDisplayCode(m.walletCode)}</td>
                           <td className="py-1.5 text-sengoku-muted">{m.computedBalance}</td>
                           <td className="py-1.5 text-sengoku-muted">{m.cachedBalance}</td>
                           <td className="py-1.5 font-semibold text-sengoku-red">{m.difference}</td>

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, ApiError, type ApprovalRequestItem, type MigrationSummary } from "@/lib/api";
+import { toDisplayCode } from "@ove/shared-ui";
 
 const KIND_LABEL: Record<string, string> = {
   HIGH_VALUE_GRANT: "高額付与",
@@ -13,7 +14,7 @@ const KIND_LABEL: Record<string, string> = {
 
 function formatDetail(r: ApprovalRequestItem): string {
   if (r.payload.kind === "ACCOUNT_MERGE") {
-    return `${r.payload.sourceAccountCode} → ${r.payload.targetAccountCode}`;
+    return `${toDisplayCode(r.payload.sourceAccountCode)} → ${toDisplayCode(r.payload.targetAccountCode)}`;
   }
   if (r.payload.kind === "MIGRATION_EXECUTION") {
     return `${r.payload.batchName} (${r.payload.fileName})`;
