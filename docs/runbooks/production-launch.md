@@ -108,6 +108,32 @@ GitHubのSecretは登録後に値を読み出せないため、検証用の値�
 Vercelダッシュボードで各プロジェクトの Production Deployment のURLを控える
 (`https://<project>.vercel.app` 形式)。
 
+#### 独自ドメイン (`sennokuni-wallet.com`) の割り当て
+
+| ホスト | 向き先 | 設定場所 |
+|---|---|---|
+| `sennokuni-wallet.com` | Vercel `ovewwallet-user-wallet` | Vercel > Settings > Domains |
+| `admin.sennokuni-wallet.com` | Vercel `ovewwallet-admin-wallet` | 同上 |
+| `api.sennokuni-wallet.com` | Railway の `api` サービス | Railway > api > Settings > Networking |
+
+ドメイン名自体が「wallet」なので、利用者向けは `wallet.` を足さず**apex (裸ドメイン)** を
+使う。`www` は apex へリダイレクトさせておく (Vercelが設定を案内する)。
+
+APIをサブドメインにするのは **admin-wallet のCookieを同一サイトにする**ため。
+user-wallet は `next.config.mjs` の `rewrites()` で `/api/*` を同一オリジンに
+見せかけて転送するのでAPIのホスト名はブラウザから見えないが、**admin-wallet には
+この仕組みがなく** `NEXT_PUBLIC_API_URL` を絶対URLとして直接呼ぶ
+(`apps/admin-wallet/src/lib/api.ts`)。Railwayの `*.up.railway.app` のままでも
+稼働はできるが、クロスサイトCookie (`SameSite=None`) に依存し続けることになる。
+
+そのため各URLは次の値になる。
+
+| 入力 / 変数 | 値 |
+|---|---|
+| `app_url` | `https://sennokuni-wallet.com` |
+| `admin_url` | `https://admin.sennokuni-wallet.com` |
+| `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+
 ### 3-2. フロントエンド側の環境変数 (Vercel)
 
 APIを立てただけではフロントエンドは本番APIを見ない。**Vercel側の設定が必要**で、
@@ -117,11 +143,17 @@ Vercelの各プロジェクト > **Settings > Environment Variables** で、
 **Environment に `Production` を選んで**登録する
 (`Preview` と分けておけば、PRのプレビューは検証用APIを向いたまま残せる)。
 
+対象プロジェクトは **`ovewwallet-user-wallet`** と **`ovewwallet-admin-wallet`** の2つ。
+Vercelには `user-wallet` / `admin-wallet` という**Git連携の切れた古いプロジェクト**も
+残っているので取り違えないこと。
+
 | プロジェクト | 変数 | 値 |
 |---|---|---|
-| user-wallet | `NEXT_PUBLIC_API_URL` | 手順4で発行される**本番APIのURL** |
-| user-wallet | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID (`2010749243-Zu7AV5nR`。`docs/roadmap.md` P0-3.6) |
-| admin-wallet | `NEXT_PUBLIC_API_URL` | 同上 |
+| `ovewwallet-user-wallet` | `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+| `ovewwallet-user-wallet` | `NEXT_PUBLIC_LINE_LIFF_ID` | LIFF ID (`2010749243-Zu7AV5nR`。`docs/roadmap.md` P0-3.6) |
+| `ovewwallet-admin-wallet` | `NEXT_PUBLIC_API_URL` | `https://api.sennokuni-wallet.com` |
+
+APIに独自ドメインを割り当てない場合は、手順4のログに出るRailwayのURLを使う。
 
 > **`NEXT_PUBLIC_*` はビルド時に埋め込まれる。** 値を変えたら**再デプロイが必要**で、
 > 環境変数を保存しただけでは反映されない。
@@ -140,14 +172,17 @@ Vercelプロジェクトを別に作る (その場合は `app_url`/`admin_url` �
 必ず拒否される。**稼働開始時点で使えるログイン方法はLINEのみ**なので、
 これは「誰もログインできない」状態になる。
 
-`NEXT_PUBLIC_API_URL` の順序だけは、APIのURLが手順4で初めて発行されるため後追いになる。
-手順4を実行してAPIのURLを得てから設定し、Vercelで再デプロイすればよい。
+`api.sennokuni-wallet.com` を先にRailwayへ割り当てておけば、APIのURLは手順4の前に
+確定するので後追いにならない。Railwayの発行URLを使う場合だけ、手順4を実行して
+URLを得てから設定し、Vercelで再デプロイする。
 
 #### LINE Developers 側
 
-LIFFアプリの **Endpoint URL** が本番のuser-walletの `/login` を指しているか確認する。
-Vercelの既存URLをそのまま使うなら変更不要。**独自ドメインに変えた場合は要更新**
-(Endpoint URL以外のリダイレクト先を渡すとトークン交換が失敗する、`docs/authentication.md`)。
+LIFFアプリの **Endpoint URL** を **`https://sennokuni-wallet.com/login`** に更新する。
+
+**ここを忘れるとLINEログインが失敗する。** Endpoint URL以外のリダイレクト先を渡すと
+トークン交換が落ちることを実チャネルで確認済み (`docs/authentication.md`)。
+LIFF SDKは登録済みのEndpoint URLをそのままOAuthの `redirect_uri` として使う。
 
 ### 4. デプロイする
 
@@ -156,8 +191,8 @@ GitHub Actions → **Deploy (Railway API)** → Run workflow
 | 入力 | 値 |
 |---|---|
 | `target` | `production` |
-| `app_url` | user-walletのURL |
-| `admin_url` | admin-walletのURL |
+| `app_url` | `https://sennokuni-wallet.com` |
+| `admin_url` | `https://admin.sennokuni-wallet.com` |
 | `run_seed_on_boot` | **初回は `true`** |
 
 ワークフローが PostgreSQL / Redis / api サービスを作り、環境変数を設定してデプロイし、
