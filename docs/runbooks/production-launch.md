@@ -1,0 +1,158 @@
+# 本番環境の立ち上げ手順
+
+検証用デプロイとは**別のRailwayプロジェクト**に本番環境を作る手順。
+
+## なぜ環境を分けるのか
+
+検証用デプロイのDBには、動作確認で作られたアカウント・取引が入っている。
+**`ove_transactions` はDBトリガーで削除できない** (設計どおり、`docs/database.md`)。
+同じDBを本番に使うと、ポイント負債レポート (`docs/point-liability.md`) の数字が
+最初から検証データを含み、後から取り除けない。
+
+## 前提: 稼働開始時点で使えるログイン方法
+
+**LINEログインのみ** (`docs/login-methods.md`)。
+
+- メールOTP: **送信基盤が未実装**。本番ではコードが誰にも届かない
+- 千ノ国パスポートSSO: 正式SSO (RS256/JWKS) が未完成
+- 代理店SSO: `SENGOKU_AI_SSO_*` 未接続
+
+デプロイワークフローがこれらを明示的に `false` に設定する。
+
+## 手順
+
+### 1. Railwayプロジェクトを作る
+
+Railwayのダッシュボードで新規プロジェクトを作成する (例: `ove-wallet-production`)。
+
+**ワークフローに自動作成させない。** 再実行のたびに本番プロジェクトが増えるのを防ぐため、
+`target=production` では既存プロジェクトIDを必須にしてある。
+
+### 2. `Production` という GitHub Environment を作る
+
+検証用のSecretは `RAILWAY` という **GitHub Environment** に入っている
+(Settings > Environments > RAILWAY)。本番のSecretを**同じEnvironmentに入れてはいけない**。
+1つのEnvironmentは1つの名前につき1つの値しか持てないため、同じ場所に入れると
+`SESSION_SECRET` と `ENCRYPTION_KEY` が検証用と同じ値になってしまう。
+検証環境の値が漏れたとき、本番のセッションと暗号化データまで影響が及ぶ。
+
+そこで**もう1つEnvironmentを作る**。Secret名は検証用とまったく同じで、値だけが違う。
+ワークフローは `target` に応じて参照するEnvironmentを切り替える。
+
+**Settings > Environments > New environment** で `Production` という名前で作成し、
+`Environment secrets` に以下を登録する。
+
+> 名前は**ワークフローの記述と完全に一致させる**こと (`Production`)。
+> 変えたい場合は `deploy.yml` / `backup-db.yml` / `restore-drill.yml` の
+> `environment:` 式も同時に直す。
+
+| Secret | 内容 |
+|---|---|
+| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (Railwayアカウント全体のトークンのため) |
+| `RAILWAY_PROJECT_ID` | **手順1で作った本番プロジェクトのID**。検証用プロジェクトを指さないこと |
+| `SESSION_SECRET` | `openssl rand -hex 32`。検証用と**別の値** |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32`。検証用と**別の値** |
+| `SEED_ADMIN_PASSWORD` | 初期管理者のパスワード。初回デプロイ後に変更する |
+| `SENTRY_DSN` | 未登録でもデプロイは通る (`initSentry()` が空なら何もしない) |
+
+`VERCEL_TOKEN` はこのワークフローでは使わない (フロントエンドはVercelのGit連携で
+デプロイする、`docs/deployment.md`)。
+
+> **`ENCRYPTION_KEY` を後から変えるときは、値の差し替えだけでは足りない。**
+> 管理者MFAシークレット等が旧鍵で暗号化されたまま復号できなくなる。
+> `pnpm --filter @ove/database rotate-encryption-key` で全件を再暗号化する手順が
+> 必要 (`docs/deployment.md`「ENCRYPTION_KEYのローテーション」)。
+> 稼働開始前に確定させておくほうが手間がない。
+>
+> 値の形式に制約はない (`scryptSync` で32byte鍵を導出するため、base64でもhexでもよい)。
+
+登録漏れは `Validate inputs` ステップが**名前を挙げて**止める (すべての不足を
+1回で報告するので、1つずつ再実行する必要はない)。
+
+#### 誤操作を防ぎたい場合
+
+`Production` Environment に **Required reviewers** を設定すると、本番デプロイの前に
+承認ステップが入る。検証用の `RAILWAY` には影響しない。
+
+### 3. フロントエンドのURLを決める
+
+`APP_URL` / `ADMIN_URL` は **CORSとCSRFの許可オリジンの唯一の入力**であり、
+`NODE_ENV=production` では未設定だと**起動時に失敗する**
+(`apps/api/src/common/assert-production-env.ts`)。
+
+そのためワークフローは `target=production` のとき両方を必須にしており、
+**デプロイ前に**設定する (後段のジョブでは初回起動に間に合わないため)。
+
+独自ドメインを使う場合はDNSとVercel側の設定を先に済ませ、確定したURLを渡す。
+暫定的にVercelの本番URLで開始することもできる (後から再実行して差し替え可能)。
+
+### 4. デプロイする
+
+GitHub Actions → **Deploy (Railway API)** → Run workflow
+
+| 入力 | 値 |
+|---|---|
+| `target` | `production` |
+| `app_url` | user-walletのURL |
+| `admin_url` | admin-walletのURL |
+| `run_seed_on_boot` | **初回は `true`** |
+
+ワークフローが PostgreSQL / Redis / api サービスを作り、環境変数を設定してデプロイし、
+`/health` が200を返すまで待つ。
+
+### 5. 初回デプロイ後にやること
+
+1. **初期管理者でログインし、パスワードを変更する**
+   (`SEED_ADMIN_PASSWORD` の値をそのまま使い続けない)
+2. **管理者MFAを有効化する** (`docs/authentication.md`「管理画面MFA」)
+3. **`run_seed_on_boot` を `false` にして再実行する**
+   起動のたびにseedを走らせる必要はなく、`SEED_ADMIN_PASSWORD` を環境変数に
+   置き続けないため
+4. **LINE Developers のコールバックURLを本番ドメインに登録する**
+5. **AIアート教室の案内先URLを設定する** (`docs/reward-landing-url.md`)
+6. **バックアップの対象を本番に切り替える** — 下記
+
+### 5-2. バックアップの対象を切り替える (忘れやすい)
+
+`backup-db.yml` (日次) と `restore-drill.yml` (月次) は、**リポジトリ変数
+`BACKUP_TARGET`** で対象を決める。未設定だと検証環境のDBをバックアップし続け、
+**本番のDBは一度もバックアップされない**。
+
+**Settings > Secrets and variables > Actions** の **Variables** タブで登録する
+(Environment側の `Environment variables` ではなく、**リポジトリ変数**):
+
+| Variable | 値 |
+|---|---|
+| `BACKUP_TARGET` | `production` |
+
+切り替えたら `backup-db.yml` を手動実行し、ログの「対象: production」と
+artifactのサイズを確認する。
+
+> 定期実行 (schedule) には実行時の入力を渡せないため、`deploy.yml` の `target` 入力
+> とは別に永続的な変数で切り替える。
+
+### 6. 動作確認
+
+| 確認項目 | 期待 |
+|---|---|
+| `GET /health` | 200 |
+| `GET /api/v1/auth/methods` | `{"line":true,"email":false,"sengoku_passport":false,"agency":false}` |
+| ログイン画面 | LINEボタンのみ表示される |
+| `POST /api/v1/auth/sso/sengoku/dev-issue` | 404 (本番で無効) |
+| 起動ログ | 7つの定期ジョブが登録されている (`docs/runbooks/scheduled-jobs.md`) |
+
+## 立ち上げ後に残る作業
+
+| 項目 | 備考 |
+|---|---|
+| 外形監視の契約 | `/health` はレート制限の対象外 |
+| ログドレインの契約 | 定期ジョブの結果が全てログに出る |
+| Sentryアラートルール | `SENTRY_DSN` 設定後 |
+| バックアップの確認 | 手順5-2で `BACKUP_TARGET=production` にした上で1回手動実行する |
+| 代理店連携の有効化 | APIキー発行 + `ENABLE_AGENCY_REFERRAL_SYNC=true` (`docs/agency-integration.md`) |
+| 匿名化の有効化 | 法務の回答後 (`docs/account-anonymization.md`)。**既定OFFなので何も消えない** |
+
+## 検証用デプロイは残す
+
+`target=staging` (既定) で従来どおり動く。本番と別プロジェクト・別DBのため、
+検証を続けながら本番を運用できる。

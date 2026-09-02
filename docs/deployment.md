@@ -1,5 +1,10 @@
 # デプロイ
 
+> **本番環境の立ち上げは `docs/runbooks/production-launch.md` を参照してください。**
+> 検証用デプロイとは別のRailwayプロジェクトを使います (検証データが本番の会計数値に
+> 混ざるのを避けるため)。デプロイワークフローの `target` 入力で切り替えます。
+
+
 ## ローカル開発
 
 ```bash
@@ -203,6 +208,10 @@ CLIでデプロイすることができない。そのため、実際のデプ�
 | `SESSION_SECRET` | セッションCookie署名用のランダム値 (`openssl rand -hex 32`) |
 | `ENCRYPTION_KEY` | MFAシークレット・外部API署名シークレットの暗号化キー (`openssl rand -hex 32`) |
 | `SEED_ADMIN_PASSWORD` | 初期SUPER_ADMINのパスワード (任意の強いパスワード) |
+
+これらは `RAILWAY` という **GitHub Environment** に登録されている。本番環境は
+`Production` という別のEnvironmentに**同じ名前で別の値**を登録し、ワークフローの
+`target` 入力で切り替える (`docs/runbooks/production-launch.md`)。
 
 #### 実行フロー
 
