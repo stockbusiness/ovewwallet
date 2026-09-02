@@ -54,6 +54,17 @@ export const FEATURE_FLAG_KEYS = [
    * 止めない。画面の出し分けだけを行う。
    */
   "ENABLE_LINKED_SERVICES",
+  /**
+   * 代理店システム(sengoku-ai.com)からの付与イベント
+   * `POST /api/integrations/agencies/point-awards` を有効化する
+   * (`docs/integration/AGENCY_POINT_AWARD.md`)。
+   *
+   * このエンドポイントは受信しただけでORI残高が増える経路なので、連携先の
+   * 送信内容が固まり、受信用APIキーを渡し終えるまでは閉じておく。OFFの間は
+   * 503を返し、`inbound_events`に行を作らない (行を作ってしまうと、後から
+   * ONにしても同じevent_idが二度と再処理されないため)。
+   */
+  "ENABLE_AGENCY_POINT_AWARD_INBOX",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

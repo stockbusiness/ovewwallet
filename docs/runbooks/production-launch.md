@@ -302,6 +302,7 @@ Railwayの既定のビルド方法は **railpack による自動判定**で、�
 | Sentryアラートルール | `SENTRY_DSN` 設定後 |
 | バックアップの確認 | 手順5-2で `BACKUP_TARGET=production` にした上で1回手動実行する |
 | 代理店連携の有効化 | APIキー発行 + `ENABLE_AGENCY_REFERRAL_SYNC=true` (`docs/agency-integration.md`) |
+| 代理店からのORI付与の有効化 | `ENABLE_AGENCY_POINT_AWARD_INBOX=true` + 管理画面で `system_key` を `orly-wallet` にする (`docs/integration/AGENCY_POINT_AWARD.md`) |
 | 匿名化の有効化 | 法務の回答後 (`docs/account-anonymization.md`)。**既定OFFなので何も消えない** |
 | 連携サービス画面の公開 | 連携先とサービス名が確定したら `ENABLE_LINKED_SERVICES=true` (下記) |
 

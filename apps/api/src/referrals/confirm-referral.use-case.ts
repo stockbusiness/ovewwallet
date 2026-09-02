@@ -242,6 +242,8 @@ export class ConfirmReferralUseCase {
       canonicalReferralToken: canonicalToken,
       commonUserId,
       walletUserId: oveAccountId,
+      // 再送のたびに値が動かないよう、送信時刻ではなく登録が完了した時刻を渡す。
+      occurredAt: referral.registeredAt ?? undefined,
     });
     if (!confirmResult) return "call_failed"; // ENABLE_AGENCY_REFERRAL_SYNC無効、または呼び出し失敗
 

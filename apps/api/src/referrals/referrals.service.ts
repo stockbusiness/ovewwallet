@@ -28,6 +28,9 @@ export class ReferralsService {
 
   async capture(params: {
     rawToken: string;
+    referralSessionKey?: string;
+    agencyId?: string;
+    source?: string;
     ipHash?: string;
     userAgentHash?: string;
   }): Promise<{ cookieToken: string; expiresAt: Date } | null> {

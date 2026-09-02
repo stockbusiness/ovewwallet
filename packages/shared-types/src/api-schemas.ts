@@ -281,6 +281,52 @@ export const RewardReversedEventSchema = BaseCommonEventSchema.extend({
   order_id: z.string().max(255).nullable().optional(),
 }).passthrough();
 
+/**
+ * 代理店システム(sengoku-ai.com)からの付与イベント `orly.point_award.wallet_delivery`
+ * (`docs/integration/AGENCY_POINT_AWARD.md`)。紹介関係が確定したあと、代理店システムが
+ * 「誰に何ポイント付けるか」を決めてウォレットへ配信してくる。
+ *
+ * 数値項目 (`id` / `campaign_id` / `*_agent_id`) は、送信側の実装次第で数値・文字列の
+ * どちらでも来うるため両方受け付ける。実際に使う値の型・範囲の検証は受け取った側
+ * (`PointAwardWalletDeliveryHandler`) で行う。
+ */
+const AgentIdSchema = z.union([z.number(), z.string().max(255)]);
+
+export const PointAwardSchema = z
+  .object({
+    id: AgentIdSchema.nullable().optional(),
+    /** 付与1件を一意に識別する送信側のキー。event_idと並ぶ、もう一つの冪等キー。 */
+    award_event_key: z.string().min(1).max(255),
+    campaign_id: AgentIdSchema.nullable().optional(),
+    campaign_version_id: AgentIdSchema.nullable().optional(),
+    point_code: z.string().max(50).nullable().optional(),
+    /** 付与先。common_user_id か agent_id のどちらかは必須 (どちらも無ければ400)。 */
+    recipient_common_user_id: z.string().max(255).nullable().optional(),
+    recipient_agent_id: AgentIdSchema.nullable().optional(),
+    /** direct_referrer / upper_director 等。台帳のmetadataに記録するだけで分岐には使わない。 */
+    recipient_type: z.string().max(50).nullable().optional(),
+    target_common_user_id: z.string().max(255).nullable().optional(),
+    trigger_event_type: z.string().max(100).nullable().optional(),
+    trigger_event_id: z.string().max(255).nullable().optional(),
+    source_system_key: z.string().max(100).nullable().optional(),
+    project_key: z.string().max(50).nullable().optional(),
+    direct_referrer_agent_id: AgentIdSchema.nullable().optional(),
+    upper_director_agent_id: AgentIdSchema.nullable().optional(),
+    points: z.number(),
+    status: z.string().max(50).nullable().optional(),
+  })
+  .passthrough();
+export type PointAward = z.infer<typeof PointAwardSchema>;
+
+export const POINT_AWARD_WALLET_DELIVERY_EVENT_TYPE =
+  "orly.point_award.wallet_delivery";
+
+export const PointAwardWalletDeliveryEventSchema =
+  BaseCommonEventSchema.extend({
+    event_type: z.literal(POINT_AWARD_WALLET_DELIVERY_EVENT_TYPE),
+    point_award: PointAwardSchema,
+  }).passthrough();
+
 /** 千ノ国NFTマーケット契約v2指示書19章。このWallet自身のsite_key。 */
 export const NFT_MARKET_WALLET_TARGET_SITE_KEY = "ovew-wallet";
 
@@ -424,6 +470,7 @@ export const EVENT_TYPE_SUPPORTED_VERSIONS: Record<string, readonly string[]> =
     /** 千ノ国NFTマーケット契約M3a。 */
     "entitlement.granted": ["1.0", "1.1"],
     "entitlement.revoked": ["1.0", "1.1"],
+    [POINT_AWARD_WALLET_DELIVERY_EVENT_TYPE]: ["1.0"],
   };
 /** 上の表に無いevent_type(Walletがハンドラを登録していない種別)に適用する既定値。 */
 export const DEFAULT_SUPPORTED_EVENT_VERSIONS = ["1.0"] as const;
