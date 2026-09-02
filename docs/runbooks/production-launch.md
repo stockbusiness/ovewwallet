@@ -48,7 +48,7 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 
 | Secret | 内容 |
 |---|---|
-| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (Railwayアカウント全体のトークンのため) |
+| `RAILWAY_API_TOKEN` | 検証用と同じ値でよい (アカウント全体のトークンのため)。分からなければ下記を参照 |
 | `RAILWAY_PROJECT_ID` | **手順1で作った本番プロジェクトのID**。検証用プロジェクトを指さないこと |
 | `SESSION_SECRET` | `openssl rand -hex 32`。検証用と**別の値** |
 | `ENCRYPTION_KEY` | `openssl rand -hex 32`。検証用と**別の値** |
@@ -57,6 +57,24 @@ Railwayのダッシュボードで新規プロジェクトを作成する (例: 
 
 `VERCEL_TOKEN` はこのワークフローでは使わない (フロントエンドはVercelのGit連携で
 デプロイする、`docs/deployment.md`)。
+
+#### `RAILWAY_API_TOKEN` の取り方
+
+GitHubのSecretは登録後に値を読み出せないため、検証用の値が手元にない場合は
+**新しく発行する**。既存のトークンは無効にならないので、検証環境には影響しない。
+
+1. Railway の **Account Settings → Tokens** (<https://railway.com/account/tokens>)
+2. トークン名を入力して作成する (例: `github-actions-production`)
+3. **プロジェクトがチーム(Workspace)に属している場合は、そのチームを選んで発行する。**
+   個人スコープのトークンではチームのプロジェクトが見えず、`railway link` が失敗する
+4. 表示は1回だけなのでその場でコピーし、`Production` Environment に登録する
+
+> **Project token と間違えないこと。** プロジェクト設定側で発行できるトークンは
+> 環境変数名が `RAILWAY_TOKEN` で、単一プロジェクトに固定される別物。ここで必要なのは
+> アカウント/チームレベルのトークン (`RAILWAY_API_TOKEN`)。
+
+トークンが正しいかは、デプロイの `Authenticate` ステップ (`railway whoami`) が
+実行直後に判定する。誤っていればそこで止まるので、他の設定には波及しない。
 
 > **`ENCRYPTION_KEY` を後から変えるときは、値の差し替えだけでは足りない。**
 > 管理者MFAシークレット等が旧鍵で暗号化されたまま復号できなくなる。
