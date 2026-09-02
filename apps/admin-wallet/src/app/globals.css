@@ -21,6 +21,17 @@
   --sengoku-faint: 148 158 173;
   --sengoku-border: 40 62 100;
   --sengoku-ink: 10 30 63;
+
+  /*
+   * フォーム部品 (input/select/textarea) の配色。ネイティブ部品の背景は
+   * OS/ブラウザ側が白で描画し、テーマのトークンには追従しない。一方で
+   * ダッシュボードは `text-sengoku-text` (ダークテーマでは白) を継承するため、
+   * **白背景に白文字**になって入力値も<option>も読めなくなる。
+   * 部品側で背景と文字色を対にして持たせ、テーマに依存しないようにする。
+   * ライト/ダークで同じ値なので `[data-theme="light"]` 側では上書きしない。
+   */
+  --sengoku-field: 255 255 255;
+  --sengoku-field-text: 17 24 39;
 }
 
 [data-theme="light"] {
@@ -40,4 +51,19 @@
 
 body {
   @apply bg-neutral-100 text-neutral-900;
+}
+
+/*
+ * 管理者アカウント画面のロール選択が「白背景に白文字」で読めない状態だったため
+ * (2026-09-02、本番の管理画面で発覚)、フォーム部品の配色を明示する。
+ * `<option>` はネイティブのドロップダウン内で描画され、親の背景色を引き継がない
+ * ため、`select` とは別に指定する必要がある。
+ * チェックボックス・ラジオは背景色を上書きするとブラウザ既定の見た目が壊れるので除く。
+ */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea,
+option {
+  background-color: rgb(var(--sengoku-field));
+  color: rgb(var(--sengoku-field-text));
 }
