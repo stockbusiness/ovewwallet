@@ -10,7 +10,10 @@
 - 平文のAPIキー・署名鍵は**発行時にのみ表示される**。DBには一方向ハッシュ(APIキー)・
   `ENCRYPTION_KEY`による暗号化(署名鍵)でしか保存しないため、以後Wallet側でも
   生値を再取得することはできない(`packages/database/src/issue-service-integration.ts`
-  参照)。
+  参照)。控え損ねた場合は再発行するしかない。
+- **新規の`service_code`追加はエンジニアの作業**。`ServiceCode`はPrismaのenumで、
+  値を増やすにはマイグレーションが必要 (`packages/database/prisma/schema.prisma`)。
+  既存の`service_code`に対する鍵の再発行は管理画面から行える (下記2章)。
 - 本番環境での実行は、この手順を実行する前に**別途Go承認**を得ること
   (千ノ国5システム改修の承認フローに従う。マイグレーション適用・機能フラグ有効化と
   同様、コード変更のマージだけでは有効化されない)。
@@ -40,10 +43,30 @@ SERVICE_CODE=SENGOKU_PASSPORT ENCRYPTION_KEY=<本番/staging用の実際の値> 
 既存の鍵を失効させ、新しい鍵に差し替える場合(定期ローテーション、鍵の漏えい疑い、
 または「発行したはずのstaging既存キーが失われている」ケースの再発行を含む)。
 
+### 管理画面から行う (推奨)
+
+**外部連携 > 外部サービス管理**の対象行にある「APIキー再発行」または
+「署名シークレット再発行」を押し、理由を入力する。再発行した値はその場で1回だけ
+表示されるので、控えてから閉じる。
+
+サーバーやDBに触れる必要がないため、通常はこちらを使う。誰がいつどの連携の鍵を
+差し替えたかは監査ログ (`SERVICE_INTEGRATION_API_KEY_ROTATE` /
+`SERVICE_INTEGRATION_SIGNING_SECRET_ROTATE`) に残る。**鍵の生値は監査ログには
+記録しない** (記録すると監査ログの閲覧権限がそのまま外部APIの実行権限になるため)。
+
+APIキーと署名シークレットは**別々に**再発行できる。片方だけ漏えいした場合、
+連携先へ渡し直す値を最小限にできる。
+
+### CLIから行う
+
+管理画面へログインできない障害時などの代替手段。
+
 ```sh
 SERVICE_CODE=SENGOKU_PASSPORT ENCRYPTION_KEY=<本番/staging用の実際の値> \
   pnpm --filter @ove/database issue-service-integration --rotate
 ```
+
+CLIはAPIキーと署名鍵を**両方同時に**再生成する (管理画面のように片方だけにはできない)。
 
 - `id`・`service_code`・利用上限(`daily_amount_limit`等)・`allowed_scopes`は
   変更されない。APIキー・署名鍵のみ再生成する。
