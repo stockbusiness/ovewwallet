@@ -1,4 +1,4 @@
-import { Body, Controller, NotFoundException, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import type { Request, Response } from "express";
@@ -9,6 +9,7 @@ import { AuthService, type SessionMeta } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { SkipTermsConsent } from "../accounts/terms-consent";
+import { availableLoginMethods, isLoginMethodEnabled, type LoginMethod } from "./login-methods";
 import { REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS } from "../referrals/referrals.controller";
 
 /** ログインデバイス一覧向けに、リクエストから接続元情報を取り出す。 */
@@ -30,13 +31,36 @@ function setSessionCookie(res: Response, token: string, expiresAt: Date): void {
   res.cookie(SESSION_COOKIE_NAME, token, { ...SESSION_COOKIE_OPTIONS, expires: expiresAt });
 }
 
+/**
+ * 無効なログイン方法を拒否する。画面から隠すだけでは、APIを直接叩けば動かない経路に
+ * 入れてしまい、原因の分かりにくい失敗になるため (`docs/login-methods.md`)。
+ *
+ * 404 を返すのは「その入口は存在しない」という扱いにするため。401/403 だと
+ * 「正しい資格情報があれば通る」と読めてしまう。
+ */
+function assertLoginMethodEnabled(method: LoginMethod): void {
+  if (!isLoginMethodEnabled(method)) {
+    throw new NotFoundException("this login method is not available");
+  }
+}
+
 @ApiTags("auth")
 @Controller("api/v1/auth")
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  /**
+   * 利用できるログイン方法。ログイン画面が「どのボタンを出すか」を決めるために叩く。
+   * 未ログインで呼ぶ必要があるため認証は不要。真偽値のみで機微な情報は含まない。
+   */
+  @Get("methods")
+  loginMethods() {
+    return availableLoginMethods();
+  }
+
   @Post("email/request-otp")
   async requestOtp(@Body(new ZodValidationPipe(RequestOtpSchema)) body: z.infer<typeof RequestOtpSchema>) {
+    assertLoginMethodEnabled("email");
     return this.auth.requestEmailOtp(body.email);
   }
 
@@ -51,6 +75,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    assertLoginMethodEnabled("email");
     const session = await this.auth.verifyEmailOtpAndLogin(
       body.email,
       body.code,
@@ -61,7 +86,7 @@ export class AuthController {
     return { ove_account_id: session.oveAccountId };
   }
 
-  /** LINEログイン。MVPではIDトークン検証をモック実装 (`mock.<lineUserId>` 形式) している。 */
+  /** LINEログイン。`AUTH_MODE=production` のとき実チャネルのIDトークンを検証する。 */
   @Post("line/login")
   async lineLogin(
     @Body(new ZodValidationPipe(LineLoginSchema)) body: z.infer<typeof LineLoginSchema>,
@@ -100,6 +125,7 @@ export class AuthController {
     if (process.env.NODE_ENV === "production") {
       throw new NotFoundException();
     }
+    assertLoginMethodEnabled("sengoku_passport");
     const code = await this.auth.issueMockSengokuSsoCode(body.sengokuMemberId);
     return { code };
   }
@@ -111,6 +137,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    assertLoginMethodEnabled("sengoku_passport");
     const session = await this.auth.loginWithSengokuSso(body.code, body.termsAccepted, sessionMetaFromRequest(req));
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
@@ -123,6 +150,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
+    assertLoginMethodEnabled("agency");
     const session = await this.auth.loginWithAgencySso(body.token, body.termsAccepted, sessionMetaFromRequest(req));
     setSessionCookie(res, session.token, session.expiresAt);
     return { ove_account_id: session.oveAccountId };
