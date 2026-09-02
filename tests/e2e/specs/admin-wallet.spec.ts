@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createTestAdmin, createTestWallet, disconnect } from "../support/seed";
 import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
+import { toDisplayCode } from "../support/display-code";
 
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
 
@@ -20,7 +21,7 @@ test.describe("admin-wallet: ログイン→個別付与→残高反映", () => 
     await page.waitForURL(/\/dashboard$/, { timeout: NAV_TIMEOUT });
 
     await page.goto(`${ADMIN_URL}/wallets/${walletId}`);
-    await expect(page.getByText(walletCode)).toBeVisible();
+    await expect(page.getByText(toDisplayCode(walletCode))).toBeVisible();
 
     await page.getByLabel("金額 (ORI)").fill("1500");
     await page.getByLabel("理由").fill("Playwright E2E自動テスト");

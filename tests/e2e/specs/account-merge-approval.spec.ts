@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createTestAdmin, createTestWallet, disconnect } from "../support/seed";
 import { NAV_TIMEOUT, NAV_TIMEOUT_SHORT } from "../support/timeouts";
+import { toDisplayCode } from "../support/display-code";
 
 const ADMIN_URL = process.env.ADMIN_URL ?? "http://localhost:3100";
 
@@ -42,7 +43,7 @@ test.describe("admin-wallet: アカウント統合の二段階承認 (申請者�
 
     await requesterPage.getByRole("link", { name: "二段階承認画面" }).click();
     await requesterPage.waitForURL(/\/approval-requests$/);
-    const mergeRowText = `${source.accountCode} → ${target.accountCode}`;
+    const mergeRowText = `${toDisplayCode(source.accountCode)} → ${toDisplayCode(target.accountCode)}`;
     await expect(requesterPage.getByText(mergeRowText)).toBeVisible();
 
     // 申請者本人による承認は職務分離違反として拒否される。他のテストが残した申請も
