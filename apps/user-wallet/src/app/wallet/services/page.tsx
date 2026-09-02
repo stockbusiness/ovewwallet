@@ -4,16 +4,38 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BottomNavigation, StatusBadge, LinkIcon, ArrowLeftIcon, HomeIcon, ClockIcon, GiftIcon, CartIcon, MenuIcon } from "@ove/shared-ui";
-import { apiFetch, ApiError, type LinkedService } from "@/lib/api";
+import { apiFetch, ApiError, type LinkedService, type MeFeatureFlags } from "@/lib/api";
 
 export default function LinkedServicesPage() {
   const router = useRouter();
   const [services, setServices] = useState<LinkedService[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // 判定が済むまでは何も描画しない (無効なら一瞬でも中身を見せない)。
+  const [visible, setVisible] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
+      // 導線を隠していてもURL直打ちやブックマークで到達できるため、この画面自体でも
+      // Feature Flagを確認する (ENABLE_LINKED_SERVICES)。取得できない場合は
+      // 「無効」側に倒す — 未整備の画面を誤って見せるより、ホームへ戻す方が安全。
+      let enabled = false;
+      try {
+        const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
+        enabled = flags.linked_services_enabled;
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          router.push("/login");
+          return;
+        }
+      }
+      if (!enabled) {
+        setVisible(false);
+        router.replace("/wallet");
+        return;
+      }
+      setVisible(true);
+
       try {
         const list = await apiFetch<LinkedService[]>("/api/v1/me/linked-services");
         setServices(list);
@@ -26,6 +48,8 @@ export default function LinkedServicesPage() {
       }
     })();
   }, [router]);
+
+  if (visible !== true) return null;
 
   function showComingSoon(label: string) {
     setToast(`${label}は準備中です`);

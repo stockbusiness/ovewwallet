@@ -29,6 +29,7 @@ export default function WalletMenuPage() {
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
   const [collectionEnabled, setCollectionEnabled] = useState(false);
+  const [linkedServicesEnabled, setLinkedServicesEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [closingAccount, setClosingAccount] = useState(false);
@@ -60,8 +61,10 @@ export default function WalletMenuPage() {
       try {
         const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
         setCollectionEnabled(flags.digital_collection_enabled);
+        setLinkedServicesEnabled(flags.linked_services_enabled);
       } catch {
         setCollectionEnabled(false);
+        setLinkedServicesEnabled(false);
       }
     })();
   }, [router]);
@@ -140,7 +143,7 @@ export default function WalletMenuPage() {
           <span className="text-sm font-semibold text-sengoku-text">表示テーマ</span>
           <ThemeToggle />
         </div>
-        <MenuLink href="/wallet/services" label="連携サービス" />
+        {linkedServicesEnabled && <MenuLink href="/wallet/services" label="連携サービス" />}
         <MenuLink href="/wallet/earn" label="ORIを貯める" />
         <MenuLink href="/wallet/use" label="ORIを使う" />
         {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}

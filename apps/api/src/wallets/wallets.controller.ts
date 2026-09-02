@@ -144,12 +144,13 @@ export class MeController {
     return this.wallets.getExpiringCreditsSummary(req.account.id);
   }
 
-  /** メニュー画面の「コレクション」導線をFeature Flagで出し分けるための最小限の公開情報。 */
+  /** メニュー画面等の導線をFeature Flagで出し分けるための最小限の公開情報。 */
   @Get("feature-flags")
   @UseGuards(SessionAuthGuard)
   async myFeatureFlags() {
     return {
       digital_collection_enabled: isFeatureEnabled("ENABLE_DIGITAL_COLLECTION"),
+      linked_services_enabled: isFeatureEnabled("ENABLE_LINKED_SERVICES"),
     };
   }
 
