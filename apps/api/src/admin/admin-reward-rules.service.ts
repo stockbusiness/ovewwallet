@@ -22,6 +22,42 @@ function toLandingUrl(input: string | null | undefined): string | null | undefin
   }
 }
 
+/**
+ * 監査ログに残す項目。金額・上限・有効期間など「いくら付与されるか」を決める値に絞る
+ * (`updatedAt` のように毎回変わる値を入れると差分が読みにくくなるため)。
+ * BigInt は JSON にできないので文字列にする。
+ */
+function auditSnapshot(rule: {
+  ruleName: string;
+  displayName: string;
+  rewardAmount: bigint | number | string;
+  perUserLimit: number | null;
+  perEventLimit: number | null;
+  monthlyCountLimit: number | null;
+  monthlyAmountLimit: bigint | number | string | null;
+  globalAmountLimit: bigint | number | string | null;
+  expiryDays: number | null;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  status: string;
+}): Record<string, string | number | null> {
+  const str = (v: bigint | number | string | null) => (v === null ? null : String(v));
+  return {
+    ruleName: rule.ruleName,
+    displayName: rule.displayName,
+    rewardAmount: String(rule.rewardAmount),
+    perUserLimit: rule.perUserLimit,
+    perEventLimit: rule.perEventLimit,
+    monthlyCountLimit: rule.monthlyCountLimit,
+    monthlyAmountLimit: str(rule.monthlyAmountLimit),
+    globalAmountLimit: str(rule.globalAmountLimit),
+    expiryDays: rule.expiryDays,
+    startsAt: rule.startsAt ? rule.startsAt.toISOString() : null,
+    endsAt: rule.endsAt ? rule.endsAt.toISOString() : null,
+    status: rule.status,
+  };
+}
+
 export interface CreateRewardRuleParams {
   ruleCode: string;
   ruleName: string;
@@ -142,11 +178,18 @@ export class AdminRewardRulesService {
     });
   }
 
-  async update(ruleCode: string, params: UpdateRewardRuleParams) {
+  /**
+   * 付与ルールの変更。**誰がいつ何をいくらに変えたか**を監査ログに残す。
+   *
+   * 付与額や上限の変更は、以降のすべての付与額を左右する会計上の重要な操作
+   * (高額な手動付与に二段階承認を課しているのと同じ理由)。変更前後の値を
+   * 記録しておかないと、ポイント負債レポートの数字が動いた理由を後から追えない。
+   */
+  async update(ruleCode: string, params: UpdateRewardRuleParams, actorId: string) {
     const existing = await this.rewardRules.findByRuleCode(ruleCode);
     if (!existing) throw new NotFoundException(`reward rule ${ruleCode} not found`);
 
-    return this.rewardRules.update(ruleCode, {
+    const updated = await this.rewardRules.update(ruleCode, {
       ruleName: params.ruleName,
       rewardAmount: params.rewardAmount,
       displayName: params.displayName,
@@ -164,6 +207,22 @@ export class AdminRewardRulesService {
       // 未指定(undefined)は据え置き。空文字・nullは未設定に戻す。
       landingUrl: params.landingUrl === undefined ? undefined : toLandingUrl(params.landingUrl),
     });
+
+    await this.db.auditLog.create({
+      data: {
+        id: generateId(),
+        actorType: "ADMIN",
+        actorId,
+        actionType: "REWARD_RULE_UPDATE",
+        targetType: "reward_rule",
+        targetId: existing.id,
+        result: "SUCCESS",
+        beforeData: auditSnapshot(existing),
+        afterData: auditSnapshot(updated),
+      },
+    });
+
+    return updated;
   }
 
   /**
