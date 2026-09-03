@@ -1,15 +1,23 @@
 name: Setup PostgreSQL client
 description: >
-  pg_dump / pg_restore / psql を、Railwayで動いているサーバーより新しいメジャーで入れる。
+  pg_dump / pg_restore / psql を、Railwayで動いているサーバー以上のメジャーで用意する。
 
-# Ubuntuランナー標準の postgresql-client は16系だが、RailwayのPostgresは18系。
-# pg_dump は「サーバーの方が新しい」と server version mismatch で停止するため、
-# 日次バックアップ (backup-db.yml) が2026-09-02まで49回連続で失敗していた
-# (= 本番・検証のどちらのDBも一度もバックアップできていなかった)。
+# RailwayのPostgresは18系だが、GitHubランナーに入っているクライアントは16系。
+# pg_dump は「サーバーの方が新しい」と、出力を作らずに server version mismatch で
+# 停止する。このため日次バックアップ (backup-db.yml) は2026-09-02まで49回連続で
+# 失敗しており、本番・検証のどちらのDBも一度もバックアップできていなかった。
 #
-# PGDG公式リポジトリを足して postgresql-client (最新メジャーのメタパッケージ) を入れる。
-# pg_dump はサーバーより**新しい**分には問題なく動くため、Railway側がメジャーを
-# 上げてもこのまま追従できる。バージョンを固定しないのはそのため。
+# 最初の修正 (PR #54) では PGDGリポジトリを足して `postgresql-client` を
+# install したが、**効かなかった** (run #50 で pg_dump 16.15 のまま失敗)。
+# `postgresql-client` はメタパッケージで、ランナーには既に16系が入っているため
+# 何も起きなかったのが理由。加えて /usr/bin/pg_dump は pg_wrapper への
+# シンボリックリンクで、/usr/lib/postgresql/ にあるメジャーから選ぶ作りになっている。
+#
+# そこで、
+#   1. 利用可能な**最大メジャー**を調べて postgresql-client-<major> を明示的に入れる
+#   2. そのメジャーの bin を PATH の先頭に置き、pg_wrapper の選択に任せない
+# の2点にした。メジャーを固定していないのは、pg_dumpはサーバーより新しい分には
+# 問題なく動くため、Railway側が上がってもこのまま追従できるようにするため。
 #
 # backup-db.yml と restore-drill.yml の両方で使う。片方だけ直して再発させないよう、
 # 手順を1か所にまとめてある。
@@ -26,7 +34,43 @@ runs:
         echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
           | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
         sudo apt-get update
-        sudo apt-get install -y postgresql-client
-        # 実際に入ったバージョンをログに残す。次に同種の不一致が起きたとき、
+
+        # リポジトリが実際に有効になったかを先に確かめる。ここを素通りさせると、
+        # 「16系しか見つからず、後段のpg_dumpで初めて失敗する」という分かりにくい
+        # 落ち方になる (実際に run #50 がそうだった)。
+        if ! apt-cache policy | grep -q 'apt\.postgresql\.org'; then
+          echo "::error::PGDGリポジトリが有効になっていません。"
+          echo "/etc/apt/sources.list.d/pgdg.list と apt-get update の出力を確認してください。"
+          exit 1
+        fi
+
+        # 利用可能な postgresql-client-<数字> のうち最大のメジャーを選ぶ。
+        MAJOR=$(apt-cache search --names-only '^postgresql-client-[0-9]+$' \
+          | awk '{print $1}' | sed 's/^postgresql-client-//' | sort -n | tail -1)
+        if [ -z "$MAJOR" ]; then
+          echo "::error::PGDGリポジトリから postgresql-client-<major> を取得できませんでした。"
+          echo "apt のソース設定を確認してください:"
+          apt-cache policy | head -20
+          exit 1
+        fi
+        echo "導入するメジャー: $MAJOR"
+        sudo apt-get install -y "postgresql-client-$MAJOR"
+
+        # /usr/bin/pg_dump は pg_wrapper へのシンボリックリンクで、どのメジャーを
+        # 使うかを自分で決める。任せると16系が選ばれたままになりうるので、
+        # 入れたメジャーの bin を PATH の先頭に置いて明示的に上書きする
+        # ($GITHUB_PATH は**次のステップ以降**に効く。実際にpg_dumpを使うのは後段)。
+        echo "/usr/lib/postgresql/$MAJOR/bin" >> "$GITHUB_PATH"
+
+        # 実際に使われるバイナリのバージョンをログに残す。次に不一致が起きたとき、
         # どちらが古いのかをこの1行で判断できる。
+        "/usr/lib/postgresql/$MAJOR/bin/pg_dump" --version
+
+    - name: Confirm pg_dump on PATH
+      shell: bash
+      run: |
+        set -e
+        # 前ステップの $GITHUB_PATH がこのステップから効く。実際に後段が呼ぶのと
+        # 同じ解決経路で確認しておく (ここが16系のままなら、後段も同じ結果になる)。
+        which pg_dump
         pg_dump --version
