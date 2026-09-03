@@ -19,6 +19,14 @@
 > 自分で決めてしまう (この2点を踏まなかった最初の修正は run #50 で再び失敗した)。
 > ローカルで実行する場合も、同様にサーバー以上のメジャーの `pg_dump` を用意すること。
 
+> **対象プロジェクトの Postgres で TCP Proxy (Public Networking) を有効にしておく。**
+> GitHub Actions のランナーは Railway の内部ネットワークにいないため、
+> `DATABASE_URL` が指す `*.railway.internal` を名前解決できない。TCP Proxy を
+> 有効にすると `DATABASE_PUBLIC_URL` が生え、ワークフローはそちらを優先して使う。
+> 無効なままだと `could not translate host name ... to address` で落ちるため、
+> ワークフロー側でも内部ホストを掴んだ時点で理由を名指しして停止する。
+> (検証環境は有効。本番は 2026-09-03 時点で未設定のため run #52 が失敗した。)
+
 - `scripts/backup-db.sh`: `pg_dump` (カスタム形式) でバックアップを取得する。
   ```
   DATABASE_URL=postgresql://... ./scripts/backup-db.sh [出力先ディレクトリ (既定: ./backups)]
