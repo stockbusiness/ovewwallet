@@ -1,0 +1,32 @@
+name: Setup PostgreSQL client
+description: >
+  pg_dump / pg_restore / psql を、Railwayで動いているサーバーより新しいメジャーで入れる。
+
+# Ubuntuランナー標準の postgresql-client は16系だが、RailwayのPostgresは18系。
+# pg_dump は「サーバーの方が新しい」と server version mismatch で停止するため、
+# 日次バックアップ (backup-db.yml) が2026-09-02まで49回連続で失敗していた
+# (= 本番・検証のどちらのDBも一度もバックアップできていなかった)。
+#
+# PGDG公式リポジトリを足して postgresql-client (最新メジャーのメタパッケージ) を入れる。
+# pg_dump はサーバーより**新しい**分には問題なく動くため、Railway側がメジャーを
+# 上げてもこのまま追従できる。バージョンを固定しないのはそのため。
+#
+# backup-db.yml と restore-drill.yml の両方で使う。片方だけ直して再発させないよう、
+# 手順を1か所にまとめてある。
+runs:
+  using: composite
+  steps:
+    - name: Install PostgreSQL client from PGDG
+      shell: bash
+      run: |
+        set -e
+        sudo install -d /usr/share/postgresql-common/pgdg
+        sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+          https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+          | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client
+        # 実際に入ったバージョンをログに残す。次に同種の不一致が起きたとき、
+        # どちらが古いのかをこの1行で判断できる。
+        pg_dump --version
