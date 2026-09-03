@@ -49,8 +49,10 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Install PostgreSQL client (pg_dump/pg_restore/psql)
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # Ubuntu標準の postgresql-client は16系で、RailwayのPostgres (18系) を
+      # pg_dump できない (server version mismatch)。手順は composite action 側に集約。
+      - name: Install PostgreSQL client
+        uses: ./.github/actions/setup-pg-client
 
       - name: Link to Railway project
         env:

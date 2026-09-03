@@ -7,6 +7,14 @@
 
 ## スクリプト
 
+> **`pg_dump` はサーバーより新しいメジャーである必要がある。** 古いとバックアップを
+> 取らずに `server version mismatch` で停止する。Ubuntuランナー標準の
+> `postgresql-client` は16系、RailwayのPostgresは18系だったため、日次バックアップは
+> 2026-09-02まで**49回連続で失敗し、一度も成功していなかった**。
+> 現在はGitHub Actions側で `.github/actions/setup-pg-client` (PGDG公式リポジトリから
+> 最新メジャーを導入する composite action) を使っており、ローカルで実行する場合も
+> 同様にサーバー以上のメジャーの `pg_dump` を用意すること。
+
 - `scripts/backup-db.sh`: `pg_dump` (カスタム形式) でバックアップを取得する。
   ```
   DATABASE_URL=postgresql://... ./scripts/backup-db.sh [出力先ディレクトリ (既定: ./backups)]
