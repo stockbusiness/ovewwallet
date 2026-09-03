@@ -11,9 +11,13 @@
 > 取らずに `server version mismatch` で停止する。Ubuntuランナー標準の
 > `postgresql-client` は16系、RailwayのPostgresは18系だったため、日次バックアップは
 > 2026-09-02まで**49回連続で失敗し、一度も成功していなかった**。
-> 現在はGitHub Actions側で `.github/actions/setup-pg-client` (PGDG公式リポジトリから
-> 最新メジャーを導入する composite action) を使っており、ローカルで実行する場合も
-> 同様にサーバー以上のメジャーの `pg_dump` を用意すること。
+> 現在はGitHub Actions側で `.github/actions/setup-pg-client` (composite action) が
+> 利用可能な最大メジャーの `postgresql-client-<major>` を明示的に導入し、その
+> `bin` を PATH の先頭に置いている。**メタパッケージ `postgresql-client` を
+> install するだけでは効かない** — ランナーには既に16系が入っているため何も起きず、
+> `/usr/bin/pg_dump` も `pg_wrapper` へのシンボリックリンクで、どのメジャーを使うかを
+> 自分で決めてしまう (この2点を踏まなかった最初の修正は run #50 で再び失敗した)。
+> ローカルで実行する場合も、同様にサーバー以上のメジャーの `pg_dump` を用意すること。
 
 - `scripts/backup-db.sh`: `pg_dump` (カスタム形式) でバックアップを取得する。
   ```
