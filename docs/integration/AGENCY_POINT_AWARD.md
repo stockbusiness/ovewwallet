@@ -133,8 +133,38 @@ POST https://api.sennokuni-wallet.com/api/integrations/agencies/point-awards
 `metadata` に `awardEventKey` / `campaignId` / `recipientType` / `triggerEventId` /
 `directReferrerAgentId` / `upperDirectorAgentId` などの由来を残す。
 
-管理画面の **付与ルール** で `AGENCY_POINT_AWARD:orly` というルールコードを登録すれば、
-1回あたり・1人あたり・月次・累計の上限を掛けられる。ルール未登録なら上限なしで通る。
+### 金額の上限
+
+上限は2段ある。
+
+**1. `service_integrations` の `AGENCY_SYSTEM` 行** (常に効く)
+
+| 列 | 本番値 | 意味 |
+|---|---|---|
+| `per_request_amount_limit` | 3,000 | 1回の付与の上限。初回登録時の付与額に合わせてある |
+| `daily_amount_limit` | 1,000,000 | サービス単位の当日合計の上限 |
+
+超過は 400 で拒否し、**残高には一切触れない**。この経路は受信しただけでORI残高が
+増えるため、桁の間違いや暴走をここで止める。判定は `ServiceIntegration` 行を
+`FOR UPDATE` でロックした中で行うので、並行リクエストでも上限を越えられない
+(`GrantRewardWithServiceLimitsUseCase`)。
+
+**付与済みイベントの再送は上限判定の対象にしない。** 冪等判定を先に行い、既に
+台帳にある `idempotency_key` ならそのまま同じ結果を返す。順序が逆だと、再送のたびに
+日次上限を二重に消費して「一度成功した付与が後から失敗として返る」ことになる。
+
+3,000を超える付与を始めるときは、**先に `per_request_amount_limit` を引き上げること。**
+上限超過は他の失敗と同じく再送対象になり、30秒から倍々で8回=約1時間で
+dead-letter になる (`inbound-events.service.ts`)。日次上限に当てた場合も同じで、
+翌日まで待ってはくれない。
+
+値の変更は管理画面からはできない (現状、外部サービス管理の画面で操作できるのは
+鍵の再発行と緊急停止だけ)。エンジニアによるDB更新が必要。
+
+**2. 管理画面の付与ルール** (任意)
+
+`AGENCY_POINT_AWARD:orly` というルールコードを登録すれば、1人あたり・月次・累計の
+上限を追加で掛けられる。ルール未登録ならこちらは素通りする (1の上限は効き続ける)。
 
 ---
 

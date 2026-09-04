@@ -1,8 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { Prisma, PrismaClient } from "@ove/database";
+import { ServiceCode, type Prisma, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 
 type Db = PrismaClient | Prisma.TransactionClient;
+
+function isServiceCode(value: string): value is ServiceCode {
+  return Object.prototype.hasOwnProperty.call(ServiceCode, value);
+}
 
 /**
  * 追加整合性対策P0-3。`ServiceIntegration`は現状`rewards`/`admin`モジュール内で
@@ -26,5 +30,15 @@ export class ServiceIntegrationRepository {
 
   async findById(id: string, client: Db = this.db) {
     return client.serviceIntegration.findUnique({ where: { id } });
+  }
+
+  /**
+   * 認証済みの送信元キーから連携先を引く。`ServiceCode`列挙にない文字列は
+   * nullを返す (共通イベントの署名鍵が持つ`source_system_key`は自由文字列で、
+   * `ServiceCode`とは限らないため。そのままPrismaへ渡すと実行時エラーになる)。
+   */
+  async findByServiceCode(serviceCode: string, client: Db = this.db) {
+    if (!isServiceCode(serviceCode)) return null;
+    return client.serviceIntegration.findUnique({ where: { serviceCode } });
   }
 }

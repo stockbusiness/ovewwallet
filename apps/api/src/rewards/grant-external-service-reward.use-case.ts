@@ -15,6 +15,7 @@ import { AccountRepository } from "../accounts/account.repository";
 import { PRISMA } from "../common/prisma.module";
 import { GrantRewardUseCase } from "./grant-reward.use-case";
 import { ServiceIntegrationRepository } from "./service-integration.repository";
+import { assertWithinServiceAmountLimits } from "./service-amount-limits";
 
 export interface GrantExternalServiceRewardParams {
   serviceIntegration: ServiceIntegration;
@@ -111,25 +112,7 @@ export class GrantExternalServiceRewardUseCase {
           return { oveAccountId: account.id, transaction: existingInTx };
         }
 
-        if (params.amount > current.perRequestAmountLimit) {
-          throw new BadRequestException(`amount exceeds per_request_amount_limit (${current.perRequestAmountLimit.toString()})`);
-        }
-
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayGranted = await tx.oveTransaction.aggregate({
-          where: {
-            sourceService: current.serviceCode,
-            status: "COMPLETED",
-            direction: "CREDIT",
-            occurredAt: { gte: todayStart },
-          },
-          _sum: { amount: true },
-        });
-        const grantedToday = todayGranted._sum.amount ?? 0n;
-        if (grantedToday + params.amount > current.dailyAmountLimit) {
-          throw new BadRequestException("daily_amount_limit for this service has been exceeded");
-        }
+        await assertWithinServiceAmountLimits(tx, current, params.amount);
 
         // 上限確認をすべて通過した後にのみアカウントを解決する (拒否時に不要な
         // OveAccount/Wallet/AccountLinkを残さないため)。
