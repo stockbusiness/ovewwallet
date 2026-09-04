@@ -430,6 +430,17 @@ jobs:
             # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
             "ENABLE_EMAIL_LOGIN=false"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
+            # 代理店SSOの検証条件 (連携先回答 2026-09-04)。issuer / JWKS URL は
+            # AuthServiceの既定値と同一だが、連携先の設定を変えずに追随できるよう
+            # 明示しておく。audienceだけは既定値が「必ず検証に失敗する
+            # プレースホルダー」なので、実値の設定が必須
+            # (apps/api/src/auth/auth.service.ts)。いずれも秘密情報ではない。
+            "SENGOKU_AI_SSO_ISSUER=https://sengoku-ai.com"
+            "SENGOKU_AI_SSO_AUDIENCE=orly-wallet"
+            "SENGOKU_AI_JWKS_URL=https://sengoku-ai.com/api/sso/jwks.php"
+            # 連携先がSSO受信URL (https://sennokuni-wallet.com/sso/agency) を
+            # 登録し終えるまでは閉じておく。上位代理店への付与はSSOでの紐付けが
+            # 前提なので、開けるのは疎通確認の後 (docs/agency-integration.md)。
             "ENABLE_AGENCY_LOGIN=false"
             # 代理店システム(sengoku-ai.com)連携のFeature Flag。
             # 管理画面の「代理店連携セットアップ」がこの4つのON/OFFを表示する。

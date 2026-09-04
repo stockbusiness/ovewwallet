@@ -85,6 +85,12 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 接続が完了し、`SENGOKU_AI_SSO_ISSUER` / `SENGOKU_AI_SSO_AUDIENCE` /
 `SENGOKU_AI_JWKS_URL` を設定してから、対応する環境変数を `true` にする。
 
+代理店SSOはこの3つに加えて、**連携先が受信URL
+(`https://sennokuni-wallet.com/sso/agency`) を登録し終えていること**が前提になる。
+登録前に `ENABLE_AGENCY_LOGIN` を `true` にしても、代理店がウォレットへ
+たどり着けないため意味がない。手順は `docs/agency-integration.md`
+「代理店SSOログイン」を参照。
+
 ## テスト環境
 
 `.env.test`・CI・Playwright では**全て有効**にしている。機能の実装そのものを検証したい

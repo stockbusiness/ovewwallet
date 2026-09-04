@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon, WalletLogo } from "@ove/shared-ui";
 import { apiFetch, ApiError, type LoginMethodAvailability } from "@/lib/api";
 import { sanitizeInternalReturnPath } from "@/lib/claim-return-path";
+import { TermsCheckbox } from "@/components/TermsCheckbox";
 import {
   isLiffConfigured,
   ensureLiffLogin,
@@ -432,25 +433,6 @@ function LoginPageContent() {
         )}
       </div>
     </main>
-  );
-}
-
-function TermsCheckbox({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="flex items-start gap-2.5 text-xs leading-relaxed text-sengoku-muted">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 accent-sengoku-gold"
-      />
-      <span>
-        <Link href="/terms" target="_blank" className="text-sengoku-gold underline underline-offset-2">
-          利用規約
-        </Link>
-        に同意する (初めてご利用の方は同意が必要です)
-      </span>
-    </label>
   );
 }
 
