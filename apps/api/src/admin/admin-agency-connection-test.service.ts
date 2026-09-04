@@ -17,6 +17,8 @@ export interface ConnectionTestResult {
   /** 実際に叩いた先 (APIキーは含めない)。 */
   requestUrl: string | null;
   httpStatus: number | null;
+  /** 連携先が返した本文の抜粋 (先頭300文字)。原因の切り分け用。 */
+  partnerResponse: string | null;
 }
 
 /**
@@ -49,11 +51,27 @@ export class AdminAgencyConnectionTestService {
           "共通顧客HUB送信設定にAPIキーが未設定です。代理店システムの担当者から受け取ったキーを先に設定してください。",
         requestUrl: null,
         httpStatus: null,
+        partnerResponse: null,
       };
     }
 
     const requestUrl = `${config.baseUrl.replace(/\/$/, "")}/api/common-users/resolve`;
-    const result = await this.http.request({
+
+    // 通常の送信経路と同じ `x-api-key` で送る。連携先は `x-api-key` と
+    // `Authorization: Bearer` のどちらでも受け付けると回答済みなので、
+    // ここで渡し方を変えて試す必要はない (2026-09-04 連携先回答)。
+    const result = await this.probe(config);
+
+    const outcome = this.classify(result, requestUrl);
+    await this.writeAudit(adminId, config.baseUrl, config.systemKey, outcome);
+    return outcome;
+  }
+
+  /** 1回分の問い合わせ。副作用を出さないよう `create_if_missing: false` で送る。 */
+  private async probe(
+    config: { baseUrl: string; systemKey: string; apiKey: string },
+  ): Promise<Awaited<ReturnType<IntegrationHttpClient["request"]>>> {
+    return this.http.request({
       baseUrl: config.baseUrl,
       path: "/api/common-users/resolve",
       apiKey: config.apiKey,
@@ -66,23 +84,29 @@ export class AdminAgencyConnectionTestService {
       responseSchema: AnyJsonSchema,
       logger: this.logger,
     });
+  }
 
-    const outcome = this.classify(result, requestUrl);
-    await this.writeAudit(adminId, config.baseUrl, config.systemKey, outcome);
-    return outcome;
+  /** 連携先の応答本文を切り分け材料として少しだけ残す。長い本文やHTMLは切り詰める。 */
+  private summarizePartnerResponse(result: Awaited<ReturnType<IntegrationHttpClient["request"]>>): string | null {
+    if (result.ok) return null;
+    const body = (result.error as { body?: unknown }).body;
+    if (body === undefined || body === null) return null;
+    return JSON.stringify(body).slice(0, 300);
   }
 
   private classify(
     result: Awaited<ReturnType<IntegrationHttpClient["request"]>>,
     requestUrl: string,
   ): ConnectionTestResult {
+    const partnerResponse = this.summarizePartnerResponse(result);
     if (result.ok) {
       return {
         outcome: "ok",
         message:
-          "送信先URLとAPIキーで応答がありました。共通顧客が見つからない旨の応答も、実在しないIDを送っているため正常です。",
+          "送信先URLとAPIキーで応答がありました。共通顧客が見つからない旨の応答も、実在しないIDを送っているため正常です。なおこのテストは既存IDの参照だけを行うため、登録経路が使う common_users:write 権限までは確認できません。",
         requestUrl,
         httpStatus: 200,
+        partnerResponse,
       };
     }
 
@@ -91,9 +115,12 @@ export class AdminAgencyConnectionTestService {
       return {
         outcome: "unauthorized",
         message:
-          `APIキーが受け付けられませんでした (HTTP ${status})。代理店システム側に登録されているキーと、こちらに保存したキーが同じか確認してください。`,
+          status === 403
+            ? `APIキーは認識されましたが、この操作が許可されていません (HTTP 403)。代理店システム側でキーに必要な権限 (common_users:read / common_users:write / referrals:write) が付いているか確認してください。下の「連携先の応答」も手がかりになります。`
+            : `APIキーが認識されませんでした (HTTP ${status})。代理店システム側に登録されているキーと、こちらに保存したキーが同じか確認してください。`,
         requestUrl,
         httpStatus: status,
+        partnerResponse,
       };
     }
     if (status === 404) {
@@ -103,6 +130,7 @@ export class AdminAgencyConnectionTestService {
           "送信先が見つかりません (HTTP 404)。共通顧客HUB送信設定の「送信先URL」を確認してください。",
         requestUrl,
         httpStatus: status,
+        partnerResponse,
       };
     }
     if (result.error.kind === "timeout" || result.error.kind === "network") {
@@ -111,6 +139,7 @@ export class AdminAgencyConnectionTestService {
         message: `代理店システムへ接続できませんでした (${result.error.kind})。送信先URLとネットワークを確認してください。`,
         requestUrl,
         httpStatus: status,
+        partnerResponse,
       };
     }
     return {
@@ -118,6 +147,7 @@ export class AdminAgencyConnectionTestService {
       message: `代理店システムがエラーを返しました${status ? ` (HTTP ${status})` : ""}。時間をおいて再実行するか、代理店システムの担当者へ連絡してください。`,
       requestUrl,
       httpStatus: status,
+      partnerResponse,
     };
   }
 

@@ -30,6 +30,7 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
         message: err instanceof Error ? err.message : "接続テストの実行に失敗しました",
         requestUrl: null,
         httpStatus: null,
+        partnerResponse: null,
       });
     } finally {
       setTesting(false);
@@ -48,6 +49,7 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
       </button>
       <p className="mt-1 text-xs">
         保存済みの送信先URLとAPIキーで代理店システムを実際に呼び出し、疎通と認証だけを確かめます。
+既存IDの参照だけを行うため、登録経路が使う書き込み権限 (common_users:write) までは確認できません。
         Feature Flag がOFFでも実行できます。実在しないIDで問い合わせ、作成もさせないため
         <strong>相手側には何も残りません。</strong>
       </p>
@@ -64,6 +66,11 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
           <p className="mt-1">{result.message}</p>
           {result.requestUrl ? (
             <p className="mt-1 break-all font-mono text-xs">{result.requestUrl}</p>
+          ) : null}
+          {result.partnerResponse ? (
+            <p className="mt-2 break-all font-mono text-xs">
+              連携先の応答: {result.partnerResponse}
+            </p>
           ) : null}
         </div>
       ) : null}
