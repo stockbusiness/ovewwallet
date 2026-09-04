@@ -439,9 +439,13 @@ jobs:
             "SENGOKU_AI_SSO_AUDIENCE=orly-wallet"
             "SENGOKU_AI_JWKS_URL=https://sengoku-ai.com/api/sso/jwks.php"
             # 連携先がSSO受信URL (https://sennokuni-wallet.com/sso/agency) を
-            # 登録し終えるまでは閉じておく。上位代理店への付与はSSOでの紐付けが
-            # 前提なので、開けるのは疎通確認の後 (docs/agency-integration.md)。
-            "ENABLE_AGENCY_LOGIN=false"
+            # SSOクライアント`orly-wallet`へ登録済みのため開ける (連携先回答 2026-09-04)。
+            # 上位代理店への付与はSSOでの紐付けが前提で、ログイン済みでない代理店宛の
+            # 付与イベントは受取人を解決できず404となり、約1時間 (30秒から倍々で8回)
+            # の再送を使い切るとDEADになる
+            # (point-award-wallet-delivery.handler.ts / inbound-events.service.ts)。
+            # そのため ENABLE_AGENCY_POINT_AWARD_INBOX より先にこちらを開ける。
+            "ENABLE_AGENCY_LOGIN=true"
             # 代理店システム(sengoku-ai.com)連携のFeature Flag。
             # 管理画面の「代理店連携セットアップ」がこの4つのON/OFFを表示する。
             # 手順が済んだものから個別にtrueへ変えてデプロイする (段階的に開ける)。
