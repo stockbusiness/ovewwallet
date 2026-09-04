@@ -8,6 +8,7 @@ import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminAgencySetupService } from "./admin-agency-setup.service";
 import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test.service";
 import { IntegrationsModule } from "../integrations/integrations.module";
+import { OutboxModule } from "../outbox/outbox.module";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -36,7 +37,7 @@ import { AdminService } from "./admin.service";
 @Module({
   // IntegrationsModule: 代理店システムへの接続テスト (AdminAgencyConnectionTestService) が
   // IntegrationHttpClient / IntegrationConfigProvider を使う。
-  imports: [AccountsModule, CollectiblesModule, IntegrationsModule],
+  imports: [AccountsModule, CollectiblesModule, IntegrationsModule, OutboxModule],
   controllers: [
     AdminController,
     AdminAuthController,

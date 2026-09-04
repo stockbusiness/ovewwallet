@@ -20,3 +20,10 @@ export const AgencyLinkManualLinkSchema = z.object({
 });
 
 export const AgencyLinkUnlinkSchema = z.object({ reason: z.string().min(1) });
+
+/** 紹介の後付け紐付け (`POST /api/v1/admin/wallet-referrals/:id/attach`)。 */
+export const WalletReferralManualAttachSchema = z.object({
+  /** ORIアカウントのコード (ORI-ACC-...) またはID。 */
+  account: z.string().min(1).max(255),
+  reason: z.string().min(1),
+});

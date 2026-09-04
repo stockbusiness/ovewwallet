@@ -13,7 +13,7 @@
 - 紹介・特典状態テーブル (専用テーブル、指示書10章の方針通り)
 - `integration_outbox` への登録 (実際の送信はPhase 2)
 - 二重登録・二重付与防止 (DB制約)
-- 管理画面の確認機能 (一覧・詳細、読み取り専用)
+- 管理画面の確認機能 (一覧・詳細) と、後付けの紐付け (下記)
 
 **Phase 2 (代理店システム接続: APIキー・署名設定・自動送信・確認結果反映・特典確定)、
 Phase 3 (管理者の手動確定・取消・紹介者訂正)は未実装。** 3,000 OVEは今回は
@@ -123,10 +123,42 @@ Cookieも **APIサーバー側のドメインで発行する**。ウォレット
 実ブラウザ (Playwright) でも、`/invite/{token}` → 別ドメインでのCookie発行 → LINE
 登録 → 管理画面での確認まで一連の流れを確認済み。
 
+## 後付けの紐付け (管理画面)
+
+```
+POST /api/v1/admin/wallet-referrals/:id/attach   { "account": "ORI-ACC-...", "reason": "..." }
+```
+
+紹介の紐付けは**新規アカウント作成時にしか起きない** (`AuthService` が
+`onNewAccountCreated` でのみ `attachToNewAccount` を呼ぶ)。そのため
+「先にウォレットへ登録した人が、後から代理店の紹介URLを踏んだ」場合は紹介が成立せず、
+代理店の成果にならない。
+
+**退会させても救済にならない。** 退会は `status = CLOSED` にするだけで identity は残り、
+同じLINEアカウントでの再登録は明示的に拒否される
+(`AccountRegistrationService.findOrCreateByIdentity`)。つまり退会させると、その利用者は
+ウォレットを一切使えなくなる。そのため個別救済はこの操作で行う。
+
+| | |
+|---|---|
+| 対象 | `CAPTURED` のみ。`EXPIRED` 等の終端状態からは復帰させない (状態遷移の不変条件を崩さないため)。単に猶予 (既定30日) を過ぎただけの行は `CAPTURED` のまま残るので紐付けできる |
+| 前提 | 代理店システムの紹介セッション (`referral_session_key` + `canonical_referral_token`) が揃っていること。無いと確定を通知できないため拒否する |
+| 遷移後 | **`PENDING`** (`CONFIRMED` にはしない) |
+| 権限 | `SUPER_ADMIN` / `INTEGRATION_ADMIN` (閲覧専用の `AUDITOR` には開けない) |
+| 記録 | `source = "admin"`、`reason`、監査ログ `WALLET_REFERRAL_ATTACHED_MANUALLY` |
+
+**`CONFIRMED` にしない理由**: 成果を認めるかどうかの正本は代理店システム側にある。
+ウォレットの管理画面から確定済みにすると連携先の記録と食い違う。確定自体は通常フローと
+同じ経路 (Outbox `wallet.referral.registered` → `AgencyReferralOutboxHandler` →
+代理店システムの `POST /api/referrals/confirm`) に委ね、先方が認めて初めて `CONFIRMED`
+になる。冪等キーも通常フローと同じなので二重送信にならない。
+
+1アカウントに紐付けられる紹介は1件まで (`@@unique([walletUserId])`)。
+
 ## 今後の課題 (Phase 2・Phase 3)
 
 - `AgencyReferralClient`: sengoku-ai.comへの実際の送信・確認結果の反映
   (代理店システム側の送信用APIキー発行が前提。`docs/agency-referral-decisions.md`参照)
 - 確認結果 (`confirmed`/`rejected`) を受けての3,000 OVE確定付与・LINE認証条件の適用
-- 管理者による手動確定・取消・紹介者訂正 (`/wallet-referrals`への操作ボタン追加)
+- 管理者による取消・紹介者訂正 (後付けの紐付けは実装済み。下記「後付けの紐付け」)
 - outboxの自動再送 (現状`/admin/outbox`からの手動dispatchのみ)
