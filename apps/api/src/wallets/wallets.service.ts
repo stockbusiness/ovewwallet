@@ -4,13 +4,27 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { generateId, type PrismaClient } from "@ove/database";
+import { generateId, type PrismaClient, type ServiceCode } from "@ove/database";
 import { getWalletBalance, listWalletTransactions } from "@ove/ledger";
 import { toCsv } from "../common/csv";
 import { PRISMA } from "../common/prisma.module";
 import { CommonEventAccountResolver } from "../common-events/common-event-account-resolver";
 import { CLOCK, type Clock } from "./clock";
 import { buildCommonUserBalanceResponse } from "./service-balance-response";
+
+/**
+ * 利用者向けの連携サービス一覧 (`GET /api/v1/me/linked-services`) に出さない連携先。
+ * 「ORIを使う」「連携サービス」の両画面がこの一覧を読む。
+ *
+ * `AGENCY_SYSTEM` はORIを**付与する側**のシステムで、利用者がORIを使う先ではない。
+ * それでも一覧に出ていたのは、代理店がSSOでログインすると`account_links`がACTIVEに
+ * なり、この一覧の「紐付いている連携先」の条件を満たしてしまうためだった
+ * (`AuthService.loginWithAgencySso`)。運用管理用の名前がそのまま利用者に見えるという
+ * 問題もあった。
+ *
+ * 除外はAPI側で行う。画面側で消すと、もう一方の画面やURL直打ちで出てしまうため。
+ */
+const HIDDEN_FROM_LINKED_SERVICES: ServiceCode[] = ["AGENCY_SYSTEM"];
 
 @Injectable()
 export class WalletsService {
@@ -141,7 +155,7 @@ export class WalletsService {
   async listLinkedServices(oveAccountId: string) {
     const [integrations, links] = await Promise.all([
       this.db.serviceIntegration.findMany({
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", serviceCode: { notIn: HIDDEN_FROM_LINKED_SERVICES } },
         orderBy: { serviceName: "asc" },
       }),
       this.db.accountLink.findMany({

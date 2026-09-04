@@ -456,15 +456,20 @@ jobs:
             # ENABLE_AGENCY_POINT_AWARD_INBOX は受信しただけでORI残高が増える経路なので、
             # 受信用APIキーを渡し終えてから最後に開ける
             # (docs/integration/AGENCY_POINT_AWARD.md)。
-            "ENABLE_PLATFORM_USER_ID=false"
-            "ENABLE_WALLET_REFERRAL_TOKEN=false"
-            "ENABLE_AGENCY_REFERRAL_SYNC=false"
+            #
+            # 第1弾 (2026-09-04): 管理画面の接続テストが通り、代理店システム側の
+            # APIキーに common_users:read / common_users:write / referrals:write /
+            # events:write が付与されたことを確認したので、紹介経路の3つを開ける。
+            "ENABLE_PLATFORM_USER_ID=true"
+            "ENABLE_WALLET_REFERRAL_TOKEN=true"
+            "ENABLE_AGENCY_REFERRAL_SYNC=true"
             # 第2弾 (2026-09-04): 受信用APIキーを連携先へ渡し終えたので開ける。
             # この経路は受信しただけでORI残高が増えるため、金額の歯止めが
             # 入っていることが前提になる (ServiceIntegration の
-            # per_request_amount_limit / daily_amount_limit)。
-            # 上限を効かせる変更とその設定値のデータ移行が本番に入る前に
-            # このFlagだけを開けないこと。
+            # per_request_amount_limit / daily_amount_limit)。上限を効かせる変更と
+            # その設定値のデータ移行はPR #63で本番に入っている。
+            # 上限を外す・上げるときは、この経路が無制限になっていないか確認すること
+            # (docs/integration/AGENCY_POINT_AWARD.md「金額の上限」)。
             "ENABLE_AGENCY_POINT_AWARD_INBOX=true"
             "HIGH_VALUE_THRESHOLD=50000"
             # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、

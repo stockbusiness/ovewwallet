@@ -22,6 +22,9 @@ describe("代理店システムからのORI付与イベント (orly.point_award.
   let partnerApiKey: string;
   let serviceIntegrationId: string;
 
+  const PER_REQUEST_LIMIT = 3_000;
+  const DAILY_LIMIT = 1_000_000;
+
   beforeAll(async () => {
     process.env.ENABLE_AGENCY_POINT_AWARD_INBOX = "true";
 
@@ -33,7 +36,15 @@ describe("代理店システムからのORI付与イベント (orly.point_award.
     partnerApiKey = `oveagn_test_${generateId()}`;
     const integration = await prisma.serviceIntegration.upsert({
       where: { serviceCode: "AGENCY_SYSTEM" },
-      update: { apiKeyHash: hashSecret(partnerApiKey), status: "ACTIVE" },
+      // 本番と同じ上限で回す。この経路はServiceIntegrationの金額上限を見るように
+      // したので、0のままだと全ての付与が拒否される
+      // (migrations/20260904110000_set_agency_system_amount_limits と同じ値)。
+      update: {
+        apiKeyHash: hashSecret(partnerApiKey),
+        status: "ACTIVE",
+        dailyAmountLimit: DAILY_LIMIT,
+        perRequestAmountLimit: PER_REQUEST_LIMIT,
+      },
       create: {
         id: generateId(),
         serviceCode: "AGENCY_SYSTEM",
@@ -41,8 +52,8 @@ describe("代理店システムからのORI付与イベント (orly.point_award.
         apiKeyHash: hashSecret(partnerApiKey),
         signingSecretEncrypted: encryptSecret(generateOpaqueToken(32), ENCRYPTION_KEY),
         allowedIps: [],
-        dailyAmountLimit: 0,
-        perRequestAmountLimit: 0,
+        dailyAmountLimit: DAILY_LIMIT,
+        perRequestAmountLimit: PER_REQUEST_LIMIT,
       },
     });
     serviceIntegrationId = integration.id;
@@ -266,6 +277,86 @@ describe("代理店システムからのORI付与イベント (orly.point_award.
       await post(
         baseBody({ recipient_common_user_id: commonUserId }, { event_type: "reward.granted" }),
       ).expect(400);
+    });
+  });
+
+  describe("金額上限 (ServiceIntegration)", () => {
+    /** dailyAmountLimitを一時的に書き換える。afterで必ず戻すこと。 */
+    async function setDailyLimit(value: number) {
+      await prisma.serviceIntegration.update({
+        where: { id: serviceIntegrationId },
+        data: { dailyAmountLimit: value },
+      });
+    }
+
+    afterEach(async () => {
+      await setDailyLimit(DAILY_LIMIT);
+    });
+
+    it("rejects an award above per_request_amount_limit without crediting", async () => {
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_over_req_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+      const before = await availableBalance(walletId);
+
+      await post(
+        baseBody({ recipient_common_user_id: commonUserId, points: PER_REQUEST_LIMIT + 1 }),
+      ).expect(400);
+
+      expect(await availableBalance(walletId)).toBe(before);
+    });
+
+    it("credits an award exactly at per_request_amount_limit", async () => {
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_at_req_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+      const before = await availableBalance(walletId);
+
+      await post(
+        baseBody({ recipient_common_user_id: commonUserId, points: PER_REQUEST_LIMIT }),
+      ).expect(201);
+
+      expect(await availableBalance(walletId)).toBe(before + BigInt(PER_REQUEST_LIMIT));
+    });
+
+    it("rejects an award that would exceed daily_amount_limit without crediting", async () => {
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_over_daily_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+      const before = await availableBalance(walletId);
+
+      // 当日分の集計が必ず上限を超えるところまで下げる。
+      await setDailyLimit(1);
+
+      await post(baseBody({ recipient_common_user_id: commonUserId, points: 100 })).expect(400);
+
+      expect(await availableBalance(walletId)).toBe(before);
+    });
+
+    /**
+     * 上限判定を冪等判定より先に置くと、付与済みイベントの再送が日次上限を
+     * 二度消費して拒否され、連携先には「失敗」として返ってしまう。順序を固定する。
+     */
+    it("still returns the credited result when a processed award is resent after the daily limit is reached", async () => {
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_resend_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+      const awardEventKey = `orly_resend_${generateId()}`;
+
+      const first = await post(
+        baseBody({ recipient_common_user_id: commonUserId, award_event_key: awardEventKey, points: 1000 }),
+      ).expect(201);
+      const afterFirst = await availableBalance(walletId);
+
+      await setDailyLimit(1);
+
+      // event_idだけ振り直した再送。台帳のidempotency_keyで受け止める経路を通る。
+      const second = await post(
+        baseBody({ recipient_common_user_id: commonUserId, award_event_key: awardEventKey, points: 1000 }),
+      ).expect(201);
+
+      expect(second.body.wallet_event_id).toBe(first.body.wallet_event_id);
+      expect(await availableBalance(walletId)).toBe(afterFirst);
     });
   });
 
