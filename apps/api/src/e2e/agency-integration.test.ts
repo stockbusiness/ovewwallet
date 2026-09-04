@@ -354,6 +354,30 @@ describe("戦国経済圏代理店システム外部連携 (仕様書v3.6.71 / �
 
       await request(app.getHttpServer()).post("/api/v1/auth/sso/agency").send({ token, termsAccepted: true }).expect(401);
     });
+
+    // 以下2件は、SSO受信画面 (apps/user-wallet/src/app/sso/agency) が
+    // 失敗の種類を出し分けるために依存しているステータスコードを固定する。
+    // 画面はステータスだけを見て分岐するため、ここが変わると案内文が嘘になる。
+
+    it("rejects a first-time login without termsAccepted as 400 (not 401)", async () => {
+      const token = await signAgencyJwt({ external_id: `dir_noterms_${generateId()}` });
+
+      // 401(トークンが無効)と紛れないこと。画面は400のときだけ規約同意を出す。
+      await request(app.getHttpServer()).post("/api/v1/auth/sso/agency").send({ token }).expect(400);
+    });
+
+    it("returns 404 when ENABLE_AGENCY_LOGIN is not enabled", async () => {
+      process.env.ENABLE_AGENCY_LOGIN = "false";
+      try {
+        const token = await signAgencyJwt({ external_id: `dir_flagoff_${generateId()}` });
+        await request(app.getHttpServer())
+          .post("/api/v1/auth/sso/agency")
+          .send({ token, termsAccepted: true })
+          .expect(404);
+      } finally {
+        process.env.ENABLE_AGENCY_LOGIN = "true";
+      }
+    });
   });
 
   describe("GET /api/v1/admin/agency-links (代理店連携状態一覧, 開発ガイドライン15章)", () => {

@@ -168,9 +168,46 @@ common_user_id が未解決だと確定のOutboxハンドラが例外を投げ�
 設定されないため、このFlagがOFFのままだと紹介が永久に確定しない。
 
 `ENABLE_AGENCY_REFERRAL_SYNC` (既定`false`) がOFFの間、
-`POST /api/integrations/agencies` は503を返す。SSOログイン
-(`POST /api/v1/auth/sso/agency`) はフラグの影響を受けない
-(LINE/戦国パスポートSSOと同様、ログイン導線自体はフラグで止めない)。
+`POST /api/integrations/agencies` は503を返す。
+
+SSOログイン (`POST /api/v1/auth/sso/agency`) は**`ENABLE_AGENCY_LOGIN`で止まる**。
+OFFの間は404 (「その入口は存在しない」) を返す (`docs/login-methods.md`、
+`auth.controller.ts`の`assertLoginMethodEnabled`)。上の4つとは別のFlagである。
+
+## 代理店SSOログイン
+
+連携先の起動URL `https://sengoku-ai.com/agent/sso_launch.php?client=orly-wallet`
+へ代理店がアクセスすると、RS256署名済みJWTが発行され、ウォレット側の**SSO受信URL**
+へクエリ文字列でリダイレクトされる (連携先回答 2026-09-04)。
+
+```
+https://sennokuni-wallet.com/sso/agency?token={JWT}
+```
+
+この受信URLを、連携先のSSOクライアント設定 `orly-wallet` の
+「SSO受信URL / callback_url」に登録してもらう必要がある。
+
+受け口は `apps/user-wallet/src/app/sso/agency/page.tsx`。JWTの検証はすべて
+サーバー側で行い、画面はトークンをAPIへ渡すだけである。画面が失敗を出し分けるために
+依存しているステータスコードは `apps/api/src/e2e/agency-integration.test.ts` で
+固定してある。
+
+| 状況 | ステータス | 画面の挙動 |
+|---|---|---|
+| 成功 | 201 | `/wallet` へ遷移 |
+| 新規アカウントで規約未同意 | 400 | 規約同意画面を出す |
+| 期限切れ・署名不正・aud不一致・jti再利用 | 401 | やり直しを案内 |
+| 退会済みアカウント | 403 | ログイン不可を案内 |
+| `ENABLE_AGENCY_LOGIN`がOFF | 404 | 受け付けていない旨を案内 |
+
+**JWTの有効期限は発行から60秒**しかない。そのため初回ログインでは、規約同意を
+受け取ってからAPIへ送るとほぼ確実に期限切れになる。同意は
+sessionStorage (真偽値のみ。トークンは保存しない) に記録したうえで起動URLへ
+戻してJWTを取り直し、再訪時に同意済みとして即座に送信する
+(`apps/user-wallet/src/components/AgencySsoCallback.tsx`)。
+
+URLに生のJWTが載るため、この画面は `referrer: "no-referrer"` と
+`robots: noindex` を指定し、読み取り後に `history.replaceState` でクエリを消す。
 
 ## 環境変数
 
@@ -180,6 +217,8 @@ common_user_id が未解決だと確定のOutboxハンドラが例外を投げ�
 | `SENGOKU_AI_SSO_ISSUER` | JWTの`iss`として期待する値 | `https://sengoku-ai.com` |
 | `SENGOKU_AI_SSO_AUDIENCE` | JWTの`aud`として期待する値 (sengoku-ai.com側で本連携用に発行された値) | 未設定時は実在しないプレースホルダー (検証は必ず失敗する安全側デフォルト) |
 | `ENABLE_AGENCY_REFERRAL_SYNC` | 同期受信APIの有効化 | `false` |
+| `ENABLE_AGENCY_LOGIN` | 代理店SSOログインの有効化。OFFの間は404 | `false` |
+| `NEXT_PUBLIC_AGENCY_SSO_LAUNCH_URL` | 受信画面がJWTを取り直しに行く先 (user-wallet側) | `https://sengoku-ai.com/agent/sso_launch.php?client=orly-wallet` |
 
 `SENGOKU_AI_SSO_AUDIENCE`は必ず実際の値を設定すること。未設定のままでは
 SSOログインは常に失敗する（起動時にエラーにはしない安全側の設計）。
