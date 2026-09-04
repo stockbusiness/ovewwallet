@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import AgencySetupStep from "@/components/agency/AgencySetupStep";
+import AgencyConnectionTest from "@/components/agency/AgencyConnectionTest";
 import { apiFetch, ApiError, type AgencySetupStatus, type AgencySetupFlagKey } from "@/lib/api";
 
 const FLAG_PURPOSE: Record<AgencySetupFlagKey, string> = {
@@ -37,6 +38,7 @@ export default function AgencySetupPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
 
   if (error) return <p className="text-sengoku-red">{error}</p>;
   if (!status) return <p className="text-sengoku-faint">読み込み中...</p>;
@@ -87,6 +89,8 @@ export default function AgencySetupPage() {
             新規登録時に共通ID (common_user_id) を問い合わせるための鍵です。
             <strong>ORI側では発行できません。</strong>代理店システムの担当者から受け取ってください。
           </p>
+
+          <AgencyConnectionTest disabled={!status.hubApiKey.set} />
         </AgencySetupStep>
 
         <AgencySetupStep

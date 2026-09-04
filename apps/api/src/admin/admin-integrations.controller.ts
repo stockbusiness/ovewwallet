@@ -5,6 +5,7 @@ import { AdminServiceIntegrationsService } from "./admin-service-integrations.se
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminAgencySetupService } from "./admin-agency-setup.service";
+import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test.service";
 import {
   AgencyLinkManualLinkSchema,
   AgencyLinkUnlinkSchema,
@@ -23,6 +24,7 @@ export class AdminIntegrationsController {
     private readonly commonUserHub: AdminCommonUserHubService,
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly agencySetup: AdminAgencySetupService,
+    private readonly agencyConnectionTest: AdminAgencyConnectionTestService,
   ) {}
 
   /**
@@ -34,6 +36,20 @@ export class AdminIntegrationsController {
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
   async getAgencySetup() {
     return this.agencySetup.get();
+  }
+
+  /**
+   * 代理店システムへの疎通と認証だけを確かめる。Feature Flagを開ける**前**に
+   * 設定の正しさを確認できるよう、Flagは見ない。副作用を避けるため
+   * `create_if_missing: false` で問い合わせる (相手側に何も作らない)。
+   *
+   * 本番の認証情報で外部へ発信するため AUDITOR には開放しない。
+   */
+  @Post("agency-setup/test-connection")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async testAgencyConnection(@Req() req: AuthenticatedAdminRequest) {
+    return this.agencyConnectionTest.run(req.admin.id);
   }
 
   @Get("service-integrations")

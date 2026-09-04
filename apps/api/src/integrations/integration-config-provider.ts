@@ -29,7 +29,17 @@ export class IntegrationConfigProvider {
 
   async resolveAgencySystemConfig(featureFlag: FeatureFlagKey): Promise<ResolvedIntegrationConfig | null> {
     if (!isFeatureEnabled(featureFlag)) return null;
+    return this.resolveAgencySystemConfigIgnoringFlag();
+  }
 
+  /**
+   * Feature Flagを見ずに設定だけを解決する。**管理画面の接続テスト専用**。
+   *
+   * Flagを開ける**前**に「送信先URLとAPIキーが正しいか」を確かめられることが
+   * 接続テストの目的なので、ここだけは意図的にFlagを無視する。
+   * 実際の送信経路では使わないこと (Flagで止められなくなる)。
+   */
+  async resolveAgencySystemConfigIgnoringFlag(): Promise<ResolvedIntegrationConfig | null> {
     const config = await this.db.commonUserHubConfig.findUnique({ where: { id: CONFIG_ID } });
     if (!config?.apiKeyEncrypted) return null;
 

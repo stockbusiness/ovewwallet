@@ -354,6 +354,14 @@ export interface AgencySetupStatus {
   agencyLinks: Record<string, number>;
 }
 
+/** 代理店システムへの接続テスト結果 (`POST /api/v1/admin/agency-setup/test-connection`)。 */
+export interface AgencyConnectionTestResult {
+  outcome: "ok" | "unauthorized" | "not_found" | "unreachable" | "server_error" | "not_configured";
+  message: string;
+  requestUrl: string | null;
+  httpStatus: number | null;
+}
+
 export type AgencySetupFlagKey =
   | "ENABLE_PLATFORM_USER_ID"
   | "ENABLE_WALLET_REFERRAL_TOKEN"
