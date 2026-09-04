@@ -32,6 +32,27 @@
 `external_id`は代理店レコード同期のイベントでは必須(無い場合は400)。HUB系
 イベントは`external_id`を持たないことがあるため任意項目にしてある。
 
+## 設定手順 (管理画面)
+
+**外部連携 > 代理店連携セットアップ** (`/agency-setup`) に、必要な設定と現在の状態が
+順番に並んでいる。設定が「共通顧客HUB送信設定」「外部サービス管理」「Feature Flag
+(環境変数)」の3か所に分かれていて、どこまで済んだか分からないという運用からの指摘への
+対応 (この画面は**状態を表示するだけ**で、変更は各設定画面で行う)。
+
+| # | 内容 | 完了の判定 |
+|---|---|---|
+| 1 | `system_key` を代理店システム側の登録値に合わせる | 現在値が `orly-wallet` か |
+| 2 | 共通顧客HUBのAPIキーを設定 (**代理店システムが発行**) | `apiKeySet` |
+| 3 | 受信用APIキーを発行して渡す (**ORI側が発行**) | `service_integrations.last_accessed_at` に接続実績があるか |
+| 4 | Feature Flag 4つを有効化 | 環境変数のON/OFF |
+| 5 | 接続テストと実績確認 | 紹介・紐付けの件数 |
+
+APIキーが2種類あり向きが逆なので混同しやすい (2はORI→代理店の問い合わせ用、
+3は代理店→ORIの付与イベント用)。画面上でも明記している。
+
+3の完了判定に `last_accessed_at` を使うのは、「鍵を渡した」ことはシステム側から
+分からないが、「相手が実際にその鍵で接続できた」ことは分かるため。
+
 ## 管理画面でできること・できないこと
 
 `AGENCY_SYSTEM` は既存の `service_integrations` を再利用しているため、既存の
@@ -98,6 +119,16 @@ provider: `"sengoku-ai"`) を使う。`account_links` はそれとは別に、
 そのまま使うことはできない。
 
 ## Feature Flag
+
+連携に必要なFlagは4つある (`ENABLE_PLATFORM_USER_ID` /
+`ENABLE_WALLET_REFERRAL_TOKEN` / `ENABLE_AGENCY_REFERRAL_SYNC` /
+`ENABLE_AGENCY_POINT_AWARD_INBOX`)。`.github/workflows/deploy.yml` で明示的に
+設定しており、手順が済んだものから個別に `true` へ変えてデプロイする。
+
+`ENABLE_PLATFORM_USER_ID` は単独の機能ではなく**紹介確定の前提**である。
+common_user_id が未解決だと確定のOutboxハンドラが例外を投げて再送し続ける
+(`agency-referral-outbox-handler.ts`)。この共通IDは共通顧客HUB経由でしか
+設定されないため、このFlagがOFFのままだと紹介が永久に確定しない。
 
 `ENABLE_AGENCY_REFERRAL_SYNC` (既定`false`) がOFFの間、
 `POST /api/integrations/agencies` は503を返す。SSOログイン

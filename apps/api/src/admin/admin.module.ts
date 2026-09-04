@@ -5,6 +5,7 @@ import { LineBroadcastService } from "../notices/line-broadcast.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminAccountsController } from "./admin-accounts.controller";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
+import { AdminAgencySetupService } from "./admin-agency-setup.service";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -57,6 +58,7 @@ import { AdminService } from "./admin.service";
     AdminApprovalService,
     AdminRewardRulesService,
     AdminAgencyLinksService,
+    AdminAgencySetupService,
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
