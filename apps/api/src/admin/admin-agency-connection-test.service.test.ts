@@ -14,6 +14,8 @@ type Ctor = ConstructorParameters<typeof AdminAgencyConnectionTestService>;
 function build(options: {
   config?: { baseUrl: string; systemKey: string; apiKey: string } | null;
   response?: unknown;
+  /** 呼び出し順に返す応答。指定時は `response` より優先する。 */
+  responses?: unknown[];
 }) {
   const created: Record<string, unknown>[] = [];
   const requests: Record<string, unknown>[] = [];
@@ -29,6 +31,9 @@ function build(options: {
   const http = {
     request: async (params: Record<string, unknown>) => {
       requests.push(params);
+      if (options.responses) {
+        return options.responses[requests.length - 1] ?? { ok: true, data: {} };
+      }
       return options.response ?? { ok: true, data: {} };
     },
   } as unknown as IntegrationHttpClient;
@@ -126,5 +131,65 @@ describe("AdminAgencyConnectionTestService", () => {
     await service.run("adm_1");
 
     expect(created[0]!["result"]).toBe("FAILURE");
+  });
+});
+
+describe("AdminAgencyConnectionTestService: APIキーの渡し方", () => {
+  const unauthorized = {
+    ok: false,
+    error: { kind: "http_4xx", status: 403, retryable: false, message: "HTTP 403", body: { error: "forbidden" } },
+  };
+
+  it("まず x-api-key で試す", async () => {
+    const { service, requests } = build({});
+
+    const result = await service.run("adm_1");
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!["apiKey"]).toBe("secret-key");
+    expect(requests[0]!["extraHeaders"]).toBeUndefined();
+    expect(result.acceptedAuthStyle).toBe("x-api-key");
+  });
+
+  it("x-api-keyが401/403なら Authorization: Bearer でも試し、通ればそれを報告する", async () => {
+    const { service, requests } = build({ responses: [unauthorized, { ok: true, data: {} }] });
+
+    const result = await service.run("adm_1");
+
+    expect(requests).toHaveLength(2);
+    expect(requests[1]!["apiKey"]).toBeUndefined();
+    expect(requests[1]!["extraHeaders"]).toEqual({ authorization: "Bearer secret-key" });
+    expect(result.outcome).toBe("ok");
+    expect(result.acceptedAuthStyle).toBe("bearer");
+    expect(result.message).toContain("bearer");
+  });
+
+  it("どちらも通らなければ、両方試した旨を伝える", async () => {
+    const { service, requests } = build({ responses: [unauthorized, unauthorized] });
+
+    const result = await service.run("adm_1");
+
+    expect(requests).toHaveLength(2);
+    expect(result.outcome).toBe("unauthorized");
+    expect(result.acceptedAuthStyle).toBeNull();
+    expect(result.message).toContain("両方で試して");
+  });
+
+  it("404など認証以外の失敗では、2回目を試さない", async () => {
+    const { service, requests } = build({
+      response: { ok: false, error: { kind: "http_4xx", status: 404, retryable: false, message: "HTTP 404" } },
+    });
+
+    await service.run("adm_1");
+
+    expect(requests).toHaveLength(1);
+  });
+
+  it("連携先の応答本文を切り分け用に残す (300文字まで)", async () => {
+    const { service } = build({ responses: [unauthorized, unauthorized] });
+
+    const result = await service.run("adm_1");
+
+    expect(result.partnerResponse).toBe(JSON.stringify({ error: "forbidden" }));
   });
 });
