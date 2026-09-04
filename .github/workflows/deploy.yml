@@ -446,6 +446,14 @@ jobs:
             # (point-award-wallet-delivery.handler.ts / inbound-events.service.ts)。
             # そのため ENABLE_AGENCY_POINT_AWARD_INBOX より先にこちらを開ける。
             "ENABLE_AGENCY_LOGIN=true"
+            # 紹介URLを開いてから登録を終えるまでの猶予 (既定24時間、ここでは30日)。
+            # 紹介URL自体の寿命ではない。代理店URLは何人でも何回でも使える固定URLで、
+            # アクセスのたびに訪問者ごとの紹介トークンとCookieが作られる。この値は
+            # その1件が有効でいられる長さで、Cookieと`wallet_referrals.expires_at`の
+            # 両方に効く (referral-capture.use-case.ts)。
+            # 24時間だと「リンクは踏んだが後日あらためて登録した」利用者を取りこぼす。
+            # アフィリエイトの一般的な設定に合わせて30日にする (2026-09-04 運用判断)。
+            "REFERRAL_SESSION_TTL_HOURS=720"
             # 代理店システム(sengoku-ai.com)連携のFeature Flag。
             # 管理画面の「代理店連携セットアップ」がこの4つのON/OFFを表示する。
             # 手順が済んだものから個別にtrueへ変えてデプロイする (段階的に開ける)。

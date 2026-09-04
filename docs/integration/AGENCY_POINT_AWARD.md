@@ -50,7 +50,11 @@ https://sennokuni-wallet.com/invite?referral_token=...&referral_session_key=...&
 `referral_token` 以外のパラメータは `^[A-Za-z0-9._~-]{1,255}$` に一致しないものを捨てる。
 URLは利用者が自由に書き換えられる入力のため、想定外の値はDBにもログにも残さない。
 
-紹介Cookieの有効期限は既定24時間 (`REFERRAL_SESSION_TTL_HOURS`)。
+紹介Cookieの有効期限は `REFERRAL_SESSION_TTL_HOURS` (コード上の既定24時間、
+本番は30日=720)。**これは紹介URL自体の寿命ではない。** 代理店URLは何人でも何回でも
+使える固定URLで、アクセスのたびに訪問者ごとの紹介トークンとCookieが作られる。
+この値はその1件が有効でいられる長さで、1件は登録に使われると再利用されない
+(`wallet_referrals.used_at`)。
 
 ---
 
