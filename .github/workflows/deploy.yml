@@ -459,7 +459,13 @@ jobs:
             "ENABLE_PLATFORM_USER_ID=false"
             "ENABLE_WALLET_REFERRAL_TOKEN=false"
             "ENABLE_AGENCY_REFERRAL_SYNC=false"
-            "ENABLE_AGENCY_POINT_AWARD_INBOX=false"
+            # 第2弾 (2026-09-04): 受信用APIキーを連携先へ渡し終えたので開ける。
+            # この経路は受信しただけでORI残高が増えるため、金額の歯止めが
+            # 入っていることが前提になる (ServiceIntegration の
+            # per_request_amount_limit / daily_amount_limit)。
+            # 上限を効かせる変更とその設定値のデータ移行が本番に入る前に
+            # このFlagだけを開けないこと。
+            "ENABLE_AGENCY_POINT_AWARD_INBOX=true"
             "HIGH_VALUE_THRESHOLD=50000"
             # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
             # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の
