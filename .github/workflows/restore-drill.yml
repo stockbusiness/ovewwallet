@@ -105,4 +105,8 @@ jobs:
               ;;
           esac
 
+          # TCP Proxy (公開ポート) 経由で繋ぐため、平文へのフォールバックを許さない。
+          # pg_dumpの既定は sslmode=prefer で、TLSが張れないと平文で接続してしまう。
+          DATABASE_URL=$(./scripts/require-sslmode.sh "$DATABASE_URL")
+
           DATABASE_URL="$DATABASE_URL" ./scripts/verify-backup-restore.sh

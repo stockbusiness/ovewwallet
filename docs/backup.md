@@ -27,6 +27,12 @@
 > ワークフロー側でも内部ホストを掴んだ時点で理由を名指しして停止する。
 > (検証環境は有効。本番は 2026-09-03 時点で未設定のため run #52 が失敗した。)
 
+> **公開ポート経由なので TLS を必須にする。** `pg_dump` の既定は `sslmode=prefer` で、
+> これは TLS が張れないと**平文で接続する**。認証情報とDBの中身が公開ポート越しに
+> 平文で流れうるため、`scripts/require-sslmode.sh` が接続URLに `sslmode=require` を
+> 付ける。`disable` / `allow` / `prefer` が明示されている場合は、平文へ落ちうるため
+> エラーで停止する。
+
 - `scripts/backup-db.sh`: `pg_dump` (カスタム形式) でバックアップを取得する。
   ```
   DATABASE_URL=postgresql://... ./scripts/backup-db.sh [出力先ディレクトリ (既定: ./backups)]
