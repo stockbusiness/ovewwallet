@@ -456,9 +456,14 @@ jobs:
             # ENABLE_AGENCY_POINT_AWARD_INBOX は受信しただけでORI残高が増える経路なので、
             # 受信用APIキーを渡し終えてから最後に開ける
             # (docs/integration/AGENCY_POINT_AWARD.md)。
-            "ENABLE_PLATFORM_USER_ID=false"
-            "ENABLE_WALLET_REFERRAL_TOKEN=false"
-            "ENABLE_AGENCY_REFERRAL_SYNC=false"
+            #
+            # 第1弾 (2026-09-04): 管理画面の接続テストが通り、代理店システム側の
+            # APIキーに common_users:read / common_users:write / referrals:write /
+            # events:write が付与されたことを確認したので、紹介経路の3つを開ける。
+            "ENABLE_PLATFORM_USER_ID=true"
+            "ENABLE_WALLET_REFERRAL_TOKEN=true"
+            "ENABLE_AGENCY_REFERRAL_SYNC=true"
+            # 第2弾。受信用APIキーを連携先へ渡し終えてから開ける。
             "ENABLE_AGENCY_POINT_AWARD_INBOX=false"
             "HIGH_VALUE_THRESHOLD=50000"
             # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
