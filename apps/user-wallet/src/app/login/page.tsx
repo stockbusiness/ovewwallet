@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PrimaryButton, AuthButton, ThemeToggle, ChatBubbleIcon, MailIcon, IdCardIcon, WalletLogo } from "@ove/shared-ui";
 import { apiFetch, ApiError, type LoginMethodAvailability } from "@/lib/api";
 import { sanitizeInternalReturnPath } from "@/lib/claim-return-path";
+import { describeLineLoginError } from "@/lib/line-login-error";
 import { TermsCheckbox } from "@/components/TermsCheckbox";
 import {
   isLiffConfigured,
@@ -130,13 +131,17 @@ function LoginPageContent() {
         clearPendingSubmission();
         router.push(postLoginRedirect);
       } catch (err) {
-        const message = err instanceof ApiError ? err.message : String(err);
-        appendDebugLog(`API送信失敗: ${message}`);
+        const raw = err instanceof ApiError ? err.message : String(err);
+        appendDebugLog(`API送信失敗: ${raw}`);
+        const info = describeLineLoginError(err);
+        // 送信待ちを残すのは「同じIDトークンでやり直せば通る」場合だけ
+        // (pageshowリロード対策、上記コメント参照)。規約未同意のように何度送っても
+        // 通らない失敗で残すと、再送上限に達するまで同じ失敗を繰り返す。
+        if (!info.retryable) clearPendingSubmission();
         if (!cancelled) {
-          setError(err instanceof ApiError ? err.message : "LINEログインに失敗しました");
+          setError(info.message);
           setDebugLog(getDebugLog());
         }
-        // ここでは送信待ちを消さない (上記コメント参照)。
       } finally {
         if (!cancelled) setLoading(null);
       }
