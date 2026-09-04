@@ -62,7 +62,8 @@ export default function WalletReferralsPage() {
         <h1 className="mb-1 text-xl font-bold">代理店紹介トークン受け入れ</h1>
         <p className="mb-4 text-xs text-sengoku-muted">
           代理店紹介URL (<code>/invite/&#123;token&#125;</code>) 経由の受付・新規登録時の紐付け・
-          初回登録特典3,000 ORIの状態を確認する画面 (Phase 1: 確認のみ。手動確定・取消はPhase 3で追加)。
+          初回登録特典3,000 ORIの状態を確認する画面。紐付かなかった紹介は、この画面から
+          後付けでORIアカウントへ紐付けできます。
         </p>
 
         <div className="mb-4 rounded-lg border border-sengoku-gold-soft bg-sengoku-navy-deep p-3 text-xs text-sengoku-muted">
@@ -102,10 +103,25 @@ export default function WalletReferralsPage() {
               <li>否認/エラー/期限切れ/取消: 何らかの理由で成立しなかった状態</li>
             </ul>
           </div>
-          <p className="text-sengoku-gold-soft">
-            重要: このページは確認専用です。「手動確定」「取消」のボタンはまだ実装されていません(今後追加予定)。
-            紹介が正しく成立していないケースへの個別対応は、現時点ではエンジニアへの依頼が必要です。
-          </p>
+          <div>
+            <p className="font-semibold text-sengoku-text">後付けで紐付ける</p>
+            <p>
+              紹介の紐付けは<strong className="text-sengoku-text">新規登録のときにしか起きません</strong>。
+              先にウォレットへ登録した人が後から紹介URLを踏んでも、代理店の成果にはなりません
+              (退会させても救済になりません。退会済みのLINEアカウントでは再登録できないためです)。
+              その個別対応がこの操作です。
+            </p>
+            <ul className="ml-4 list-disc">
+              <li>「受付済み(登録前)」の行の「詳細」を開き、ORIアカウントのコード(ORI-ACC-…)と理由を入れて「このアカウントへ紐付ける」を押します</li>
+              <li>状態は「登録済み・確認待ち」になります。<strong className="text-sengoku-text">確定にはしません</strong> — 成果を認めるかどうかの正本は代理店システム側にあるためです</li>
+              <li>そのあと代理店システムへ自動で確定を送り、先方が認めれば「紹介関係確定」に変わります</li>
+              <li>誰がいつ何を理由に紐付けたかは監査ログに残ります</li>
+            </ul>
+            <p className="text-sengoku-gold-soft">
+              代理店の成果の宛先を決める操作です。本人のアカウントであることを必ず確認してください。
+              1つのアカウントに紐付けられる紹介は1件までです。
+            </p>
+          </div>
         </HelpPanel>
 
         {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
@@ -189,6 +205,9 @@ export default function WalletReferralsPage() {
                             <dd>{item.reason ?? "-"}</dd>
                           </div>
                         </dl>
+                        {item.status === "CAPTURED" && !item.account && (
+                          <ManualAttachForm referral={item} onDone={load} />
+                        )}
                       </td>
                     </tr>
                   )}
@@ -205,4 +224,85 @@ export default function WalletReferralsPage() {
           </tbody>
         </table>
       </>  );
+}
+
+/**
+ * 紹介URLは踏まれたのに登録へ紐付かなかった紹介を、後からORIアカウントへ紐付ける。
+ * 代理店の成果の宛先を決める操作なので、確認の一手間 (confirm) を必ず挟む。
+ */
+function ManualAttachForm({
+  referral,
+  onDone,
+}: {
+  referral: WalletReferralItem;
+  onDone: () => void;
+}) {
+  const [account, setAccount] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!account.trim() || !reason.trim()) {
+      setError("ORIアカウントと理由の両方が必要です");
+      return;
+    }
+    if (
+      !window.confirm(
+        `紹介をORIアカウント ${account} へ紐付けます。\n\n` +
+          "代理店の成果の宛先を決める操作です。本人のアカウントであることを確認しましたか？",
+      )
+    ) {
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/admin/wallet-referrals/${referral.id}/attach`, {
+        method: "POST",
+        body: JSON.stringify({ account: account.trim(), reason: reason.trim() }),
+      });
+      setAccount("");
+      setReason("");
+      onDone();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "紐付けに失敗しました");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-sengoku-border pt-3">
+      <p className="mb-2 text-xs font-semibold text-sengoku-text">後付けで紐付ける</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-xs text-sengoku-muted">
+          ORIアカウント
+          <input
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
+            placeholder="ORI-ACC-00000001"
+            className="ml-2 rounded border border-sengoku-border bg-sengoku-navy px-2 py-1 text-sengoku-text"
+          />
+        </label>
+        <label className="text-xs text-sengoku-muted">
+          理由 (監査ログに残ります)
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="先にLINEで登録済みだったため"
+            className="ml-2 w-64 rounded border border-sengoku-border bg-sengoku-navy px-2 py-1 text-sengoku-text"
+          />
+        </label>
+        <button
+          onClick={submit}
+          disabled={submitting}
+          className="rounded bg-sengoku-red px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+        >
+          {submitting ? "処理中..." : "このアカウントへ紐付ける"}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-sengoku-red">{error}</p>}
+    </div>
+  );
 }
