@@ -30,7 +30,6 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
         message: err instanceof Error ? err.message : "接続テストの実行に失敗しました",
         requestUrl: null,
         httpStatus: null,
-        acceptedAuthStyle: null,
         partnerResponse: null,
       });
     } finally {
@@ -50,7 +49,7 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
       </button>
       <p className="mt-1 text-xs">
         保存済みの送信先URLとAPIキーで代理店システムを実際に呼び出し、疎通と認証だけを確かめます。
-        認証で弾かれた場合は x-api-key と Authorization: Bearer の両方を試し、どちらなら通るかを判定します。
+既存IDの参照だけを行うため、登録経路が使う書き込み権限 (common_users:write) までは確認できません。
         Feature Flag がOFFでも実行できます。実在しないIDで問い合わせ、作成もさせないため
         <strong>相手側には何も残りません。</strong>
       </p>
@@ -67,13 +66,6 @@ export default function AgencyConnectionTest({ disabled }: { disabled: boolean }
           <p className="mt-1">{result.message}</p>
           {result.requestUrl ? (
             <p className="mt-1 break-all font-mono text-xs">{result.requestUrl}</p>
-          ) : null}
-          {result.acceptedAuthStyle === "bearer" ? (
-            <p className="mt-2">
-              <strong>x-api-key では通らず、Authorization: Bearer で通りました。</strong>
-              通常の送信経路は x-api-key 固定のため、このままでは本番の送信も失敗します。
-              エンジニアへ連絡してください。
-            </p>
           ) : null}
           {result.partnerResponse ? (
             <p className="mt-2 break-all font-mono text-xs">

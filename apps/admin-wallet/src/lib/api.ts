@@ -360,8 +360,6 @@ export interface AgencyConnectionTestResult {
   message: string;
   requestUrl: string | null;
   httpStatus: number | null;
-  /** 疎通できたときに、どのAPIキーの渡し方で通ったか。 */
-  acceptedAuthStyle: "x-api-key" | "bearer" | null;
   /** 連携先が返した本文の抜粋。原因の切り分け用。 */
   partnerResponse: string | null;
 }
