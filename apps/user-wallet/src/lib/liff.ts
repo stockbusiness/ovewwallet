@@ -238,6 +238,36 @@ export async function ensureLiffLogin(termsAccepted: boolean): Promise<void> {
  * いずれの場合も`localStorage`のフラグは読み取り後すぐに消す
  * (次回以降の通常訪問が「復帰後」と誤認識されないようにするため)。
  */
+export type LiffReturnAction =
+  | { kind: "ignore" }
+  | { kind: "error"; reason: "not-logged-in" | "no-id-token" }
+  | { kind: "resume"; idToken: string; termsAccepted: boolean };
+
+/**
+ * LINEからの復帰処理をどう扱うかの判定。副作用を持たないので単体テストで固定する
+ * (`liff.test.ts`)。
+ *
+ * **`wasPending` を必ず見ること。** `liff.login()` が張ったLINEのセッションは
+ * ブラウザに残るため、`isLoggedIn()` だけで判断すると「ログイン開始を経ていない
+ * ただの再読み込み」まで復帰と誤認する。そのとき同意フラグ (`TERMS_KEY`) は
+ * 直前の復帰処理で読み捨てられており、`termsAccepted=false` のまま送信して
+ * **新規アカウント作成が400で失敗する** (2026-09-04、紹介URLからの新規登録が
+ * "terms of service agreement is required to create a new account" で止まった)。
+ * さらにその値が `savePendingSubmission` で正しい同意付きの送信待ちを上書きするため、
+ * 再試行しても復旧しなくなる。
+ */
+export function decideLiffReturn(state: {
+  wasPending: boolean;
+  termsAccepted: boolean;
+  loggedIn: boolean;
+  idToken: string | null;
+}): LiffReturnAction {
+  if (!state.wasPending) return { kind: "ignore" };
+  if (!state.loggedIn) return { kind: "error", reason: "not-logged-in" };
+  if (!state.idToken) return { kind: "error", reason: "no-id-token" };
+  return { kind: "resume", idToken: state.idToken, termsAccepted: state.termsAccepted };
+}
+
 export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null> {
   if (!LIFF_ID) return null;
 
@@ -259,26 +289,28 @@ export async function getLiffIdTokenIfLoggedIn(): Promise<LiffLoginResult | null
 
   const loggedIn = liff.isLoggedIn();
   appendDebugLog(`liff.isLoggedIn()=${loggedIn} (getLiffIdTokenIfLoggedIn)`);
-  if (!loggedIn) {
-    if (wasPending) {
-      throw new Error("LINEログインからの復帰後もログイン状態を確認できませんでした (liff.isLoggedIn()がfalse)");
-    }
-    return null;
+  const idToken = loggedIn ? liff.getIDToken() : null;
+  if (loggedIn) {
+    appendDebugLog(`liff.getIDToken()=${idToken ? "取得できた" : "null"}`);
   }
 
-  const idToken = liff.getIDToken();
-  appendDebugLog(`liff.getIDToken()=${idToken ? "取得できた" : "null"}`);
-  if (!idToken) {
-    if (wasPending) {
-      throw new Error("LINEのIDトークンを取得できませんでした (liff.getIDToken()がnull)");
-    }
+  const action = decideLiffReturn({ wasPending, termsAccepted, loggedIn, idToken });
+  if (action.kind === "ignore") {
+    appendDebugLog("ログイン開始を経ていない訪問のため復帰として扱わない");
     return null;
+  }
+  if (action.kind === "error") {
+    throw new Error(
+      action.reason === "not-logged-in"
+        ? "LINEログインからの復帰後もログイン状態を確認できませんでした (liff.isLoggedIn()がfalse)"
+        : "LINEのIDトークンを取得できませんでした (liff.getIDToken()がnull)",
+    );
   }
 
   // 呼び出し元に返ってから保存するまでの一瞬の間にpageshowリロードが発生し、
   // 保存されないまま次のループに入ってしまう事象を確認したため(2026-07-18)、
   // 呼び出し元を経由せずこの場で即座に保存する。
-  savePendingSubmission({ idToken, termsAccepted });
+  savePendingSubmission({ idToken: action.idToken, termsAccepted: action.termsAccepted });
   appendDebugLog("getLiffIdTokenIfLoggedIn成功 (送信待ちとして保存済み)");
-  return { idToken, termsAccepted };
+  return { idToken: action.idToken, termsAccepted: action.termsAccepted };
 }
