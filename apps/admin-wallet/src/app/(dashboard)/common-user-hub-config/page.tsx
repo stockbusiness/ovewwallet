@@ -9,6 +9,8 @@ import { apiFetch, ApiError, type CommonUserHubConfig } from "@/lib/api";
  * 代理店システム内共通顧客HUBへの送信設定 (外部開発者向け連携ガイド9章)。
  * `ENABLE_PLATFORM_USER_ID` Feature Flag自体は環境変数のみで変更可能 (他の
  * Feature Flagと同じ方針、`/outbox`画面で確認可能) だが、送信先URL・
+ * system_keyは代理店システム側の登録値と一致している必要がある (登録完了通知の
+ * source_system_keyとしてそのまま送られるため。`agency-referral.adapter.ts`)。
  * system_key・APIキーはここから編集できる。APIキーは一度保存すると生値を
  * 二度と表示せず、末尾4文字のみのマスク表示になる。
  */
@@ -96,7 +98,12 @@ export default function CommonUserHubConfigPage() {
             <p className="font-semibold text-sengoku-text">設定手順</p>
             <ol className="ml-4 list-decimal">
               <li>送信先URLは通常初期値のままで問題ありません(代理店システムから変更の指示があった場合のみ変更)</li>
-              <li>system_keyも通常は初期値のままで問題ありません</li>
+              <li>
+                system_keyは<strong>代理店システム側の登録値に合わせる必要があります</strong>。
+                この値は登録完了通知のsource_system_keyとしてそのまま送られ、一致しないと通知が弾かれます。
+                初期値(ove-wallet)のままにしないでください。代理店システムの担当者に登録値を確認してから設定します
+                (連携仕様書の想定値はorly-wallet)。
+              </li>
               <li>APIキー欄に、代理店システムから発行されたキーを貼り付け(空欄のまま保存すると今のキーが維持されます)</li>
               <li>変更理由を入力(必須)</li>
               <li>「保存」を押す。保存後、APIキーは末尾4文字だけのマスク表示になり、元の値は二度と表示されません</li>

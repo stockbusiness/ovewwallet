@@ -4,6 +4,7 @@ import { z } from "zod";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
+import { AdminAgencySetupService } from "./admin-agency-setup.service";
 import {
   AgencyLinkManualLinkSchema,
   AgencyLinkUnlinkSchema,
@@ -21,7 +22,19 @@ export class AdminIntegrationsController {
     private readonly serviceIntegrations: AdminServiceIntegrationsService,
     private readonly commonUserHub: AdminCommonUserHubService,
     private readonly agencyLinks: AdminAgencyLinksService,
+    private readonly agencySetup: AdminAgencySetupService,
   ) {}
+
+  /**
+   * 代理店連携の設定状況を1回でまとめて返す (セットアップ画面用)。
+   * 設定変更は行わず、状態を読むだけ。AUDITORにも開放している。
+   */
+  @Get("agency-setup")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async getAgencySetup() {
+    return this.agencySetup.get();
+  }
 
   @Get("service-integrations")
   @UseGuards(AdminAuthGuard, RolesGuard)

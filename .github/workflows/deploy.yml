@@ -431,6 +431,20 @@ jobs:
             "ENABLE_EMAIL_LOGIN=false"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
             "ENABLE_AGENCY_LOGIN=false"
+            # 代理店システム(sengoku-ai.com)連携のFeature Flag。
+            # 管理画面の「代理店連携セットアップ」がこの4つのON/OFFを表示する。
+            # 手順が済んだものから個別にtrueへ変えてデプロイする (段階的に開ける)。
+            #
+            # 順序に意味がある。ENABLE_PLATFORM_USER_ID は単独の機能ではなく
+            # 紹介確定の前提で、common_user_idが未解決だと確定のOutboxハンドラが
+            # 例外を投げて再送し続ける (apps/api/src/referrals/agency-referral-outbox-handler.ts)。
+            # ENABLE_AGENCY_POINT_AWARD_INBOX は受信しただけでORI残高が増える経路なので、
+            # 受信用APIキーを渡し終えてから最後に開ける
+            # (docs/integration/AGENCY_POINT_AWARD.md)。
+            "ENABLE_PLATFORM_USER_ID=false"
+            "ENABLE_WALLET_REFERRAL_TOKEN=false"
+            "ENABLE_AGENCY_REFERRAL_SYNC=false"
+            "ENABLE_AGENCY_POINT_AWARD_INBOX=false"
             "HIGH_VALUE_THRESHOLD=50000"
             # SENTRY_DSN未設定 (シークレット未登録) の場合は空文字列がセットされるだけで、
             # apps/api/src/common/sentry.tsのinitSentry()は空の場合何もしない安全側の

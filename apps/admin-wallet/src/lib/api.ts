@@ -334,6 +334,32 @@ export interface OutboxEventItem {
 }
 
 /** 代理店連携状態一覧 (開発ガイドライン15章)。account_links のうちAGENCY_SYSTEM分。 */
+/**
+ * 代理店連携セットアップ画面がまとめて読む設定状況
+ * (`GET /api/v1/admin/agency-setup`)。設定変更はここでは行わない。
+ */
+export interface AgencySetupStatus {
+  systemKey: { current: string; expected: string; matches: boolean };
+  /** 代理店システムが発行し、ORI側が共通ID解決に使う鍵。下の inboundApiKey とは別物。 */
+  hubApiKey: { set: boolean; preview: string | null; updatedAt: string | null };
+  /** ORI側が発行し、代理店システムが付与イベント送信に使う鍵。 */
+  inboundApiKey: {
+    issued: boolean;
+    status: string | null;
+    issuedAt: string | null;
+    lastAccessedAt: string | null;
+  };
+  flags: Record<AgencySetupFlagKey, boolean>;
+  referrals: Record<string, number>;
+  agencyLinks: Record<string, number>;
+}
+
+export type AgencySetupFlagKey =
+  | "ENABLE_PLATFORM_USER_ID"
+  | "ENABLE_WALLET_REFERRAL_TOKEN"
+  | "ENABLE_AGENCY_REFERRAL_SYNC"
+  | "ENABLE_AGENCY_POINT_AWARD_INBOX";
+
 export interface AgencyLinkItem {
   id: string;
   externalUserId: string;
