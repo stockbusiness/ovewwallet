@@ -56,7 +56,7 @@ Cookieも **APIサーバー側のドメインで発行する**。ウォレット
 
 - Cookie名: `referral_session`
 - `HttpOnly` / `Secure` / `SameSite=None` (セッションCookieと同じ、別ドメイン構成のため)
-- 既定の有効期限: 24時間 (`REFERRAL_SESSION_TTL_HOURS`)
+- 有効期限: `REFERRAL_SESSION_TTL_HOURS` (コード上の既定24時間、本番は30日=720)
 - Cookieに保存するのは不透明なランダムトークンのみで、紹介トークン本体は保存しない
   (サーバー側の`wallet_referrals.session_token_hash`と照合する、セッションCookieの
   `token`/`tokenHash`と同じ設計)
@@ -96,7 +96,7 @@ Cookieも **APIサーバー側のドメインで発行する**。ウォレット
 
 | 変数名 | 内容 | 既定値 |
 |---|---|---|
-| `REFERRAL_SESSION_TTL_HOURS` | 紹介セッションCookieの有効期限(時間) | `24` |
+| `REFERRAL_SESSION_TTL_HOURS` | 紹介URLを開いてから登録を終えるまでの猶予(時間)。紹介URL自体の寿命ではない | `24` (本番は`720`) |
 | `REFERRAL_SIGNUP_BONUS_AMOUNT` | 初回登録特典の額(OVE) | `3000` |
 
 ## セキュリティ
