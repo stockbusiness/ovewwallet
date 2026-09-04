@@ -10,7 +10,7 @@ import {
   type PointAward,
 } from "@ove/shared-types";
 import type { z } from "zod";
-import { GrantRewardUseCase } from "../../rewards/grant-reward.use-case";
+import { GrantRewardWithServiceLimitsUseCase } from "../../rewards/grant-reward-with-service-limits.use-case";
 import type {
   AuthenticatedEventContext,
   CommonEventHandler,
@@ -48,7 +48,7 @@ export class PointAwardWalletDeliveryHandler
 
   constructor(
     private readonly recipients: PointAwardRecipientResolver,
-    private readonly grantReward: GrantRewardUseCase,
+    private readonly grantReward: GrantRewardWithServiceLimitsUseCase,
   ) {}
 
   async handle(
@@ -91,6 +91,10 @@ export class PointAwardWalletDeliveryHandler
     }
 
     const { transaction } = await this.grantReward.execute({
+      // 認証済みの送信元で`ServiceIntegration`の金額上限を引く。この経路は
+      // 受信しただけでORI残高が増えるため、1リクエスト/1日あたりの歯止めを掛ける
+      // (以前はGrantRewardUseCaseを直接呼んでおり上限が効いていなかった)。
+      serviceCode: context.authenticatedSourceSystemKey,
       oveAccountId: resolved.account.id,
       amount: BigInt(points),
       transactionType: "COMMON_EVENT_REWARD",

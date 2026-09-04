@@ -105,8 +105,12 @@ async function main() {
         apiKeyHash: hashSecret(partnerApiKey),
         signingSecretEncrypted: encryptSecret(unusedSigningSecret, encryptionKey),
         allowedIps: [],
-        dailyAmountLimit: 0,
-        perRequestAmountLimit: 0,
+        // ORI付与イベントはこの上限で止まる (PointAwardWalletDeliveryHandler ->
+        // GrantRewardWithServiceLimitsUseCase)。0にすると全ての付与が拒否される。
+        // 既存環境向けの同じ値は
+        // migrations/20260904110000_set_agency_system_amount_limits にある。
+        dailyAmountLimit: 1_000_000,
+        perRequestAmountLimit: 3_000,
       },
     });
     console.log(`  service_integrations: AGENCY_SYSTEM apiKey=${partnerApiKey}`);
