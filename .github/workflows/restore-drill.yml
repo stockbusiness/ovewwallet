@@ -85,4 +85,24 @@ jobs:
             exit 1
           fi
 
+          # `*.railway.internal` はRailwayのネットワーク内部からしか名前解決できない。
+          # GitHub Actionsのランナーからは届かず、pg_dumpは
+          #   could not translate host name "postgres.railway.internal" to address
+          # という、原因が読み取りにくいエラーで落ちる (run #52 で発生)。
+          # 内部ホストを掴んでいる時点で、この経路ではバックアップが取れないため、
+          # 何をすればよいかを名指しして先に止める。
+          case "$DATABASE_URL" in
+            *.railway.internal*)
+              echo "::error::PostgresサービスのTCP Proxy (Public Networking) が無効です。"
+              echo "取得できたのは内部ホスト (*.railway.internal) のURLだけで、"
+              echo "GitHub Actionsのランナーからは名前解決できません。"
+              echo "--------------------------------------------------------------"
+              echo "Railway > Postgres > Settings > Networking > Public Networking で"
+              echo "TCP Proxy を有効にしてください。有効にすると Postgres サービスに"
+              echo "DATABASE_PUBLIC_URL が生えて、このワークフローがそれを使います"
+              echo "(検証環境のプロジェクトでは既に有効になっています)。"
+              exit 1
+              ;;
+          esac
+
           DATABASE_URL="$DATABASE_URL" ./scripts/verify-backup-restore.sh
