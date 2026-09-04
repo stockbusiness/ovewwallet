@@ -6,6 +6,8 @@ import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AdminAccountsController } from "./admin-accounts.controller";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminAgencySetupService } from "./admin-agency-setup.service";
+import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test.service";
+import { IntegrationsModule } from "../integrations/integrations.module";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -32,7 +34,9 @@ import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
 
 @Module({
-  imports: [AccountsModule, CollectiblesModule],
+  // IntegrationsModule: 代理店システムへの接続テスト (AdminAgencyConnectionTestService) が
+  // IntegrationHttpClient / IntegrationConfigProvider を使う。
+  imports: [AccountsModule, CollectiblesModule, IntegrationsModule],
   controllers: [
     AdminController,
     AdminAuthController,
@@ -59,6 +63,7 @@ import { AdminService } from "./admin.service";
     AdminRewardRulesService,
     AdminAgencyLinksService,
     AdminAgencySetupService,
+    AdminAgencyConnectionTestService,
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
