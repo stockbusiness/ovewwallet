@@ -11,13 +11,16 @@
 
 ## 前提: 稼働開始時点で使えるログイン方法
 
-**LINEログインのみ** (`docs/login-methods.md`)。
+一般の利用者は **LINEログインのみ** (`docs/login-methods.md`)。
 
 - メールOTP: **送信基盤が未実装**。本番ではコードが誰にも届かない
 - 千ノ国パスポートSSO: 正式SSO (RS256/JWKS) が未完成
-- 代理店SSO: `SENGOKU_AI_SSO_*` 未接続
 
-デプロイワークフローがこれらを明示的に `false` に設定する。
+デプロイワークフローがこの2つを明示的に `false` に設定する。
+
+代理店SSO (`ENABLE_AGENCY_LOGIN`) は2026-09-04に接続し、本番で有効にしてある。
+一般の利用者向けの入口ではなく、代理店システム側の起動URLから来た代理店だけが
+通る (`docs/agency-integration.md`「代理店SSOログイン」)。
 
 ## 手順
 

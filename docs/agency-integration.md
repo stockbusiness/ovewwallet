@@ -184,8 +184,9 @@ OFFの間は404 (「その入口は存在しない」) を返す (`docs/login-me
 https://sennokuni-wallet.com/sso/agency?token={JWT}
 ```
 
-この受信URLを、連携先のSSOクライアント設定 `orly-wallet` の
-「SSO受信URL / callback_url」に登録してもらう必要がある。
+この受信URLは、連携先のSSOクライアント設定 `orly-wallet` の
+「SSO受信URL / callback_url」に**登録済み** (2026-09-04、連携先回答)。
+`ENABLE_AGENCY_LOGIN` も本番で `true` にしてある。
 
 受け口は `apps/user-wallet/src/app/sso/agency/page.tsx`。JWTの検証はすべて
 サーバー側で行い、画面はトークンをAPIへ渡すだけである。画面が失敗を出し分けるために
