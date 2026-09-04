@@ -251,15 +251,29 @@ HMAC (`X-SenNoKuni-*`) は**このエンドポイントでは不要**。署名�
 
 ## 有効化に必要な環境変数
 
-| 変数 | 用途 |
-|---|---|
-| `ENABLE_WALLET_REFERRAL_TOKEN` | 紹介URLの受け付け |
-| `ENABLE_AGENCY_REFERRAL_SYNC` | 代理店システムへの capture/confirm 送信 |
-| `ENABLE_AGENCY_POINT_AWARD_INBOX` | 付与イベントの受信 |
+| 変数 | 用途 | 本番 (2026-09-04) |
+|---|---|---|
+| `ENABLE_PLATFORM_USER_ID` | 共通顧客HUB経由の `common_user_id` 解決 | ✅ |
+| `ENABLE_WALLET_REFERRAL_TOKEN` | 紹介URLの受け付け | ✅ |
+| `ENABLE_AGENCY_REFERRAL_SYNC` | 代理店システムへの capture/confirm 送信 | ✅ |
+| `ENABLE_AGENCY_LOGIN` | 代理店SSOログイン (`/sso/agency`) | ✅ |
+| `ENABLE_AGENCY_POINT_AWARD_INBOX` | 付与イベントの受信 | 本PRで有効化 |
 
-いずれも既定 false。`ENABLE_AGENCY_POINT_AWARD_INBOX` が false の間は 503 を返し、
-`inbound_events` に行を作らない (行を作ると、後から有効化しても同じ `event_id` が
-二度と処理されなくなるため)。
+いずれもコード上の既定は false。`.github/workflows/deploy.yml` が本番の値を持つ。
+
+`ENABLE_PLATFORM_USER_ID` は**紹介確定の前提**である。`common_user_id` が未解決だと
+確定のOutboxハンドラが例外を投げて再送し続けるため
+(`apps/api/src/referrals/agency-referral-outbox-handler.ts`)、
+`ENABLE_AGENCY_REFERRAL_SYNC` だけを開けても紹介は確定しない。
+
+`ENABLE_AGENCY_LOGIN` は**付与の前提**である。付与先が `recipient_agent_id` で
+指定された場合、その代理店がSSOでログインして `account_links` が ACTIVE に
+なっていないと受取人を解決できず404になる (3-4章)。
+
+`ENABLE_AGENCY_POINT_AWARD_INBOX` が false の間は 503 を返し、`inbound_events` に
+行を作らない (行を作ると、後から有効化しても同じ `event_id` が二度と処理されなく
+なるため)。有効化するときは、**金額上限が入っていること**を先に確認すること
+(受信しただけでORI残高が増える経路のため。上限は3-4章「金額の上限」)。
 
 ---
 
