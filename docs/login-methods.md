@@ -13,7 +13,7 @@
 | 方法 | 状態 | 本番で開けられない理由 |
 |---|---|---|
 | **LINE** | ✅ 使える | `AUTH_MODE=production` で実チャネルのIDトークンを検証する。LIFF結合試験済み |
-| **メールOTP** | ⚙️ 鍵の設定待ち | 2026-09-05に送信処理を実装した (Resend)。`RESEND_API_KEY` を設定すれば開けられる。**LINEを持っていない利用者のための入口** |
+| **メールOTP** | ⚙️ 鍵の設定待ち | 2026-09-05に送信処理を実装した (Resend)。管理画面「メール送信設定」から鍵を入れれば開けられる。**LINEを持っていない利用者のための入口** |
 | **千ノ国パスポートSSO** | ❌ | 正式SSO (RS256/JWKS) が未完成。モック発行エンドポイントは本番で404 |
 | **代理店SSO** | ✅ 使える | 2026-09-04接続。`SENGOKU_AI_SSO_*` を設定し、連携先がSSO受信URLを登録済み。ただし利用者向けではなく**代理店専用**の入口で、ログイン画面にボタンは出ない (連携先の起動URLから来る) |
 
@@ -82,14 +82,44 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 LINEを持っていない利用者が新規登録するための入口 (2026-09-05実装)。
 
 1. Resend (https://resend.com) でアカウントを作り、**差出人ドメインを検証する**
-   (`sennokuni-wallet.com` のDNSへ SPF / DKIM / DMARC を設定する)
-2. APIキーを発行し、GitHubのリポジトリシークレット `RESEND_API_KEY` へ登録する
-   (`deploy.yml` が環境変数として渡す)
-3. `ENABLE_EMAIL_LOGIN=true` にしてデプロイする
+   (`sennokuni-wallet.com` のDNSへ SPF / DKIM を設定する)
+2. APIキーを発行し、**管理画面「メール送信設定」(`/mail-config`) へ登録する**
+3. 同じ画面の「テスト送信」で、実際に届くことを確認する
+4. `ENABLE_EMAIL_LOGIN=true` にしてデプロイする
 
-**2を飛ばして3だけ行っても起動しない**。`assertProductionEnvSafe()` が
-`RESEND_API_KEY` の未設定を検出して起動を止める。以前は「コードが誰にも届かない
-まま画面に選択肢が出る」という、最も原因の掴みにくい壊れ方をしていた。
+### 鍵を管理画面に置く理由
+
+鍵の入れ替えにデプロイを待たせないため。環境変数 `RESEND_API_KEY` でも設定できるが、
+**管理画面の値が優先**される。環境変数は管理画面へ入れるまでの初期設定と、
+緊急時の逃げ道として残している。
+
+鍵は `CommonUserHubConfig.apiKeyEncrypted` と同じ AES-256-GCM 可逆暗号化
+(`ENCRYPTION_KEY`) で `mail_config` に保存し、画面へは末尾4文字だけのマスク表示を
+返す。生値は保存後二度と表示しない。
+
+### 未設定なら選択肢を出さない
+
+`GET /auth/methods` は、`ENABLE_EMAIL_LOGIN=true` でも**送信の設定が済むまで
+`email: false` を返す**。押してもコードが届かないボタンを見せないため。設定は
+管理画面から変わるので、環境変数ではなく毎回確かめる。
+
+APIを直接叩いた場合は、本番なら 503 になる (`MailNotConfiguredError`)。
+本番以外では何もせず成功にする — ワンタイムコードは応答の `devCode` で確認できるので、
+開発・テストに送信基盤を要求しない (`REDIS_URL` 未設定でインメモリへ落ちるのと同じ考え方)。
+
+### テスト送信
+
+管理画面から、保存済みの設定でテストメールを1通送れる。本番の鍵をそのまま使う
+外部への発信なので:
+
+- 参照権限しかない `AUDITOR` には開けない (`SUPER_ADMIN` / `INTEGRATION_ADMIN` のみ)
+- 1つの発信元から5分3回までに絞る
+- **実行者と宛先を監査ログ (`MAIL_TEST_SENT`) に残す**。宛先はワンタイムコードと
+  違い秘密ではなく、誤送信や乱用の追跡に要るため
+- 本文にワンタイムコードは含めない (テストに実コードを流さない)
+
+失敗したときは原因の分類 (`not_configured` / `failed`) と、次に何をすればよいかを
+画面へ返す (`AdminAgencyConnectionTestService` と同じ方針)。
 
 #### 送信できなかったときは失敗として返す
 
@@ -155,6 +185,8 @@ LINEを持っていない利用者が新規登録するための入口 (2026-09-
 - `apps/api/src/mail/otp-mail.test.ts` (4件): 件名・本文・リンクを置かないこと
 - `apps/api/src/mail/resend-mail-sender.test.ts` (6件): 送信内容、APIキーの渡し方、
   失敗時に例外を投げること、例外に鍵・宛先・コードを含めないこと
-- `apps/api/src/mail/mail.module.test.ts` (2件): 鍵の有無による実装の選択
-- `apps/api/src/common/assert-production-env.test.ts` (3件追加): メールログインを
-  開けたのに鍵が無い場合に起動を止めること
+- `apps/api/src/mail/mail-config.service.test.ts` (7件): 管理画面の値が環境変数より
+  優先されること、マスク、空欄保存で鍵を消さないこと
+- `apps/api/src/e2e/mail-config.test.ts` (14件): 保存とマスク表示、DBへ暗号化して
+  置くこと、監査ログに鍵を残さないこと、権限、テスト送信 (未設定・成功・失敗・
+  コードを含めないこと・回数制限)、設定が済むまでログイン画面に出さないこと

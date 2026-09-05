@@ -7,6 +7,7 @@ import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
 import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/shared-types";
 import { AuthService, type SessionMeta } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { MailService } from "../mail/mail.service";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { SkipTermsConsent } from "../accounts/terms-consent";
 import { availableLoginMethods, isLoginMethodEnabled, type LoginMethod } from "./login-methods";
@@ -47,15 +48,23 @@ function assertLoginMethodEnabled(method: LoginMethod): void {
 @ApiTags("auth")
 @Controller("api/v1/auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly mail: MailService,
+  ) {}
 
   /**
    * 利用できるログイン方法。ログイン画面が「どのボタンを出すか」を決めるために叩く。
    * 未ログインで呼ぶ必要があるため認証は不要。真偽値のみで機微な情報は含まない。
+   *
+   * メールは環境変数で有効にしていても、**送信の設定が済むまでは出さない**。
+   * 押してもコードが届かないボタンを見せないため (`docs/login-methods.md`)。
+   * 設定は管理画面から変えられるので、ここで毎回確かめる。
    */
   @Get("methods")
-  loginMethods() {
-    return availableLoginMethods();
+  async loginMethods() {
+    const methods = availableLoginMethods();
+    return { ...methods, email: methods.email && (await this.mail.isConfigured()) };
   }
 
   /**

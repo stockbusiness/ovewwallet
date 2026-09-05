@@ -16,9 +16,8 @@ import { KV_STORE } from "../common/kv-store.module";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { AgencyService } from "../agency/agency.service";
-import { MAIL_SENDER } from "../mail/mail.module";
+import { MailService, MailNotConfiguredError } from "../mail/mail.service";
 import { buildOtpMail } from "../mail/otp-mail";
-import type { MailSender } from "../mail/mail-sender";
 import { MailSendError } from "../mail/resend-mail-sender";
 import { ReferralsService } from "../referrals/referrals.service";
 
@@ -47,7 +46,7 @@ export class AuthService {
     private readonly accounts: AccountsService,
     private readonly agencyService: AgencyService,
     private readonly referrals: ReferralsService,
-    @Inject(MAIL_SENDER) private readonly mail: MailSender,
+    private readonly mail: MailService,
   ) {
     this.emailOtp = new EmailOtpService(kv);
     this.sengokuSso = new SengokuSsoService(kv);
@@ -77,7 +76,7 @@ export class AuthService {
     try {
       await this.mail.send(buildOtpMail({ to: email, code }));
     } catch (err) {
-      if (err instanceof MailSendError) {
+      if (err instanceof MailSendError || err instanceof MailNotConfiguredError) {
         // 「送信しました」と表示させない。利用者が届かないコードを待ち続けるため。
         throw new ServiceUnavailableException("failed to send the verification code");
       }

@@ -550,3 +550,21 @@ export interface CollectibleHoldingItem {
     commonUserId: string | null;
   } | null;
 }
+
+/** `GET /api/v1/admin/mail-config` (docs/login-methods.md)。生のAPIキーは返らない。 */
+export interface MailConfig {
+  apiKeySet: boolean;
+  apiKeyPreview: string | null;
+  /** 管理画面未設定でも環境変数で送れる状態か。 */
+  fallbackFromEnv: boolean;
+  mailFrom: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+/** `POST /api/v1/admin/mail-config/test` の結果。 */
+export interface MailTestResult {
+  outcome: "ok" | "failed" | "not_configured";
+  message: string;
+  mailFrom: string | null;
+}

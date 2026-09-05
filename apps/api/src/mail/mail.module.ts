@@ -1,30 +1,15 @@
-import { Global, Logger, Module } from "@nestjs/common";
-import { NoopMailSender, type MailSender } from "./mail-sender";
-import { ResendMailSender } from "./resend-mail-sender";
-
-export const MAIL_SENDER = "MAIL_SENDER";
-
-export const DEFAULT_MAIL_FROM = "no-reply@sennokuni-wallet.com";
+import { Global, Module } from "@nestjs/common";
+import { MailConfigService } from "./mail-config.service";
+import { MailService } from "./mail.service";
 
 /**
- * 設定から送信実装を選ぶ。`RESEND_API_KEY`があればResend、無ければ何もしない実装。
- *
- * 本番で鍵が無いまま`ENABLE_EMAIL_LOGIN=true`にしてしまう事故は
- * `assertProductionEnvSafe()`が起動時に止めるので、ここでは黙って
- * `NoopMailSender`に落として構わない (開発・テストがこの分岐を通る)。
+ * メール送信。設定は管理画面 (`mail_config`) または環境変数から、送信のたびに
+ * 読み直す (`MailConfigService`)。起動時に固めないのは、管理画面で鍵を変えた
+ * 直後から新しい鍵で送れるようにするため。
  */
-export function createMailSender(env: NodeJS.ProcessEnv = process.env): MailSender {
-  const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) {
-    new Logger("MailModule").log("RESEND_API_KEY is not set; outgoing mail is disabled");
-    return new NoopMailSender();
-  }
-  return new ResendMailSender({ apiKey, from: env.MAIL_FROM || DEFAULT_MAIL_FROM });
-}
-
 @Global()
 @Module({
-  providers: [{ provide: MAIL_SENDER, useFactory: () => createMailSender() }],
-  exports: [MAIL_SENDER],
+  providers: [MailConfigService, MailService],
+  exports: [MailConfigService, MailService],
 })
 export class MailModule {}

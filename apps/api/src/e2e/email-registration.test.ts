@@ -5,9 +5,8 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { ThrottlerStorage } from "@nestjs/throttler";
 import { prisma, generateId } from "@ove/database";
-import { MAIL_SENDER } from "../mail/mail.module";
+import { MailService } from "../mail/mail.service";
 import { MailSendError } from "../mail/resend-mail-sender";
-import type { MailSender } from "../mail/mail-sender";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { REFERRAL_SESSION_COOKIE_NAME } from "../referrals/referrals.controller";
@@ -216,9 +215,9 @@ describe("メールでの新規登録", () => {
   describe("送信に失敗したとき", () => {
     it("「送信しました」と返さず、失敗として返す", async () => {
       // 握り潰すと、利用者は永遠に届かないコードを待つことになる
-      const sender = app.get<MailSender>(MAIL_SENDER);
+      const mail = app.get(MailService);
       const spy = jest
-        .spyOn(sender, "send")
+        .spyOn(mail, "send")
         .mockRejectedValue(new MailSendError("mail delivery service returned status 500"));
       try {
         await request(app.getHttpServer())

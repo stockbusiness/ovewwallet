@@ -10,13 +10,19 @@ import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 /**
  * 利用できるログイン方法の出し分け (docs/login-methods.md)。
  *
- * 稼働開始時点で使えるのはLINEログインだけ。メールOTPは**送信基盤が未実装**で、
- * 千ノ国パスポートSSOは正式SSOが未完成、代理店SSOは未接続。画面から隠すだけでなく
+ * 稼働開始時点で使えるのはLINEログインだけ。メールOTPは**送信の設定が済むまで**
+ * 出さず、千ノ国パスポートSSOは正式SSOが未完成、代理店SSOは未接続。画面から隠すだけでなく
  * サーバー側でも拒否する。
  */
 describe("利用できるログイン方法", () => {
   let app: INestApplication;
-  const KEYS = ["ENABLE_EMAIL_LOGIN", "ENABLE_SENGOKU_PASSPORT_LOGIN", "ENABLE_AGENCY_LOGIN"] as const;
+  const KEYS = [
+    "ENABLE_EMAIL_LOGIN",
+    "ENABLE_SENGOKU_PASSPORT_LOGIN",
+    "ENABLE_AGENCY_LOGIN",
+    // メールは環境変数だけでは出ない。送信の設定も要る (docs/login-methods.md)
+    "RESEND_API_KEY",
+  ] as const;
   const original = new Map(KEYS.map((k) => [k, process.env[k]]));
 
   /** 本番と同じ「LINEのみ」の状態にする。テスト環境は`.env.test`で全て有効にしてあるため。 */
@@ -58,10 +64,27 @@ describe("利用できるログイン方法", () => {
       });
     });
 
-    it("環境変数で有効化すると反映される (メール送信基盤ができたとき用)", async () => {
+    it("メールは有効化しただけでは出ない (送信の設定が済むまで)", async () => {
+      // 押してもコードが届かないボタンを見せないため
+      disableAllButLine();
       process.env.ENABLE_EMAIL_LOGIN = "true";
       const res = await request(app.getHttpServer()).get("/api/v1/auth/methods").expect(200);
+      expect(res.body.email).toBe(false);
+    });
+
+    it("有効化と送信の設定が揃うとメールが出る", async () => {
+      disableAllButLine();
+      process.env.ENABLE_EMAIL_LOGIN = "true";
+      process.env.RESEND_API_KEY = "re_configured_for_test";
+      const res = await request(app.getHttpServer()).get("/api/v1/auth/methods").expect(200);
       expect(res.body.email).toBe(true);
+    });
+
+    it("送信の設定だけあっても、無効なら出ない", async () => {
+      disableAllButLine();
+      process.env.RESEND_API_KEY = "re_configured_for_test";
+      const res = await request(app.getHttpServer()).get("/api/v1/auth/methods").expect(200);
+      expect(res.body.email).toBe(false);
     });
   });
 

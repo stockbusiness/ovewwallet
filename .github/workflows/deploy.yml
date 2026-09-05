@@ -428,14 +428,16 @@ jobs:
             # 使えるログイン方法 (docs/login-methods.md)。SSOは未接続のため閉じたまま
             # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
             #
-            # メールログインは送信処理まで実装済みだが、RESEND_API_KEY を設定して
-            # から開けること。鍵が無いまま true にすると起動時に止まる
-            # (assert-production-env.ts)。開ける手順は docs/login-methods.md 参照。
+            # メールログイン (LINEを持っていない利用者の入口)。送信の鍵は
+            # 管理画面「メール送信設定」(/mail-config) から設定する。
+            # 未設定のまま true にしても、GET /auth/methods がメールを「使えない」と
+            # 返すので、押しても届かないボタンは出ない (docs/login-methods.md)。
             "ENABLE_EMAIL_LOGIN=false"
-            # Resend (https://resend.com) のAPIキー。差出人ドメインへ SPF/DKIM/DMARC を
-            # 設定してから発行する。未設定なら送信は行われない (メールログインは閉じたまま)。
+            # 管理画面へ入れるまでの初期設定・緊急時用。空でよい (管理画面の値が優先)。
+            # Resend (https://resend.com) のAPIキーで、差出人ドメインへ SPF/DKIM を
+            # 設定してから発行する。
             "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}"
-            # 差出人。SPF/DKIMを設定したドメインのアドレスであること。
+            # 差出人の既定値。管理画面で設定すればそちらが優先される。
             "MAIL_FROM=no-reply@sennokuni-wallet.com"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
             # 代理店SSOの検証条件 (連携先回答 2026-09-04)。issuer / JWKS URL は

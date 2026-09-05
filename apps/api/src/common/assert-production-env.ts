@@ -12,9 +12,12 @@
  *   (`allowed-origins.ts`)の唯一の入力。未設定だと許可リストが空になり、
  *   CSRF対策のオリジン検証が「何が正当なオリジンか不明」として素通しになる
  *   (`csrf-protection.middleware.ts`参照)。
- * - RESEND_API_KEY: **`ENABLE_EMAIL_LOGIN=true`のときのみ**必須。未設定のまま
- *   メールログインを開けると、画面にボタンは出るのにワンタイムコードが誰にも
- *   届かないという、最も原因の掴みにくい壊れ方をする (`docs/login-methods.md`)。
+ *
+ * メール送信のAPIキーはここで見ない。管理画面 (`mail_config`) からも設定できる
+ * ようになったため、起動時の環境変数だけでは設定済みかを判断できない
+ * (`MailConfigService`)。未設定のまま`ENABLE_EMAIL_LOGIN=true`にしても、
+ * `GET /auth/methods`がメールを「使えない」と返してログイン画面にボタンが出ず、
+ * APIを直接叩いても本番では503になる (`docs/login-methods.md`)。
  */
 export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV !== "production") return;
@@ -25,8 +28,6 @@ export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): v
   if (!env.LINE_CHANNEL_ID) missing.push("LINE_CHANNEL_ID");
   if (!env.APP_URL) missing.push("APP_URL");
   if (!env.ADMIN_URL) missing.push("ADMIN_URL");
-  // メールログインを開けていないなら送信設定は要らない (LINEだけで動く構成を壊さない)。
-  if (env.ENABLE_EMAIL_LOGIN === "true" && !env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
 
   if (missing.length > 0) {
     throw new Error(

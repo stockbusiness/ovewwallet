@@ -51,6 +51,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/service-integrations", label: "外部サービス管理" },
       { href: "/common-event-signing-keys", label: "共通イベント Signing Key" },
       { href: "/common-user-hub-config", label: "共通顧客HUB送信設定" },
+      { href: "/mail-config", label: "メール送信設定" },
       { href: "/agency-links", label: "代理店連携状態" },
       { href: "/wallet-referrals", label: "紹介トークン受け入れ" },
     ],
