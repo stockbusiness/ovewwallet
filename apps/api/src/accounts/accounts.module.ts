@@ -3,6 +3,7 @@ import { CommonUserHubModule } from "../common-user-hub/common-user-hub.module";
 import { ReferralsModule } from "../referrals/referrals.module";
 import { AccountAnonymizationService } from "./account-anonymization.service";
 import { AccountClosureService } from "./account-closure.service";
+import { AccountProfileService } from "./account-profile.service";
 import { AccountRegistrationService } from "./account-registration.service";
 import { AccountsController } from "./accounts.controller";
 import { AccountsService } from "./accounts.service";
@@ -21,7 +22,8 @@ import { TermsConsentService } from "./terms-consent.service";
     AccountClosureService,
     AccountAnonymizationService,
     TermsConsentService,
+    AccountProfileService,
   ],
-  exports: [AccountsService, AccountAnonymizationService],
+  exports: [AccountsService, AccountAnonymizationService, AccountProfileService],
 })
 export class AccountsModule {}

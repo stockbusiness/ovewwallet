@@ -294,6 +294,8 @@ model OveAccount {
   notices             Notice[]
   dailyBonusClaims    DailyBonusClaim[]
   collectibleHoldings CollectibleHolding[]
+  /// 氏名・電話・住所。ORI付与を入口にしたリスト取りのために任意で預かる。
+  profile             AccountProfile?
 
   @@index([commonUserId])
   @@map("ove_accounts")
@@ -365,6 +367,66 @@ model CommonUserHubConfig {
   updatedBy       String?  @map("updated_by")
 
   @@map("common_user_hub_config")
+}
+
+/// プロフィール項目の要求レベル。管理画面から項目ごとに切り替える。
+enum ProfileFieldRequirement {
+  /// 入力欄自体を出さない。
+  HIDDEN
+  /// 出すが未入力でもよい。**未入力であること自体をセグメントに使う**。
+  OPTIONAL
+  /// 入力を求める。ただしウォレットの利用は妨げない (促すだけ)。
+  REQUIRED
+}
+
+/// 利用者のプロフィール (氏名・電話・住所)。ORI付与を入口にしたリスト取りが目的で、
+/// 後のアップセルに使う (2026-09-05 運用判断)。
+///
+/// `ove_accounts`とは別テーブルにしている。ここに入るのは個人情報だけなので、
+/// 保管・削除・匿名化の対象範囲をこのテーブル1つに閉じ込められる
+/// (`AccountAnonymizationService`が扱いやすい)。
+model AccountProfile {
+  oveAccountId String @id @map("ove_account_id")
+
+  fullName     String? @map("full_name")
+  fullNameKana String? @map("full_name_kana")
+  phone        String?
+  postalCode   String? @map("postal_code")
+  prefecture   String?
+  city         String?
+  addressLine  String? @map("address_line")
+  building     String?
+
+  /// 利用者が「入力しない」を選んだ日時。未入力のまま放置しているのか、
+  /// 明示的に断ったのかを区別してセグメントするため。
+  declinedAt DateTime? @map("declined_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  account OveAccount @relation(fields: [oveAccountId], references: [id])
+
+  @@map("account_profiles")
+}
+
+/// プロフィール項目をどこまで求めるかの設定 (管理画面から変更する)。
+/// 1行だけ持つ (`id = "default"`、CommonUserHubConfigと同じ方式)。
+model AccountProfileConfig {
+  id String @id
+
+  fullName     ProfileFieldRequirement @default(OPTIONAL) @map("full_name")
+  fullNameKana ProfileFieldRequirement @default(HIDDEN) @map("full_name_kana")
+  phone        ProfileFieldRequirement @default(OPTIONAL)
+  postalCode   ProfileFieldRequirement @default(OPTIONAL) @map("postal_code")
+  address      ProfileFieldRequirement @default(OPTIONAL)
+
+  /// 入力を促す帯を出すか。項目が全てHIDDENでも設定として独立させておく。
+  promptEnabled Boolean @default(true) @map("prompt_enabled")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("account_profile_config")
 }
 
 /// 外部サービスAPI (指示書11章) へのリクエスト記録。管理画面の
