@@ -103,7 +103,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       expect(res.body.result.action).toBe("granted");
       expect(res.body.result.ove_account_id).toBe(accountId);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId: body.entitlement_id },
       });
       expect(holding.oveAccountId).toBe(accountId);
@@ -124,7 +124,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId: body.entitlement_id },
       });
       expect(holding.oveAccountId).toBe(accountId);
@@ -194,7 +194,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId: body.entitlement_id },
       });
       expect(holding.orderId).toBe(body.order_id);
@@ -209,7 +209,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId: body.entitlement_id },
       });
       const log = await prisma.auditLog.findFirst({
@@ -401,7 +401,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const res = await postEvent(body).expect(201);
       expect(res.body.result.action).toBe("revoked");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.status).toBe("REVOKED");
       expect(holding.revokedAt).not.toBeNull();
     });
@@ -415,7 +415,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const res = await postEvent(secondBody).expect(201);
       expect(res.body.result.action).toBe("already_revoked");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       const logs = await prisma.auditLog.findMany({
         where: { actionType: "COLLECTIBLE_REVOKED", targetId: holding.id },
       });
@@ -429,7 +429,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const res = await postEvent(body).expect(201);
       expect(res.body.result.action).toBe("tombstoned");
 
-      const tombstone = await prisma.collectibleEntitlementTombstone.findUniqueOrThrow({
+      const tombstone = await prisma.collectibleEntitlementTombstone.findFirstOrThrow({
         where: { entitlementId },
       });
       expect(tombstone.sourceSystemKey).toBe(SENGOKU_MARKET);
@@ -453,7 +453,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const grantRes = await postEvent(grantedBody({ common_user_id: commonUserId, entitlement_id: entitlementId })).expect(201);
       expect(grantRes.body.result.action).toBe("skipped_revoked_before_grant");
 
-      const holding = await prisma.collectibleHolding.findUnique({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirst({ where: { entitlementId } });
       expect(holding).toBeNull();
     });
 
@@ -463,7 +463,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body, otherKey).expect(403);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.status).toBe("ACTIVE");
 
       const log = await prisma.auditLog.findFirst({
@@ -474,9 +474,9 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       expect(log?.result).toBe("FAILURE");
     });
 
-    it("4b. sourceSystemKeyがsengoku-marketでも付与時と異なるHoldingなら拒否される (PR#2最終修正P0-1)", async () => {
-      // Holdingの本来の送信元(付与時に記録されたsourceSystemKey)と、取消リクエストの
-      // 認証済みsource_system_keyが一致することも要求する (二重チェック)。
+    it("4b. 別マーケットの同じentitlement_idには手を出さない (複合キー化)", async () => {
+      // 各マーケットは互いのID採番を知らないので、同じentitlement_idが来ることは
+      // 避けられない。一意性を論理Market単位にしたため、他方のカードは見えない。
       const entitlementId = `ent_${generateId()}`;
       const holdingId = generateId();
       const asset = await prisma.collectibleAsset.create({
@@ -490,15 +490,25 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
           collectibleAssetId: asset.id,
           entitlementId,
           sourceSystemKey: "some-other-market",
+          logicalMarket: "some-other-market",
           acquiredAt: new Date(),
         },
       });
 
-      const body = revokedBody(entitlementId);
-      await postEvent(body).expect(403);
+      // NFTマーケットから見ると「まだ付与していないentitlement_id」なので、
+      // revoke先行として自分のマーケットにtombstoneを作り、2xxで応答する。
+      const res = await postEvent(revokedBody(entitlementId)).expect(201);
+      expect(res.body.result.action).toBe("tombstoned");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
-      expect(holding.status).toBe("ACTIVE");
+      // 他マーケットのHoldingは触られない。ここが複合キー化の目的。
+      const untouched = await prisma.collectibleHolding.findUniqueOrThrow({ where: { id: holdingId } });
+      expect(untouched.status).toBe("ACTIVE");
+
+      // tombstoneは要求元のマーケット側に作られる。
+      const tombstone = await prisma.collectibleEntitlementTombstone.findFirstOrThrow({
+        where: { entitlementId },
+      });
+      expect(tombstone.logicalMarket).toBe("nft-art-market");
     });
 
     it("5. reason保存: metadata.reasonがrevoke_reasonへ保存される", async () => {
@@ -507,7 +517,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.revokeReason).toBe("user_requested_refund");
     });
 
@@ -517,7 +527,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
 
       await postEvent(body).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUnique({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirst({ where: { entitlementId } });
       expect(holding).not.toBeNull();
       expect(holding?.oveAccountId).toBe(accountId);
     });
@@ -536,6 +546,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
           collectibleAssetId: asset.id,
           entitlementId,
           sourceSystemKey: SENGOKU_MARKET,
+          logicalMarket: "nft-art-market",
           acquiredAt: new Date(),
           status: "ONCHAIN",
         },
@@ -545,7 +556,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       const res = await postEvent(body).expect(201);
       expect(res.body.result.action).toBe("manual_review_required");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.status).toBe("ONCHAIN");
       expect(holding.revokedAt).toBeNull();
 
@@ -574,7 +585,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       });
       await postEvent(secondBody).expect(409);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.id).toBe(firstRes.body.result.holding_id);
       expect(holding.oveAccountId).toBe(owner.accountId);
 
@@ -645,7 +656,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       });
       await postEvent(secondBody).expect(409);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
         include: { asset: true },
       });
@@ -736,7 +747,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked", () => 
       expect(grantRes.body.result.action).toBe("granted");
       expect(grantRes.body.result.ove_account_id).toBe(accountId);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({ where: { entitlementId } });
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({ where: { entitlementId } });
       expect(holding.serialNumber).toBe(grantedFixture.metadata.serial_number);
       expect(holding.displayNameSnapshot).toBe(grantedFixture.metadata.name);
       expect(holding.orderId).toBe(grantedEventBody.order_id);

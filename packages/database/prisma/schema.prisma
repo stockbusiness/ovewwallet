@@ -1307,10 +1307,15 @@ model CollectibleHolding {
   id                       String                   @id
   oveAccountId             String                   @map("ove_account_id")
   collectibleAssetId       String                   @map("collectible_asset_id")
-  /// 戦国マーケット側の`NftIssue.id` (指示書5.2章)。同一entitlementで複数Holdingを
-  /// 作らないためのUNIQUE制約。
-  entitlementId            String                   @unique @map("entitlement_id")
+  /// マーケット側の`NftIssue.id` (指示書5.2章)。**マーケットごとに独立して採番される**
+  /// ため、単独では一意にならない。`logicalMarket`との複合で一意にしている
+  /// (docs/collectible-multi-market.md)。
+  entitlementId            String                   @map("entitlement_id")
+  /// 認証された生の source_system_key。監査・調査用にそのまま残す。
   sourceSystemKey          String                   @map("source_system_key")
+  /// `sourceSystemKey`が指す論理Market (`ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES`)。
+  /// 同一マーケットの新旧表記を1つに寄せた値で、**保有権の同一性の単位**。
+  logicalMarket            String                   @map("logical_market")
   orderId                  String?                  @map("order_id")
   orderItemId              String?                  @map("order_item_id")
   acquiredAt               DateTime                 @map("acquired_at")
@@ -1368,6 +1373,7 @@ model CollectibleHolding {
   account OveAccount       @relation(fields: [oveAccountId], references: [id])
   asset   CollectibleAsset @relation(fields: [collectibleAssetId], references: [id])
 
+  @@unique([logicalMarket, entitlementId])
   @@index([oveAccountId, status])
   @@index([orderId])
   @@index([orderItemId])
@@ -1401,9 +1407,13 @@ model ClaimSession {
 /// (指示書25章「revoked → granted → ACTIVEにならない」)。
 model CollectibleEntitlementTombstone {
   id              String    @id
-  /// 同じentitlement_idの重複作成を防ぐ (revoke再送時は既存行をそのまま使う)。
-  entitlementId   String    @unique @map("entitlement_id")
+  /// マーケットごとに独立採番されるため、単独では一意にならない。`logicalMarket`との
+  /// 複合で、revoke再送時に既存行をそのまま使えるようにしている。
+  entitlementId   String    @map("entitlement_id")
+  /// 認証された生の source_system_key。監査・調査用。
   sourceSystemKey String    @map("source_system_key")
+  /// 保有権の同一性の単位 (CollectibleHolding.logicalMarketと同じ意味)。
+  logicalMarket   String    @map("logical_market")
   eventId         String    @map("event_id")
   reason          String
   /// PR-W3-a: 構造化された取消理由コード。CollectibleHolding.revokeReasonCodeと同じ意味。
@@ -1414,5 +1424,6 @@ model CollectibleEntitlementTombstone {
   revokedAt       DateTime  @map("revoked_at")
   createdAt       DateTime  @default(now()) @map("created_at")
 
+  @@unique([logicalMarket, entitlementId])
   @@map("collectible_entitlement_tombstones")
 }

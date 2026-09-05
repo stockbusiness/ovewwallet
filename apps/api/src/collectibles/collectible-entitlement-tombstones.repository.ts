@@ -12,6 +12,7 @@ export interface CreateTombstoneParams {
   id: string;
   entitlementId: string;
   sourceSystemKey: string;
+  logicalMarket: string;
   eventId: string;
   reason: string;
   reasonCode?: string | null;
@@ -29,11 +30,12 @@ export class CollectibleEntitlementTombstonesRepository {
   constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
 
   async findByEntitlementId(
+    logicalMarket: string,
     entitlementId: string,
     client: Db = this.db,
   ): Promise<CollectibleEntitlementTombstone | null> {
     return client.collectibleEntitlementTombstone.findUnique({
-      where: { entitlementId },
+      where: { logicalMarket_entitlementId: { logicalMarket, entitlementId } },
     });
   }
 
@@ -46,6 +48,7 @@ export class CollectibleEntitlementTombstonesRepository {
         id: params.id,
         entitlementId: params.entitlementId,
         sourceSystemKey: params.sourceSystemKey,
+        logicalMarket: params.logicalMarket,
         eventId: params.eventId,
         reason: params.reason,
         reasonCode: params.reasonCode ?? null,

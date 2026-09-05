@@ -1,10 +1,10 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { generateId, Prisma, type CollectibleHolding, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CollectibleAssetsRepository } from "./collectible-assets.repository";
 import { CollectibleEntitlementTombstonesRepository } from "./collectible-entitlement-tombstones.repository";
 import { CollectibleHoldingsRepository, type CollectibleHoldingWithAsset } from "./collectible-holdings.repository";
-import { entitlementAdvisoryLockKey } from "./constants";
+import { entitlementAdvisoryLockKey, logicalMarketFor } from "./constants";
 
 export interface GrantCollectibleParams {
   oveAccountId: string;
@@ -79,21 +79,42 @@ export class GrantCollectibleUseCase {
   ) {}
 
   async execute(params: GrantCollectibleParams): Promise<GrantCollectibleResult> {
-    const existing = await this.holdings.findByEntitlementIdWithAsset(params.entitlementId);
+    // 保有権の同一性は論理Market単位 (docs/collectible-multi-market.md)。呼び出し元が
+    // 受理済みのsource_system_keyしか渡さない前提だが、ここでも確かめておく。
+    // 未知のまま進むと、どのマーケットのIDか分からない行を作ってしまうため。
+    const logicalMarket = logicalMarketFor(params.sourceSystemKey);
+    if (logicalMarket === null) {
+      throw new BadRequestException(
+        `source_system_key "${params.sourceSystemKey}" is not a known NFT market`,
+      );
+    }
+
+    const existing = await this.holdings.findByEntitlementIdWithAsset(
+      logicalMarket,
+      params.entitlementId,
+    );
     if (existing) return this.handleExisting(this.db, existing, params);
 
     try {
       return await this.db.$transaction(async (tx) => {
         // 契約v2指示書23章。revoke-collectible.use-caseの同名キーと衝突させ、
         // Tombstone作成とHolding作成を同じentitlement_idについて排他する。
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(params.entitlementId)}))`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(logicalMarket, params.entitlementId)}))`;
 
-        const existingInTx = await this.holdings.findByEntitlementIdWithAsset(params.entitlementId, tx);
+        const existingInTx = await this.holdings.findByEntitlementIdWithAsset(
+          logicalMarket,
+          params.entitlementId,
+          tx,
+        );
         if (existingInTx) return this.handleExisting(tx, existingInTx, params);
 
         // 契約v2指示書24〜25章。revoke先行でTombstone済みなら、ACTIVE Holdingを作らない
         // (「revoked → granted → ACTIVEにならない」)。
-        const tombstone = await this.tombstones.findByEntitlementId(params.entitlementId, tx);
+        const tombstone = await this.tombstones.findByEntitlementId(
+          logicalMarket,
+          params.entitlementId,
+          tx,
+        );
         if (tombstone) {
           await tx.auditLog.create({
             data: {
@@ -158,6 +179,7 @@ export class GrantCollectibleUseCase {
             collectibleAssetId: asset.id,
             entitlementId: params.entitlementId,
             sourceSystemKey: params.sourceSystemKey,
+            logicalMarket,
             orderId: params.orderId,
             orderItemId: params.orderItemId,
             acquiredAt: params.acquiredAt,
@@ -206,7 +228,10 @@ export class GrantCollectibleUseCase {
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        const race = await this.holdings.findByEntitlementIdWithAsset(params.entitlementId);
+        const race = await this.holdings.findByEntitlementIdWithAsset(
+          logicalMarket,
+          params.entitlementId,
+        );
         if (race) return this.handleExisting(this.db, race, params);
       }
       throw error;

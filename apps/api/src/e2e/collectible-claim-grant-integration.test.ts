@@ -160,7 +160,7 @@ describe("NFT結合試験: Claim確定 → entitlement.granted → Holding ACTIV
 
     const collection = await request(app.getHttpServer()).get("/api/v1/me/collectibles").set("Cookie", cookie).expect(200);
     expect(collection.body.items).toHaveLength(1);
-    const holding = await prisma.collectibleHolding.findUnique({
+    const holding = await prisma.collectibleHolding.findFirst({
       where: { entitlementId },
       include: { asset: true },
     });
@@ -216,7 +216,7 @@ describe("NFT結合試験: Claim確定 → entitlement.granted → Holding ACTIV
     const revokeRes = await postEntitlementEvent(revokedBody).expect(201);
     expect(revokeRes.body.result.action).toBe("revoked");
 
-    const holding = await prisma.collectibleHolding.findUnique({ where: { entitlementId } });
+    const holding = await prisma.collectibleHolding.findFirst({ where: { entitlementId } });
     expect(holding?.status).toBe("REVOKED");
     // 物理削除禁止 (指示書§15) — 行自体は残る。
     expect(holding).not.toBeNull();
