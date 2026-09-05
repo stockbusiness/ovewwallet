@@ -258,3 +258,35 @@ export interface RewardRulePublic {
   /** この利用者が既に受け取っているか。1回限りの特典を「もらえます」と出し続けないための判定。 */
   already_earned: boolean;
 }
+
+/** プロフィール項目の要求レベル (docs/account-profile.md)。管理画面から項目ごとに変わる。 */
+export type ProfileFieldRequirement = "HIDDEN" | "OPTIONAL" | "REQUIRED";
+
+export type ProfileFieldKey = "fullName" | "fullNameKana" | "phone" | "postalCode" | "address";
+
+/**
+ * `GET /api/v1/accounts/me/profile`。どの入力欄を出すかは`config`に従う
+ * (ビルド時の値ではなくAPIから取るので、管理画面の変更が再ビルド無しで効く)。
+ */
+export interface AccountProfileResponse {
+  profile: {
+    fullName: string | null;
+    fullNameKana: string | null;
+    phone: string | null;
+    postalCode: string | null;
+    prefecture: string | null;
+    city: string | null;
+    addressLine: string | null;
+    building: string | null;
+    declinedAt: string | null;
+    updatedAt: string | null;
+  };
+  config: {
+    fields: Record<ProfileFieldKey, ProfileFieldRequirement>;
+    promptEnabled: boolean;
+  };
+  prompt: {
+    show: boolean;
+    missingRequired: ProfileFieldKey[];
+  };
+}

@@ -209,6 +209,20 @@ export interface AccountDetailItem {
   }>;
   mergedIntoAccount: { id: string; accountCode: string } | null;
   mergedAccounts: Array<{ id: string; accountCode: string }>;
+  /** 本人が入力したお客様情報 (docs/account-profile.md)。未入力なら null。 */
+  profile: {
+    fullName: string | null;
+    fullNameKana: string | null;
+    phone: string | null;
+    postalCode: string | null;
+    prefecture: string | null;
+    city: string | null;
+    addressLine: string | null;
+    building: string | null;
+    /** 「入力しない」を明示的に選んだ日時。未入力放置と区別してセグメントに使う。 */
+    declinedAt: string | null;
+    updatedAt: string;
+  } | null;
   auditLogs: AuditLogItem[];
   activeSessionCount: number;
 }
@@ -567,4 +581,17 @@ export interface MailTestResult {
   outcome: "ok" | "failed" | "not_configured";
   message: string;
   mailFrom: string | null;
+}
+
+/** プロフィール項目の要求レベル (docs/account-profile.md)。 */
+export type ProfileFieldRequirement = "HIDDEN" | "OPTIONAL" | "REQUIRED";
+
+export type ProfileFieldKey = "fullName" | "fullNameKana" | "phone" | "postalCode" | "address";
+
+/** `GET /api/v1/admin/profile-config`。 */
+export interface ProfileConfig {
+  fields: Record<ProfileFieldKey, ProfileFieldRequirement>;
+  promptEnabled: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
 }

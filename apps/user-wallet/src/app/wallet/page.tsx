@@ -38,6 +38,7 @@ import {
   type MeFeatureFlags,
 } from "@/lib/api";
 import { EarnOpportunityCard, pickEarnOpportunity } from "@/components/EarnOpportunityCard";
+import { ProfilePromptBanner } from "@/components/ProfilePromptBanner";
 
 export default function WalletTopPage() {
   const router = useRouter();
@@ -177,6 +178,8 @@ export default function WalletTopPage() {
 
       <div className="flex flex-col gap-6 px-4">
         <p className="-mt-4 text-xs text-sengoku-muted">{toDisplayCode(balance.wallet_code)}</p>
+
+        <ProfilePromptBanner />
 
         <BalanceCard
           amount={Number(balance.available_balance).toLocaleString("ja-JP")}

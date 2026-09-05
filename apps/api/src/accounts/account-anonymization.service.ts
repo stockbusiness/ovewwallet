@@ -57,6 +57,8 @@ export function anonymizationGraceDays(env: NodeJS.ProcessEnv = process.env): nu
  *
  * - `ove_accounts`: `display_name` / `primary_email` / `primary_phone`
  * - `account_identities`: `email` / `phone` / `metadata`、`provider_subject`はハッシュ化
+ * - `account_profiles`: 行ごと削除。氏名・電話・住所しか入っておらず、退会済みの
+ *   相手にセグメントを残しておく理由も無いため (`docs/account-profile.md`)
  *
  * ## 消さないもの
  *
@@ -150,6 +152,10 @@ export class AccountAnonymizationService {
           where: { id: account.id },
           data: { displayName: null, primaryEmail: null, primaryPhone: null },
         });
+
+        // プロフィールは個人情報しか持たないので、部分的に消すのではなく行ごと消す。
+        // 未登録なら何もしない (deleteだとレコード不在で例外になるためdeleteMany)。
+        await tx.accountProfile.deleteMany({ where: { oveAccountId: account.id } });
 
         let updated = 0;
         for (const identity of account.identities) {

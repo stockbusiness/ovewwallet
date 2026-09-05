@@ -28,6 +28,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/wallets", label: "ウォレット一覧" },
       { href: "/transactions", label: "取引一覧" },
       { href: "/bulk-grants", label: "CSV一括付与" },
+      { href: "/profile-config", label: "お客様情報の入力設定" },
     ],
   },
   {

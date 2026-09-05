@@ -76,6 +76,10 @@ export class AccountRepository {
         links: { include: { serviceIntegration: { select: { serviceCode: true, serviceName: true } } } },
         mergedIntoAccount: { select: { id: true, accountCode: true } },
         mergedAccounts: { select: { id: true, accountCode: true } },
+        // LINE登録のアカウントは display_name が空のままなので、管理画面では
+        // アカウントコードしか手がかりが無い。プロフィールを添えて誰なのか
+        // 分かるようにする (docs/account-profile.md)。
+        profile: true,
       },
     });
   }
