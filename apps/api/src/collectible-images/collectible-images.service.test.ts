@@ -11,11 +11,8 @@ class FakeStorage {
   configured = true;
   putCalls = 0;
 
-  isConfigured(): boolean {
+  async isConfigured(): Promise<boolean> {
     return this.configured;
-  }
-  bucket(): string | null {
-    return "test-bucket";
   }
   async put(params: { key: string; body: Buffer; contentType: string }): Promise<void> {
     this.putCalls += 1;

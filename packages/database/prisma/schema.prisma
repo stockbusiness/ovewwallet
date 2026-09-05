@@ -401,6 +401,33 @@ model MailConfig {
   @@map("mail_config")
 }
 
+/// カード画像の保管先 (S3互換オブジェクトストレージ) の設定。管理画面から編集する
+/// (docs/collectible-images.md)。`MailConfig`と同じくシングルトン行。
+///
+/// 環境変数でも設定できるが、**この行があればそちらが優先される**。鍵の入れ替えに
+/// デプロイを待たせないため。
+model CollectibleImageStorageConfig {
+  id String @id
+
+  /// バケット名。
+  bucket String?
+  /// Cloudflare R2 等の独自エンドポイント。AWS S3 なら未設定でよい。
+  endpoint String?
+  /// R2 はregionを見ないが、SDKが必須とするため既定は "auto"。
+  region String?
+
+  accessKeyId String? @map("access_key_id")
+  /// ENCRYPTION_KEYによる可逆暗号化 (AES-256-GCM、MailConfig.apiKeyEncryptedと同方式)。
+  secretAccessKeyEncrypted String? @map("secret_access_key_encrypted")
+  /// 管理画面表示用のマスク済みプレビュー (例: "****abcd")。生値は含まない。
+  secretAccessKeyPreview   String? @map("secret_access_key_preview")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("collectible_image_storage_config")
+}
+
 /// 利用規約・プライバシーポリシー・会社情報など、画面に出す法的文書。
 /// 管理画面 (/legal) から編集する。コード修正とデプロイ無しで直せるようにするため。
 ///

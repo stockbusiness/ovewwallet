@@ -37,7 +37,7 @@ export class CollectibleImagesService {
     fetchImpl?: FetchLike,
   ): Promise<void> {
     const urls = uniqueUrls(sourceUrls);
-    if (urls.length === 0 || !this.storage.isConfigured()) return;
+    if (urls.length === 0 || !(await this.storage.isConfigured())) return;
 
     for (const url of urls) {
       try {
@@ -141,7 +141,7 @@ export class CollectibleImagesService {
    * 試行回数の上限に達したものは対象外。運用者が管理画面から手動で再試行できる。
    */
   async retryPending(limit: number, fetchImpl?: FetchLike): Promise<{ attempted: number; stored: number }> {
-    if (!this.storage.isConfigured()) return { attempted: 0, stored: 0 };
+    if (!(await this.storage.isConfigured())) return { attempted: 0, stored: 0 };
 
     const rows = await this.db.collectibleImage.findMany({
       where: { status: { in: ["PENDING", "FAILED"] }, attemptCount: { lt: MAX_INGEST_ATTEMPTS } },

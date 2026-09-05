@@ -28,6 +28,8 @@ import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminCollectiblesService } from "./admin-collectibles.service";
 import { AdminEmailDomainsController } from "./admin-email-domains.controller";
 import { AdminEmailDomainsService } from "./admin-email-domains.service";
+import { AdminImageStorageController } from "./admin-image-storage.controller";
+import { AdminImageStorageService } from "./admin-image-storage.service";
 import { AdminIntegrationsController } from "./admin-integrations.controller";
 import { AdminMigrationService } from "./admin-migration.service";
 import { AdminMigrationsController } from "./admin-migrations.controller";
@@ -69,6 +71,7 @@ import { AdminService } from "./admin.service";
     AdminUsersController,
     AdminLegalController,
     AdminEmailDomainsController,
+    AdminImageStorageController,
   ],
   providers: [
     AdminService,
@@ -90,6 +93,7 @@ import { AdminService } from "./admin.service";
     AdminMailConfigService,
     AdminProfileConfigService,
     AdminEmailDomainsService,
+    AdminImageStorageService,
     AdminCollectiblesService,
     AdminUsersService,
     LineBroadcastService,

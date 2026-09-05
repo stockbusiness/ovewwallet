@@ -45,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { href: "/collectible-cards", label: "カードマスター管理" },
       { href: "/collectible-holdings", label: "カード保有一覧" },
+      { href: "/image-storage-config", label: "カード画像の保管先" },
     ],
   },
   {

@@ -596,6 +596,29 @@ export interface ProfileConfig {
   updatedBy: string | null;
 }
 
+/** `GET /api/v1/admin/image-storage-config` (docs/collectible-images.md)。 */
+export interface ImageStorageConfig {
+  /** 取り込みが動く状態か (バケット・キー・シークレットが揃っているか)。 */
+  configured: boolean;
+  bucket: string | null;
+  endpoint: string | null;
+  region: string;
+  accessKeyId: string | null;
+  secretAccessKeySet: boolean;
+  /** 末尾4文字のみのマスク表示。生値は返らない。 */
+  secretAccessKeyPreview: string | null;
+  /** 管理画面未設定でも環境変数で動く状態かどうか。 */
+  fallbackFromEnv: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface ImageStorageTestResult {
+  outcome: "ok" | "failed" | "not_configured";
+  message: string;
+  bucket: string | null;
+}
+
 /** `GET /api/v1/admin/email-domains` (docs/email-domain-policy.md)。 */
 export interface EmailDomainRule {
   domain: string;
