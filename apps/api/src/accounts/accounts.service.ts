@@ -33,6 +33,10 @@ export class AccountsService {
     return this.accountRepository.findById(oveAccountId);
   }
 
+  async hasIdentity(provider: string, providerSubject: string): Promise<boolean> {
+    return this.registration.hasIdentity(provider, providerSubject);
+  }
+
   async findOrCreateByIdentity(params: FindOrCreateIdentityParams): Promise<OveAccount> {
     return this.registration.findOrCreateByIdentity(params);
   }

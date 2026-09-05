@@ -596,6 +596,22 @@ export interface ProfileConfig {
   updatedBy: string | null;
 }
 
+/** `GET /api/v1/admin/email-domains` (docs/email-domain-policy.md)。 */
+export interface EmailDomainRule {
+  domain: string;
+  /** BLOCK は組み込みリストへの追加、ALLOW は組み込みリストの誤検知の解除。 */
+  action: "BLOCK" | "ALLOW";
+  reason: string | null;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+export interface EmailDomainRuleList {
+  /** コード側に持っている使い捨てドメインの件数。 */
+  built_in_count: number;
+  rules: EmailDomainRule[];
+}
+
 /** `GET /api/v1/admin/legal` (docs/legal-documents.md)。本文はプレーンテキスト。 */
 export interface LegalDocument {
   slug: "terms" | "privacy" | "company";

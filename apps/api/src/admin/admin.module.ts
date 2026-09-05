@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AccountsModule } from "../accounts/accounts.module";
+import { AuthModule } from "../auth/auth.module";
 import { CollectiblesModule } from "../collectibles/collectibles.module";
 import { LineBroadcastService } from "../notices/line-broadcast.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
@@ -24,6 +25,8 @@ import { AdminLegalService } from "./admin-legal.service";
 import { AdminMailConfigService } from "./admin-mail-config.service";
 import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminCollectiblesService } from "./admin-collectibles.service";
+import { AdminEmailDomainsController } from "./admin-email-domains.controller";
+import { AdminEmailDomainsService } from "./admin-email-domains.service";
 import { AdminIntegrationsController } from "./admin-integrations.controller";
 import { AdminMigrationService } from "./admin-migration.service";
 import { AdminMigrationsController } from "./admin-migrations.controller";
@@ -41,7 +44,8 @@ import { AdminService } from "./admin.service";
 @Module({
   // IntegrationsModule: 代理店システムへの接続テスト (AdminAgencyConnectionTestService) が
   // IntegrationHttpClient / IntegrationConfigProvider を使う。
-  imports: [AccountsModule, CollectiblesModule, IntegrationsModule, OutboxModule],
+  // AuthModule は EmailDomainPolicyService (使い捨てドメイン判定のキャッシュ破棄) のため。
+  imports: [AccountsModule, AuthModule, CollectiblesModule, IntegrationsModule, OutboxModule],
   controllers: [
     AdminController,
     AdminAuthController,
@@ -56,6 +60,7 @@ import { AdminService } from "./admin.service";
     AdminCollectiblesController,
     AdminUsersController,
     AdminLegalController,
+    AdminEmailDomainsController,
   ],
   providers: [
     AdminService,
@@ -76,6 +81,7 @@ import { AdminService } from "./admin.service";
     AdminLegalService,
     AdminMailConfigService,
     AdminProfileConfigService,
+    AdminEmailDomainsService,
     AdminCollectiblesService,
     AdminUsersService,
     LineBroadcastService,
