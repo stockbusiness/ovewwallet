@@ -425,10 +425,18 @@ jobs:
             # 実チャネルでのLIFF結合試験(2026-07-18)でLINE本番ログインの動作を確認済み。
             # LINE_CHANNEL_IDと合わせてLineIdTokenVerifierが使われる (docs/authentication.md)。
             "AUTH_MODE=production"
-            # 稼働開始時点で使えるログイン方法はLINEのみ (docs/login-methods.md)。
-            # メールは送信基盤が未実装、SSOは未接続のため、明示的に閉じておく
+            # 使えるログイン方法 (docs/login-methods.md)。SSOは未接続のため閉じたまま
             # (既定でも閉じているが、環境変数を見れば状態が分かるようにする)。
+            #
+            # メールログインは送信処理まで実装済みだが、RESEND_API_KEY を設定して
+            # から開けること。鍵が無いまま true にすると起動時に止まる
+            # (assert-production-env.ts)。開ける手順は docs/login-methods.md 参照。
             "ENABLE_EMAIL_LOGIN=false"
+            # Resend (https://resend.com) のAPIキー。差出人ドメインへ SPF/DKIM/DMARC を
+            # 設定してから発行する。未設定なら送信は行われない (メールログインは閉じたまま)。
+            "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}"
+            # 差出人。SPF/DKIMを設定したドメインのアドレスであること。
+            "MAIL_FROM=no-reply@sennokuni-wallet.com"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
             # 代理店SSOの検証条件 (連携先回答 2026-09-04)。issuer / JWKS URL は
             # AuthServiceの既定値と同一だが、連携先の設定を変えずに追随できるよう

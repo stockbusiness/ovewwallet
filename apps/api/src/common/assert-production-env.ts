@@ -12,6 +12,9 @@
  *   (`allowed-origins.ts`)の唯一の入力。未設定だと許可リストが空になり、
  *   CSRF対策のオリジン検証が「何が正当なオリジンか不明」として素通しになる
  *   (`csrf-protection.middleware.ts`参照)。
+ * - RESEND_API_KEY: **`ENABLE_EMAIL_LOGIN=true`のときのみ**必須。未設定のまま
+ *   メールログインを開けると、画面にボタンは出るのにワンタイムコードが誰にも
+ *   届かないという、最も原因の掴みにくい壊れ方をする (`docs/login-methods.md`)。
  */
 export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV !== "production") return;
@@ -22,6 +25,8 @@ export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): v
   if (!env.LINE_CHANNEL_ID) missing.push("LINE_CHANNEL_ID");
   if (!env.APP_URL) missing.push("APP_URL");
   if (!env.ADMIN_URL) missing.push("ADMIN_URL");
+  // メールログインを開けていないなら送信設定は要らない (LINEだけで動く構成を壊さない)。
+  if (env.ENABLE_EMAIL_LOGIN === "true" && !env.RESEND_API_KEY) missing.push("RESEND_API_KEY");
 
   if (missing.length > 0) {
     throw new Error(

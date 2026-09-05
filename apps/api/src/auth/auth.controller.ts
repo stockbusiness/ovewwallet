@@ -58,6 +58,15 @@ export class AuthController {
     return availableLoginMethods();
   }
 
+  /**
+   * ワンタイムコードの発行と送信。
+   *
+   * **1つのIPから5分に5回まで**に絞る。`EmailOtpService`にはアドレス単位の60秒
+   * クールダウンがあるが、宛先を変えれば回避できるため防御にならない。絞らないと
+   * グローバル上限 (120回/60秒) まで任意の宛先へメールを撃ててしまい、
+   * メール爆撃・送信費用・送信ドメインの評判低下に直結する。
+   */
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
   @Post("email/request-otp")
   async requestOtp(@Body(new ZodValidationPipe(RequestOtpSchema)) body: z.infer<typeof RequestOtpSchema>) {
     assertLoginMethodEnabled("email");
@@ -76,14 +85,22 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     assertLoginMethodEnabled("email");
-    const session = await this.auth.verifyEmailOtpAndLogin(
-      body.email,
-      body.code,
-      body.termsAccepted,
-      sessionMetaFromRequest(req),
-    );
-    setSessionCookie(res, session.token, session.expiresAt);
-    return { ove_account_id: session.oveAccountId };
+    // 紹介Cookieの扱いはLINEログインと揃える。メール登録でも紹介を成立させるため。
+    const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
+    try {
+      const session = await this.auth.verifyEmailOtpAndLogin(
+        body.email,
+        body.code,
+        body.termsAccepted,
+        sessionMetaFromRequest(req),
+        referralCookieToken,
+      );
+      setSessionCookie(res, session.token, session.expiresAt);
+      return { ove_account_id: session.oveAccountId };
+    } finally {
+      // LINEログインと同じく、成功・失敗にかかわらず使い切りとして削除する。
+      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS);
+    }
   }
 
   /** LINEログイン。`AUTH_MODE=production` のとき実チャネルのIDトークンを検証する。 */

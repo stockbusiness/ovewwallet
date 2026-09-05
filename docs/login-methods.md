@@ -13,7 +13,7 @@
 | 方法 | 状態 | 本番で開けられない理由 |
 |---|---|---|
 | **LINE** | ✅ 使える | `AUTH_MODE=production` で実チャネルのIDトークンを検証する。LIFF結合試験済み |
-| **メールOTP** | ❌ | **メール送信基盤が実装されていない**。`EmailOtpService.issue()` はコードを生成してKVに保存するだけで、どこにも送信していない |
+| **メールOTP** | ⚙️ 鍵の設定待ち | 2026-09-05に送信処理を実装した (Resend)。`RESEND_API_KEY` を設定すれば開けられる。**LINEを持っていない利用者のための入口** |
 | **千ノ国パスポートSSO** | ❌ | 正式SSO (RS256/JWKS) が未完成。モック発行エンドポイントは本番で404 |
 | **代理店SSO** | ✅ 使える | 2026-09-04接続。`SENGOKU_AI_SSO_*` を設定し、連携先がSSO受信URLを登録済み。ただし利用者向けではなく**代理店専用**の入口で、ログイン画面にボタンは出ない (連携先の起動URLから来る) |
 
@@ -35,7 +35,7 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 | 環境変数 | 既定 |
 |---|---|
 | `ENABLE_LINE_LOGIN` | **有効** (`false` を明示したときだけ無効) |
-| `ENABLE_EMAIL_LOGIN` | 無効 (`true` のときだけ有効) |
+| `ENABLE_EMAIL_LOGIN` | 無効 (`true` のときだけ有効。`RESEND_API_KEY` が必須) |
 | `ENABLE_SENGOKU_PASSPORT_LOGIN` | 無効 |
 | `ENABLE_AGENCY_LOGIN` | 無効 (本番は`deploy.yml`で`true`。2026-09-04接続済み) |
 
@@ -79,11 +79,51 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 
 ### メールログイン
 
-1. メール配信サービス (SendGrid / SES 等) を契約する
-2. `EmailOtpService.issue()` の呼び出し元 (`AuthService.requestEmailOtp`) に送信処理を追加する
-3. `ENABLE_EMAIL_LOGIN=true` を設定する
+LINEを持っていない利用者が新規登録するための入口 (2026-09-05実装)。
 
-**2を飛ばして3だけ行うと、コードが誰にも届かないまま画面に選択肢が出る**ので注意。
+1. Resend (https://resend.com) でアカウントを作り、**差出人ドメインを検証する**
+   (`sennokuni-wallet.com` のDNSへ SPF / DKIM / DMARC を設定する)
+2. APIキーを発行し、GitHubのリポジトリシークレット `RESEND_API_KEY` へ登録する
+   (`deploy.yml` が環境変数として渡す)
+3. `ENABLE_EMAIL_LOGIN=true` にしてデプロイする
+
+**2を飛ばして3だけ行っても起動しない**。`assertProductionEnvSafe()` が
+`RESEND_API_KEY` の未設定を検出して起動を止める。以前は「コードが誰にも届かない
+まま画面に選択肢が出る」という、最も原因の掴みにくい壊れ方をしていた。
+
+#### 送信できなかったときは失敗として返す
+
+`AuthService.requestEmailOtp()` は送信失敗を握り潰さず **503** を返す。ここで
+握り潰すと画面には「送信しました」と出るのに、利用者は届かないコードを待ち
+続けることになる。
+
+発行済みのコードは送信に失敗しても消さない。60秒のクールダウン中に再送を
+求められても、KVには最新のコードが残っているため、送信さえ復旧すれば同じ
+コードで先へ進める。
+
+#### コード発行は発信元で絞る
+
+`POST /auth/email/request-otp` は **1つのIPから5分に5回まで**。
+`EmailOtpService` にはアドレス単位の60秒クールダウンがあるが、宛先を変えれば
+回避できるため防御にならない。絞らないとグローバル上限 (120回/60秒) まで
+任意の宛先へメールを撃ててしまい、メール爆撃・送信費用・送信ドメインの
+評判低下に直結する。
+
+#### メール本文にリンクを置かない
+
+`buildOtpMail()` はプレーンテキストで、URLを一切含めない。「メールのリンクを
+踏む」習慣をつけると、同じ見た目の偽メールで誘導されたときに見分けが
+つかなくなるため。コードは画面へ手で入力してもらう。
+
+#### 紹介はLINE登録と同じように成立する
+
+`POST /auth/email/verify-otp` はLINEログインと同じく紹介セッションCookieを
+読み、新規作成時に紐付ける (`docs/agency-integration.md`)。ここが抜けていると、
+紹介URL経由でメール登録した人が代理店に紐付かず、しかも**画面上は普通に
+登録成功して見えるため気づけない**。
+
+ただしLINEを通っていないので、代理店へ送る `line_verified` は `false` になり、
+初回登録特典の `line_user_id_hash` は空になる。
 
 ### 千ノ国パスポートSSO / 代理店SSO
 
@@ -108,3 +148,13 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 - `apps/api/src/e2e/login-methods.test.ts` (7件): `GET /auth/methods` の内容と未ログインでの
   参照、無効な方法のエンドポイントが404になること (メール・パスポートSSO・代理店SSO)、
   LINEログインが従来どおり通ること、有効化すれば元の挙動に戻ること
+- `apps/api/src/e2e/email-registration.test.ts` (9件): メールでの新規登録
+  (アカウント・ウォレット作成、再ログイン、規約未同意の拒否、誤コードの拒否)、
+  紹介URL経由での紐付けと`line_verified: false`、紹介Cookieの使い切り、
+  送信失敗時に503を返すこと、コード発行の回数制限
+- `apps/api/src/mail/otp-mail.test.ts` (4件): 件名・本文・リンクを置かないこと
+- `apps/api/src/mail/resend-mail-sender.test.ts` (6件): 送信内容、APIキーの渡し方、
+  失敗時に例外を投げること、例外に鍵・宛先・コードを含めないこと
+- `apps/api/src/mail/mail.module.test.ts` (2件): 鍵の有無による実装の選択
+- `apps/api/src/common/assert-production-env.test.ts` (3件追加): メールログインを
+  開けたのに鍵が無い場合に起動を止めること

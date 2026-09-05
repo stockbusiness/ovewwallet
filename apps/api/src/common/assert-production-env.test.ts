@@ -47,6 +47,25 @@ describe("assertProductionEnvSafe (次期改修指示書P0-6)", () => {
     expect(() => assertProductionEnvSafe(rest)).toThrow(/ADMIN_URL/);
   });
 
+  // メールログインを開けたのに送信設定が無いと、画面にボタンは出るのにコードが
+  // 誰にも届かないという最も原因の掴みにくい壊れ方をする (docs/login-methods.md)。
+  it("throws when email login is enabled without a mail delivery key", () => {
+    expect(() => assertProductionEnvSafe({ ...complete, ENABLE_EMAIL_LOGIN: "true" })).toThrow(
+      /RESEND_API_KEY/,
+    );
+  });
+
+  it("does not require a mail delivery key while email login stays closed", () => {
+    expect(() => assertProductionEnvSafe(complete)).not.toThrow();
+    expect(() => assertProductionEnvSafe({ ...complete, ENABLE_EMAIL_LOGIN: "false" })).not.toThrow();
+  });
+
+  it("accepts email login once the mail delivery key is set", () => {
+    expect(() =>
+      assertProductionEnvSafe({ ...complete, ENABLE_EMAIL_LOGIN: "true", RESEND_API_KEY: "re_x" }),
+    ).not.toThrow();
+  });
+
   it("does not throw outside production regardless of missing vars", () => {
     expect(() => assertProductionEnvSafe({ NODE_ENV: "development" })).not.toThrow();
     expect(() => assertProductionEnvSafe({ NODE_ENV: "test" })).not.toThrow();
