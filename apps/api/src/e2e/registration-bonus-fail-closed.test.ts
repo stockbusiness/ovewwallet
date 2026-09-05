@@ -8,6 +8,7 @@ import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import {
   createTestServiceIntegration,
+  ensureRegistrationBonusRule,
   signedHeaders,
   type TestServiceIntegration,
 } from "./test-helpers";
@@ -57,28 +58,17 @@ describe("transaction_type: REGISTRATION_BONUS (代理店システムからの�
     });
   });
 
+  // ルールの状態そのものを操作するテストなので、後片付けはprisma切断より先に行う。
   afterAll(async () => {
+    await ensureRegistrationBonusRule();
     await app.close();
     await prisma.$disconnect();
   });
 
-  // seedはこのルールをACTIVEで作る。各テストが状態を変えるため、毎回作り直して
-  // 他のe2e (me-and-service-accounts等) が前提とするACTIVEな行を残す。
-  afterEach(async () => {
-    await prisma.rewardRule.deleteMany({ where: { ruleCode: RULE_CODE } });
-    await prisma.rewardRule.create({
-      data: {
-        id: generateId(),
-        ruleCode: RULE_CODE,
-        ruleName: "戦国パスポート登録特典",
-        sourceService: "SENGOKU_PASSPORT",
-        rewardAmount: 3000,
-        perUserLimit: 1,
-        approvalType: "AUTOMATIC",
-        status: "ACTIVE",
-        displayName: "戦国パスポート登録特典",
-      },
-    });
+  // 各テストの開始時にACTIVEへ揃える。DBは全e2eで共有しており (jestは--runInBand)、
+  // ここでの削除・無効化を他のテストへ持ち越さないため。
+  beforeEach(async () => {
+    await ensureRegistrationBonusRule();
   });
 
   it("管理画面で無効化(INACTIVE)したら、代理店からの3000を拒否する", async () => {
