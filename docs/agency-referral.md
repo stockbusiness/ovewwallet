@@ -56,12 +56,43 @@ Cookieも **APIサーバー側のドメインで発行する**。ウォレット
 
 - Cookie名: `referral_session`
 - `HttpOnly` / `Secure` / `SameSite=None` (セッションCookieと同じ、別ドメイン構成のため)
+- `Domain`: `APP_URL`から導出した共有ドメイン (下記)。導出できないときは付けない
 - 有効期限: `REFERRAL_SESSION_TTL_HOURS` (コード上の既定24時間、本番は30日=720)
 - Cookieに保存するのは不透明なランダムトークンのみで、紹介トークン本体は保存しない
   (サーバー側の`wallet_referrals.session_token_hash`と照合する、セッションCookieの
   `token`/`tokenHash`と同じ設計)
 - オープンリダイレクト対策: `/referrals/capture`のリダイレクト先は`APP_URL`環境変数由来の
   固定値のみで、リクエストパラメータからは組み立てない
+
+### `Domain`を付けて両ホストへ届かせる (2026-09-05修正)
+
+導入当初は`domain`を指定しておらず、Cookieが**発行元ホスト専用**になっていた。
+その結果、`api.sennokuni-wallet.com`で発行したCookieが、ウォレットドメイン宛の
+ログインリクエストへ送られず、**紹介URLから登録しても代理店に紐付かない**
+状態だった。登録自体は成功して見えるため、運用では気づけない。
+
+なぜログインのセッションCookieは同じ問題を起こしていなかったのか:
+
+| | 経路 | Cookieが付くホスト |
+|---|---|---|
+| ログイン | `sennokuni-wallet.com/api/...` → Next.jsのrewriteがサーバー側でAPIへ中継 | ウォレット |
+| 紹介のcapture | ブラウザが`api.sennokuni-wallet.com`へ**直接**リダイレクト | API |
+
+captureだけがrewriteを経由せず、ブラウザを直接APIドメインへ飛ばしていた。
+
+`referral-cookie.ts`が`APP_URL`から共有ドメインを導出して`domain`に指定する。
+ただし**リクエストのホストがそのドメイン配下だと確認できたときだけ**付ける。
+APIを別ドメイン (例: Railwayの既定ホスト名) で受けている場合に無関係な`Domain`を
+指定すると、ブラウザがCookieを**丸ごと拒否**して今より悪くなるため。確認できない
+ときは従来どおりホスト専用で発行する。
+
+`res.cookie`と`res.clearCookie`は同じ関数から属性を取る。指定が食い違うと
+ブラウザが削除を無視するため。
+
+**E2E (Playwright) で検出できなかった理由**: ローカルは`localhost:3000` /
+`localhost:4000`で動き、**Cookieはポートを区別しない**ので同一ホスト扱いになる。
+`apps/api/src/e2e/referral-cookie-domain.test.ts`はHostヘッダーを差し替えて
+本番と同じホスト構成を再現し、実際に出る`Set-Cookie`ヘッダーを検証する。
 
 ## データモデル
 
@@ -119,6 +150,14 @@ Cookieも **APIサーバー側のドメインで発行する**。ウォレット
 - 紹介Cookieが無い通常のログインでは紹介関係が作られない
 - 既存ユーザーが紹介URLを開いても紹介関係が上書きされない (セッションも未使用のまま)
 - 使用済みの紹介セッションを2回目の登録に使い回せない
+
+`apps/api/src/referrals/referral-cookie.test.ts` (9件): 共有ドメインの導出
+(サブドメイン配下なら付ける・同一ホストや別ドメインには付けない・似ているだけの
+ドメインに広げない・ローカルや`APP_URL`未設定では付けない)と、Cookie属性
+
+`apps/api/src/e2e/referral-cookie-domain.test.ts` (4件): Hostヘッダーを本番と同じ
+構成に差し替えて、実際に出る`Set-Cookie`に`Domain`が付くこと・別ドメインでは
+付かないこと・従来の属性が変わらないこと
 
 実ブラウザ (Playwright) でも、`/invite/{token}` → 別ドメインでのCookie発行 → LINE
 登録 → 管理画面での確認まで一連の流れを確認済み。
