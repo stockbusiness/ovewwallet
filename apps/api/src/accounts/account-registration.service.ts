@@ -105,6 +105,16 @@ export class AccountRegistrationService {
    * 未登録なら「1. ユーザーごとのOVEアカウントを作成する」「2. ウォレットを作成する」
    * を1トランザクションで実行する (指示書3章)。
    */
+  /**
+   * その `provider_subject` で登録済みかどうか。
+   *
+   * メールの別名を正規形へ寄せる前に登録した人を、そのまま既存アカウントへ
+   * 通すための判定に使う (`AuthService.resolveEmailProviderSubject`)。
+   */
+  async hasIdentity(provider: string, providerSubject: string): Promise<boolean> {
+    return (await this.findIdentity(provider, providerSubject)) !== null;
+  }
+
   async findOrCreateByIdentity(params: FindOrCreateIdentityParams): Promise<OveAccount> {
     const existing = await this.findIdentity(params.provider, params.providerSubject);
     if (existing) {

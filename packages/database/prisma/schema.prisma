@@ -427,6 +427,34 @@ model LegalDocument {
   @@map("legal_documents")
 }
 
+/// メールドメインに対する運用者の指示。組み込みの使い捨てドメイン一覧
+/// (`disposable-email-domains.generated.ts`) を上書きする。
+enum EmailDomainRuleAction {
+  /// 組み込みリストに無くても登録を拒否する。
+  BLOCK
+  /// 組み込みリストに載っていても登録を許可する。**誤検知の解除用**で、
+  /// BLOCKより優先される。
+  ALLOW
+}
+
+/// 管理画面から編集するメールドメインの個別指定。組み込みの一覧はコード側に
+/// 持っており、この表はその差分だけを持つ (docs/email-domain-policy.md)。
+model EmailDomainRule {
+  /// 小文字のドメイン。`mailinator.com` のように登録すると、その下の
+  /// サブドメインにも効く。
+  domain String @id
+
+  action EmailDomainRuleAction
+
+  /// なぜ追加したか。運用者が後から判断を追えるようにするための覚書。
+  reason String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by")
+
+  @@map("email_domain_rules")
+}
+
 /// プロフィール項目の要求レベル。管理画面から項目ごとに切り替える。
 enum ProfileFieldRequirement {
   /// 入力欄自体を出さない。

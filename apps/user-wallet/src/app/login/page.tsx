@@ -30,6 +30,18 @@ function getMockLineUserId(): string {
   return generated;
 }
 
+/**
+ * 使い捨てアドレスは理由まで伝える。伝えないと、正規の利用者が誤って弾かれたときに
+ * 「コードが届かない」と待ち続けてしまうため (docs/email-domain-policy.md)。
+ */
+function emailOtpErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) return "送信に失敗しました";
+  if (err.code === "disposable_email_domain") {
+    return "このメールアドレスはご利用いただけません。普段お使いのアドレスでご登録ください。";
+  }
+  return err.message;
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -190,7 +202,7 @@ function LoginPageContent() {
       setDevCode(res.devCode ?? null);
       setView("email-code");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "送信に失敗しました");
+      setError(emailOtpErrorMessage(err));
     } finally {
       setLoading(null);
     }
