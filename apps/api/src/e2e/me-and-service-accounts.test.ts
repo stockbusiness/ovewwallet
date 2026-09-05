@@ -6,7 +6,12 @@ import request from "supertest";
 import { prisma, generateId } from "@ove/database";
 import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
-import { createTestServiceIntegration, signedHeaders, type TestServiceIntegration } from "./test-helpers";
+import {
+  createTestServiceIntegration,
+  ensureRegistrationBonusRule,
+  signedHeaders,
+  type TestServiceIntegration,
+} from "./test-helpers";
 
 /**
  * 開発ガイドライン12章「本番公開前の必須項目」: 本人用/管理者用/外部サービス用でAPIを
@@ -21,6 +26,8 @@ describe("本人用API (/me) と外部サービス用API (/service/accounts) の
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
+    // REGISTRATION_BONUSはreward_rules必須(fail-closed)。CIのDBはseedを流さないため用意する。
+    await ensureRegistrationBonusRule();
   });
 
   afterAll(async () => {

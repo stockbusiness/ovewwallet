@@ -137,3 +137,28 @@ export function commonEventSignedHeaders(
       (body as { event_version?: string })?.event_version ?? "1.0",
   };
 }
+
+/**
+ * `SENGOKU_REGISTRATION_BONUS` をACTIVEで用意する。
+ *
+ * `REGISTRATION_BONUS` は `REWARD_RULE_REQUIRED_TRANSACTION_TYPES` に入っており
+ * (代理店からの3000を管理画面から止められるようにするため)、ルールが無いと付与が
+ * 400で拒否される。CIのテストDBはマイグレーションのみでseedを流さないため、この行は
+ * 存在しない。`REGISTRATION_BONUS` で付与するテストは自分でこれを呼ぶこと。
+ */
+export async function ensureRegistrationBonusRule(): Promise<void> {
+  await prisma.rewardRule.upsert({
+    where: { ruleCode: "SENGOKU_REGISTRATION_BONUS" },
+    update: { status: "ACTIVE" },
+    create: {
+      id: generateId(),
+      ruleCode: "SENGOKU_REGISTRATION_BONUS",
+      ruleName: "戦国パスポート登録特典",
+      sourceService: "SENGOKU_PASSPORT",
+      rewardAmount: 3000,
+      approvalType: "AUTOMATIC",
+      status: "ACTIVE",
+      displayName: "戦国パスポート登録特典",
+    },
+  });
+}

@@ -85,6 +85,16 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 `REWARD_RULE_REQUIRED_TRANSACTION_TYPES`にオプトインしたtransaction_typeだけが対象
 で、他のtransaction_typeは引き続き上記の既定挙動(fail-open)のまま。
 
+**`REGISTRATION_BONUS`も fail-closed 対象**: 段階付与(`docs/milestone-rewards.md`)への
+移行で、代理店システムからの登録特典3000を管理画面から止める運用が発生した。fail-open
+のままだと`SENGOKU_REGISTRATION_BONUS`を「無効化」しても上限検証が飛ぶだけで付与は通り、
+ウォレット側の1000+1000と重なって**合計5000**になる。運用担当者が止めたつもりの操作が
+実際には何も止めていない状態を避けるため、こちらもオプトインさせている。
+
+そのため`SENGOKU_REGISTRATION_BONUS`が未登録・非ACTIVEの状態で代理店が
+`transaction_type: "REGISTRATION_BONUS"`を送ると400になる。代理店側の付与を再開する
+ときは、先に管理画面でこのルールをACTIVEに戻すこと。
+
 `monthly_count_limit`/`monthly_amount_limit` は `per_user_limit` (ユーザー単位) とは
 異なり、当初の実装では誤ってウォレット単位で集計してしまうバグがあった
 (実装中にテストで発見・修正。`docs/test-plan.md` 参照)。

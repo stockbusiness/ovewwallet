@@ -11,6 +11,7 @@ import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { WALLET_SERVICE_SCOPES } from "../wallets/wallet-service-scopes";
 import {
   createTestServiceIntegration,
+  ensureRegistrationBonusRule,
   signedHeaders,
   type TestServiceIntegration,
 } from "./test-helpers";
@@ -53,6 +54,8 @@ describe("POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)", () =
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
+    // REGISTRATION_BONUSはreward_rules必須(fail-closed)。CIのDBはseedを流さないため用意する。
+    await ensureRegistrationBonusRule();
   });
 
   afterAll(async () => {
