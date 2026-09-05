@@ -440,6 +440,15 @@ jobs:
             "RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}"
             # 差出人の既定値。管理画面で設定すればそちらが優先される。
             "MAIL_FROM=no-reply@sennokuni-wallet.com"
+            # 段階付与 (新規登録1000 + お客様情報1000、docs/milestone-rewards.md)。
+            # 開ける条件が揃ったので有効にする (2026-09-05):
+            #   - 代理店システム側の3000付与を停止済み (二重付与にならない)
+            #   - 管理画面でお客様情報の必須項目を設定済み (未設定だと誰にも付かない)
+            #   - 使い捨てメールでの登録を遮断済み (docs/email-domain-policy.md)
+            # 金額と回数上限は管理画面 /reward-rules から変えられる。発行総額の上限は
+            # 運用方針により設定していないため、歯止めは使い捨てアドレス対策のみ。
+            # 累計発行額を定期的に確認すること。
+            "ENABLE_WALLET_MILESTONE_REWARDS=true"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
             # 代理店SSOの検証条件 (連携先回答 2026-09-04)。issuer / JWKS URL は
             # AuthServiceの既定値と同一だが、連携先の設定を変えずに追随できるよう
