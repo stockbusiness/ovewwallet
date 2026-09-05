@@ -12,9 +12,6 @@ import {
   isLiffConfigured,
   ensureLiffLogin,
   getLiffIdTokenIfLoggedIn,
-  getDebugLog,
-  clearDebugLog,
-  appendDebugLog,
   getPendingSubmission,
   clearPendingSubmission,
   incrementPendingSubmitAttempts,
@@ -64,16 +61,11 @@ function LoginPageContent() {
   // 稼働開始時点で使えるのはLINEのみで、メール・SSOは実装/接続が未了。
   // 取得できるまでは何も出さない (使えない選択肢を一瞬でも見せないため)。
   const [methods, setMethods] = useState<LoginMethodAvailability | null>(null);
-  // LINEアプリ経由での結合試験(2026-07-18)で発生した不具合の調査用。開発者ツールが
-  // 使えない環境でも状況を把握できるよう、画面に直接表示する (恒久的な機能ではない)。
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-
   // LIFFの login() はページ全体をLINEのログイン画面へ遷移させ、認証後にこの同じURLへ
   // 戻ってくる。戻ってきた直後にLIFFがログイン済みと判定できるので、その場合だけ
   // ここでログインを完了させる (LIFF未設定の環境ではgetLiffIdTokenIfLoggedIn()は
   // 常にnullを返し、何もしない)。
   useEffect(() => {
-    if (isLiffConfigured()) setDebugLog(getDebugLog());
     let cancelled = false;
     (async () => {
       // 直前の試行でAPI送信・画面遷移が完了する前にページがリロードされていた
@@ -85,7 +77,6 @@ function LoginPageContent() {
       const pending = getPendingSubmission();
       let result;
       if (pending) {
-        appendDebugLog("保存済みの送信待ちIDトークンを検出、liff.init()をスキップして直接送信");
         result = pending;
       } else {
         try {
@@ -95,25 +86,21 @@ function LoginPageContent() {
           // (未訪問時のnullとは区別して、必ず画面にエラーを表示する)。
           if (!cancelled) {
             setError(err instanceof Error ? err.message : "LINEログインに失敗しました");
-            setDebugLog(getDebugLog());
           }
           return;
         }
         // 送信待ちとしての保存はgetLiffIdTokenIfLoggedIn()内部で(呼び出し元に
         // 返る前に)即座に行われる。ここで改めて保存する必要はない。
       }
-      if (isLiffConfigured()) setDebugLog(getDebugLog());
       if (!result || cancelled) return;
 
       // トークン失効等でAPI送信が恒久的に失敗し続けるケースで、送信待ちの
       // IDトークンを無限に再送し続けないよう上限を設ける。
       const attempts = incrementPendingSubmitAttempts();
-      appendDebugLog(`API送信試行 ${attempts}/${MAX_PENDING_SUBMIT_ATTEMPTS}回目`);
       if (attempts > MAX_PENDING_SUBMIT_ATTEMPTS) {
         clearPendingSubmission();
         if (!cancelled) {
           setError("LINEログインの送信が繰り返し失敗しました。もう一度最初からお試しください。");
-          setDebugLog(getDebugLog());
         }
         return;
       }
@@ -124,15 +111,12 @@ function LoginPageContent() {
           method: "POST",
           body: JSON.stringify({ idToken: result.idToken, termsAccepted: result.termsAccepted }),
         });
-        appendDebugLog("API送信成功、/walletへ遷移開始");
         // 送信・遷移が両方完了して初めて送信待ちを消す。この間にリロードが割り込んだ
         // 場合は消さずに残しておき、次の読み込みで(liff.init()を経由せず)同じ
         // IDトークンで送信をやり直せるようにする (2026-07-18、pageshowリロード対策)。
         clearPendingSubmission();
         router.push(postLoginRedirect);
       } catch (err) {
-        const raw = err instanceof ApiError ? err.message : String(err);
-        appendDebugLog(`API送信失敗: ${raw}`);
         const info = describeLineLoginError(err);
         // 送信待ちを残すのは「同じIDトークンでやり直せば通る」場合だけ
         // (pageshowリロード対策、上記コメント参照)。規約未同意のように何度送っても
@@ -140,7 +124,6 @@ function LoginPageContent() {
         if (!info.retryable) clearPendingSubmission();
         if (!cancelled) {
           setError(info.message);
-          setDebugLog(getDebugLog());
         }
       } finally {
         if (!cancelled) setLoading(null);
@@ -416,26 +399,6 @@ function LoginPageContent() {
 
         {error && <p className="text-center text-sm font-medium text-sengoku-gold-soft">{error}</p>}
 
-        {isLiffConfigured() && debugLog.length > 0 && (
-          <div className="rounded-lg border border-sengoku-border bg-black/40 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-sengoku-muted">診断ログ (調査用)</span>
-              <button
-                type="button"
-                onClick={() => {
-                  clearDebugLog();
-                  setDebugLog([]);
-                }}
-                className="text-xs font-medium text-sengoku-gold underline underline-offset-2"
-              >
-                ログをクリア
-              </button>
-            </div>
-            <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap break-all text-[10px] leading-relaxed text-sengoku-muted">
-              {debugLog.join("\n")}
-            </pre>
-          </div>
-        )}
       </div>
     </main>
   );

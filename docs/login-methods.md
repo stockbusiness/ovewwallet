@@ -13,7 +13,7 @@
 | 方法 | 状態 | 本番で開けられない理由 |
 |---|---|---|
 | **LINE** | ✅ 使える | `AUTH_MODE=production` で実チャネルのIDトークンを検証する。LIFF結合試験済み |
-| **メールOTP** | ⚙️ 鍵の設定待ち | 2026-09-05に送信処理を実装した (Resend)。管理画面「メール送信設定」から鍵を入れれば開けられる。**LINEを持っていない利用者のための入口** |
+| **メールOTP** | ✅ 使える | 2026-09-05に送信処理を実装 (Resend) し、管理画面からのテスト送信で到達を確認して開けた。**LINEを持っていない利用者のための入口** |
 | **千ノ国パスポートSSO** | ❌ | 正式SSO (RS256/JWKS) が未完成。モック発行エンドポイントは本番で404 |
 | **代理店SSO** | ✅ 使える | 2026-09-04接続。`SENGOKU_AI_SSO_*` を設定し、連携先がSSO受信URLを登録済み。ただし利用者向けではなく**代理店専用**の入口で、ログイン画面にボタンは出ない (連携先の起動URLから来る) |
 
@@ -35,7 +35,7 @@ return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
 | 環境変数 | 既定 |
 |---|---|
 | `ENABLE_LINE_LOGIN` | **有効** (`false` を明示したときだけ無効) |
-| `ENABLE_EMAIL_LOGIN` | 無効 (`true` のときだけ有効。`RESEND_API_KEY` が必須) |
+| `ENABLE_EMAIL_LOGIN` | 無効 (`true` のときだけ有効。本番は`deploy.yml`で`true`。2026-09-05開通) |
 | `ENABLE_SENGOKU_PASSPORT_LOGIN` | 無効 |
 | `ENABLE_AGENCY_LOGIN` | 無効 (本番は`deploy.yml`で`true`。2026-09-04接続済み) |
 
