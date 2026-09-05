@@ -68,6 +68,7 @@ function build(overrides: {
   } as unknown as AccountAnonymizationService;
 
   const collectibleImages = {
+    backfillFromCatalog: jest.fn().mockResolvedValue(1),
     retryPending: jest.fn().mockResolvedValue({ attempted: 3, stored: 2 }),
     ...overrides.collectibleImages,
   } as unknown as CollectibleImagesService;
@@ -220,6 +221,9 @@ describe("SchedulerService", () => {
     it("runs the collectible image ingest job", async () => {
       const { service, collectibleImages } = build();
       await expect(service.runCollectibleImageIngest()).resolves.toBe(true);
+      // 取得の前に取りこぼしを拾う。保管先の設定より前に登録されたカードは
+      // これをやらないと永久に取り込まれない (docs/collectible-images.md)。
+      expect(collectibleImages.backfillFromCatalog).toHaveBeenCalledTimes(1);
       expect(collectibleImages.retryPending).toHaveBeenCalledTimes(1);
     });
 

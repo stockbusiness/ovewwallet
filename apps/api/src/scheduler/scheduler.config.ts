@@ -31,6 +31,13 @@ export const OUTBOX_MAX_BATCHES_PER_TICK = 10;
 export const COLLECTIBLE_IMAGE_MAX_PER_TICK = 20;
 
 /**
+ * 1回の巡回で新たに取り込み対象へ登録するURLの上限。取得(20件)より多くしている。
+ * 登録はDBの中で完結し外部アクセスを伴わないため、先に待ち行列へ積んでおいて
+ * 構わない。管理画面が「取りこぼしN件」を0に近づけていく様子を出せる。
+ */
+export const COLLECTIBLE_IMAGE_BACKFILL_PER_TICK = 100;
+
+/**
  * ジョブごとの排他ロックの保持時間。実行時間より十分長く、かつ異常終了時に
  * 次回実行までロックが残り続けない長さにする。
  */

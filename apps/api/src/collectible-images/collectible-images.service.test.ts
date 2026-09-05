@@ -1,5 +1,6 @@
 import { prisma, generateId } from "@ove/database";
 import { CollectibleImagesService, MAX_INGEST_ATTEMPTS, servedUrlFor, storageKeyFor } from "./collectible-images.service";
+import { findUnregisteredCatalogUrls } from "./image-catalog";
 import type { FetchLike } from "./image-fetcher";
 import type { ObjectStorageService } from "./object-storage";
 
@@ -33,6 +34,9 @@ describe("CollectibleImagesService", () => {
   let storage: FakeStorage;
   let service: CollectibleImagesService;
   const createdUrls: string[] = [];
+  const createdAssetIds: string[] = [];
+  const createdHoldingIds: string[] = [];
+  const createdAccountIds: string[] = [];
 
   function newUrl(): string {
     const url = `https://cdn.example.com/${generateId()}.png`;
@@ -45,10 +49,72 @@ describe("CollectibleImagesService", () => {
     service = new CollectibleImagesService(prisma, storage as unknown as ObjectStorageService);
   });
 
+  beforeAll(async () => {
+    // 取りこぼしの拾い直しはDB全体のカードを見る。他のテストが作ったカードのURLを
+    // 先に対象外にしておかないと、この suite が無関係なURLへ実際に通信してしまう。
+    for (const url of await findUnregisteredCatalogUrls(prisma, 1000)) {
+      await prisma.collectibleImage.create({
+        data: {
+          id: generateId(),
+          sourceUrl: url,
+          status: "FAILED",
+          attemptCount: MAX_INGEST_ATTEMPTS,
+        },
+      });
+    }
+  });
+
   afterAll(async () => {
-    await prisma.collectibleImage.deleteMany({ where: { sourceUrl: { in: createdUrls } } });
+    await prisma.collectibleHolding.deleteMany({ where: { id: { in: createdHoldingIds } } });
+    await prisma.collectibleAsset.deleteMany({ where: { id: { in: createdAssetIds } } });
+    await prisma.oveAccount.deleteMany({ where: { id: { in: createdAccountIds } } });
+    // このテーブルはこの機能の作業領域なので丸ごと消す。残しておくと、後続の suite が
+    // 「取り込み済み」として配信URLへ差し替えてしまう。
+    await prisma.collectibleImage.deleteMany({});
     await prisma.$disconnect();
   });
+
+  /** カードマスターを1件作る。画像URLは取り込み対象へ**登録しない**。 */
+  async function createAsset(imageUrl: string, thumbnailUrl?: string) {
+    const id = generateId();
+    createdAssetIds.push(id);
+    return prisma.collectibleAsset.create({
+      data: {
+        id,
+        assetCode: `TEST-${id}`,
+        name: "テストカード",
+        imageUrl,
+        thumbnailUrl: thumbnailUrl ?? null,
+      },
+    });
+  }
+
+  /** 付与済みの保有を1件作る。スナップショットのURLだけがカタログに載る状態を作る。 */
+  async function createHolding(snapshotUrl: string) {
+    const asset = await createAsset(`https://cdn.example.com/${generateId()}-master.png`);
+    createdUrls.push(asset.imageUrl);
+
+    const accountId = generateId();
+    createdAccountIds.push(accountId);
+    await prisma.oveAccount.create({
+      data: { id: accountId, accountCode: `OVE-ACC-TEST-${accountId}` },
+    });
+
+    const holdingId = generateId();
+    createdHoldingIds.push(holdingId);
+    await prisma.collectibleHolding.create({
+      data: {
+        id: holdingId,
+        oveAccountId: accountId,
+        collectibleAssetId: asset.id,
+        entitlementId: `ent-${holdingId}`,
+        sourceSystemKey: "sennokuni-nft-market",
+        logicalMarket: "nft-art-market",
+        acquiredAt: new Date(),
+        imageUrlSnapshot: snapshotUrl,
+      },
+    });
+  }
 
   it("取り込むとストレージへ保存され、STOREDになる", async () => {
     const url = newUrl();
@@ -165,15 +231,153 @@ describe("CollectibleImagesService", () => {
         data: { status: "FAILED", attemptCount: MAX_INGEST_ATTEMPTS },
       });
 
-      const result = await service.retryPending(10, okFetch());
+      // 対象の行が触られないことで確かめる。`attempted`の総数はテーブル全体の
+      // 状態に左右され、この行の性質ではない。
+      await service.retryPending(100, okFetch());
       const saved = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
       expect(saved.status).toBe("FAILED");
-      expect(result.attempted).toBe(0);
+      expect(saved.attemptCount).toBe(MAX_INGEST_ATTEMPTS);
     });
 
     it("ストレージ未設定なら何もしない", async () => {
       storage.configured = false;
       expect(await service.retryPending(10, okFetch())).toEqual({ attempted: 0, stored: 0 });
+    });
+  });
+
+  describe("取りこぼしの拾い直し", () => {
+    it("カードマスターの画像URLとサムネイルURLを取り込み対象へ入れる", async () => {
+      // 保管先を設定する前に登録されたカードを再現する。registerAndIngest は
+      // 未設定のとき登録ごと行わないため、collectible_images に行が無い。
+      const imageUrl = newUrl();
+      const thumbnailUrl = newUrl();
+      await createAsset(imageUrl, thumbnailUrl);
+
+      expect(await service.backfillFromCatalog(50)).toBeGreaterThanOrEqual(2);
+
+      for (const url of [imageUrl, thumbnailUrl]) {
+        const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+        expect(row.status).toBe("PENDING");
+      }
+    });
+
+    it("保有側のスナップショットURLも拾う", async () => {
+      // カードマスターを差し替えても、配布済みの保有は付与時のURLを表示し続ける。
+      // マスターだけを見ると、実際に表示されているURLを取りこぼす。
+      const snapshotUrl = newUrl();
+      await createHolding(snapshotUrl);
+
+      await service.backfillFromCatalog(50);
+
+      expect(
+        await prisma.collectibleImage.findUnique({ where: { sourceUrl: snapshotUrl } }),
+      ).not.toBeNull();
+    });
+
+    it("既に取り込み済みのURLは対象にしない (状態を巻き戻さない)", async () => {
+      const url = newUrl();
+      await createAsset(url);
+      await service.register(url);
+      await service.ingest(url, okFetch());
+
+      await service.backfillFromCatalog(50);
+
+      const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+      expect(row.status).toBe("STORED");
+    });
+
+    it("ストレージ未設定なら何もしない (試行回数だけが減るのを避ける)", async () => {
+      storage.configured = false;
+      const url = newUrl();
+      await createAsset(url);
+
+      expect(await service.backfillFromCatalog(50)).toBe(0);
+      expect(await prisma.collectibleImage.findUnique({ where: { sourceUrl: url } })).toBeNull();
+    });
+  });
+
+  describe("打ち切った分の戻し", () => {
+    it("上限に達したものを対象へ戻す。失敗の理由は消さない", async () => {
+      const url = newUrl();
+      await service.register(url);
+      await prisma.collectibleImage.update({
+        where: { sourceUrl: url },
+        data: { status: "FAILED", attemptCount: MAX_INGEST_ATTEMPTS, lastError: "status 404" },
+      });
+
+      expect(await service.resetExhausted()).toBeGreaterThanOrEqual(1);
+
+      const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+      expect(row.status).toBe("PENDING");
+      expect(row.attemptCount).toBe(0);
+      // 取得元が直ったのかを、戻したあとも運用者が読めるようにしている。
+      expect(row.lastError).toBe("status 404");
+    });
+
+    it("取り込み済みは戻さない (取り直して外部を叩き直さない)", async () => {
+      const url = newUrl();
+      await service.register(url);
+      await service.ingest(url, okFetch());
+      await prisma.collectibleImage.update({
+        where: { sourceUrl: url },
+        data: { attemptCount: MAX_INGEST_ATTEMPTS },
+      });
+
+      await service.resetExhausted();
+
+      const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+      expect(row.status).toBe("STORED");
+      expect(row.attemptCount).toBe(MAX_INGEST_ATTEMPTS);
+    });
+  });
+
+  describe("取り込み状況の内訳", () => {
+    it("取り込み済み・打ち切り・対象外を数える", async () => {
+      const before = await service.stats();
+
+      const storedUrl = newUrl();
+      await service.register(storedUrl);
+      await service.ingest(storedUrl, okFetch());
+
+      const exhaustedUrl = newUrl();
+      await service.register(exhaustedUrl);
+      await prisma.collectibleImage.update({
+        where: { sourceUrl: exhaustedUrl },
+        data: { status: "FAILED", attemptCount: MAX_INGEST_ATTEMPTS },
+      });
+
+      // カードには載っているが取り込み対象へ入っていないURL。
+      await createAsset(newUrl());
+
+      const after = await service.stats();
+      expect(after.stored).toBe(before.stored + 1);
+      expect(after.exhausted).toBe(before.exhausted + 1);
+      expect(after.unregistered).toBeGreaterThanOrEqual(before.unregistered + 1);
+    });
+  });
+
+  describe("手動実行の打ち切り", () => {
+    it("期限を過ぎていれば1件も取得しない", async () => {
+      const url = newUrl();
+      await service.register(url);
+
+      const result = await service.retryPending(10, okFetch(), Date.now() - 1);
+
+      expect(result).toEqual({ attempted: 0, stored: 0 });
+      const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+      expect(row.status).toBe("PENDING");
+    });
+
+    it("期限内なら通常どおり取得する", async () => {
+      const url = newUrl();
+      await service.register(url);
+
+      // 上の取りこぼしテストが積んだ分より大きい枚数を渡す。lastAttemptAtがnullの
+      // 行同士の順序は決まらないため、少ない枚数だと対象の1件が入らないことがある。
+      await service.retryPending(100, okFetch(), Date.now() + 60_000);
+
+      const row = await prisma.collectibleImage.findUniqueOrThrow({ where: { sourceUrl: url } });
+      expect(row.status).toBe("STORED");
     });
   });
 });
