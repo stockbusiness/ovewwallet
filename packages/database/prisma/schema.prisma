@@ -68,6 +68,9 @@ enum ServiceCode {
   /// 再利用する方針だが、相手システムがHMAC署名に対応していないため認証ロジック自体は
   /// 簡易版を別途用意している。`AgencyApiKeyGuard`参照)。
   AGENCY_SYSTEM
+  /// ORIウォレット自身。外部サービスではなく、ウォレット内の出来事 (新規登録・
+  /// お客様情報の登録) を条件に付与するルールで使う (docs/milestone-rewards.md)。
+  OVE_WALLET
 }
 
 enum ServiceIntegrationStatus {
@@ -112,6 +115,12 @@ enum TransactionStatus {
 
 enum TransactionType {
   REGISTRATION_BONUS
+  /// ORIウォレットへの新規登録特典 (docs/milestone-rewards.md)。既存の
+  /// REGISTRATION_BONUS は戦国パスポートの登録特典なので別にする。
+  WALLET_SIGNUP_BONUS
+  /// お客様情報 (氏名・電話・住所) の登録特典。管理画面で必須にした項目が
+  /// すべて埋まったときに付与する (docs/milestone-rewards.md)。
+  PROFILE_COMPLETION_BONUS
   AIART_ATTENDANCE
   /// 戦国EC(戦国楽市楽座、ServiceCode.SENGOKU_EC)の購入特典ポイント付与。
   /// reward_rules.rule_code = "SENGOKU_EC_PURCHASE_REWARD" と対応させる

@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { CommonUserHubModule } from "../common-user-hub/common-user-hub.module";
 import { ReferralsModule } from "../referrals/referrals.module";
+import { RewardsModule } from "../rewards/rewards.module";
 import { AccountAnonymizationService } from "./account-anonymization.service";
 import { AccountClosureService } from "./account-closure.service";
 import { AccountProfileService } from "./account-profile.service";
@@ -12,7 +13,7 @@ import { SessionManagementService } from "./session-management.service";
 import { TermsConsentService } from "./terms-consent.service";
 
 @Module({
-  imports: [CommonUserHubModule, ReferralsModule],
+  imports: [CommonUserHubModule, ReferralsModule, RewardsModule],
   controllers: [AccountsController],
   providers: [
     AccountsService,

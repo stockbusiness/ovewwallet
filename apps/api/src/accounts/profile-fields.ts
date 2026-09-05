@@ -98,6 +98,25 @@ export function decideProfilePrompt(params: {
   return { show: neverAnswered, missingRequired };
 }
 
+/**
+ * お客様情報の登録が「完了」したか (docs/milestone-rewards.md)。
+ *
+ * **管理画面で必須 (REQUIRED) にした項目がすべて埋まっていること**を条件にする
+ * (2026-09-05 運用判断)。任意項目は条件に含めない。
+ *
+ * 必須項目が1つも無い設定では**完了にしない**。埋めるべきものが無い状態を
+ * 「完了」と扱うと、何も入力していない人に特典が出てしまうため。
+ */
+export function isProfileComplete(params: {
+  config: EffectiveProfileConfig;
+  profile: (Pick<AccountProfile, ProfileValueKey> & { declinedAt: Date | null }) | null;
+}): boolean {
+  const { config, profile } = params;
+  const required = PROFILE_FIELD_KEYS.filter((key) => config.fields[key] === "REQUIRED");
+  if (required.length === 0) return false;
+  return required.every((key) => isFilled(profile, key));
+}
+
 /** HIDDENの項目は保存しない。設定を閉じた後に古い入力欄から送られても書き込ませないため。 */
 export function isFieldEditable(config: EffectiveProfileConfig, key: ProfileFieldKey): boolean {
   return config.fields[key] !== "HIDDEN";

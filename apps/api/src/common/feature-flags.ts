@@ -65,6 +65,15 @@ export const FEATURE_FLAG_KEYS = [
    * ONにしても同じevent_idが二度と再処理されないため)。
    */
   "ENABLE_AGENCY_POINT_AWARD_INBOX",
+  /**
+   * ウォレット内の出来事を条件にしたORI付与 (新規登録・お客様情報の登録) を
+   * 有効化する (`docs/milestone-rewards.md`)。
+   *
+   * 開ける前に、**代理店システムが送っている3000 ORIを止めてもらう必要がある**。
+   * 止めないと、ウォレットの1000+1000と代理店の3000で合計5000になる。先方との
+   * 調整が済むまでコードだけ入れておけるよう、既定OFFにしてある。
+   */
+  "ENABLE_WALLET_MILESTONE_REWARDS",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];
