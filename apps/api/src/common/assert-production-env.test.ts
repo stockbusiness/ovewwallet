@@ -47,6 +47,14 @@ describe("assertProductionEnvSafe (次期改修指示書P0-6)", () => {
     expect(() => assertProductionEnvSafe(rest)).toThrow(/ADMIN_URL/);
   });
 
+  // メール送信のAPIキーは管理画面からも設定できるため、環境変数の有無では
+  // 設定済みか判断できない。起動は止めず、GET /auth/methods がメールを
+  // 「使えない」と返すことで、押しても届かないボタンを出さない
+  // (docs/login-methods.md)。
+  it("does not block startup on the mail delivery key (it can live in the admin screen)", () => {
+    expect(() => assertProductionEnvSafe({ ...complete, ENABLE_EMAIL_LOGIN: "true" })).not.toThrow();
+  });
+
   it("does not throw outside production regardless of missing vars", () => {
     expect(() => assertProductionEnvSafe({ NODE_ENV: "development" })).not.toThrow();
     expect(() => assertProductionEnvSafe({ NODE_ENV: "test" })).not.toThrow();

@@ -41,11 +41,12 @@ export class ReferralsService {
     return this.capture_.resolvePendingSession(cookieToken);
   }
 
+  /** `lineUserId`はメール登録の場合 null (`AttachReferralToAccountUseCase`参照)。 */
   async attachToNewAccount(
     tx: Prisma.TransactionClient,
     referral: WalletReferral,
     account: OveAccount,
-    lineUserId: string,
+    lineUserId: string | null,
   ): Promise<void> {
     return this.attach.attachToNewAccount(tx, referral, account, lineUserId);
   }

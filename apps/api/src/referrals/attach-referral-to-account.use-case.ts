@@ -25,12 +25,17 @@ export class AttachReferralToAccountUseCase {
    * 新規アカウント作成と同一トランザクション内で呼ぶ (`AccountRegistrationService.onNewAccountCreated`)。
    * 紹介関係をPENDINGへ、初回登録特典をPENDINGで作成し、代理店システムへの同期を
    * outboxへ登録する (実際の送信はPhase 2でAgencyReferralClientを実装してから)。
+   *
+   * `lineUserId`はメール登録の場合 null になる (`docs/login-methods.md`「メールログイン」)。
+   * その場合は特典の`line_user_id_hash`を空にし、代理店へは`line_verified: false`で
+   * 送る。LINEを通っていないのに`true`を送ると、連携先には「LINE確認済み」と
+   * 伝わってしまうため。
    */
   async attachToNewAccount(
     tx: Prisma.TransactionClient,
     referral: WalletReferral,
     account: OveAccount,
-    lineUserId: string,
+    lineUserId: string | null,
   ): Promise<void> {
     const now = new Date();
 
@@ -56,7 +61,7 @@ export class AttachReferralToAccountUseCase {
         {
           id: generateId(),
           walletUserId: account.id,
-          lineUserIdHash: sha256Hex(lineUserId),
+          lineUserIdHash: lineUserId === null ? null : sha256Hex(lineUserId),
           referralId: referral.id,
           benefitType: "REFERRAL_SIGNUP_BONUS",
           amount: REFERRAL_SIGNUP_BONUS_AMOUNT,
@@ -86,7 +91,7 @@ export class AttachReferralToAccountUseCase {
         referral_token: referralTokenPlain,
         referred_at: referral.capturedAt.toISOString(),
         registration_completed_at: now.toISOString(),
-        line_verified: true,
+        line_verified: lineUserId !== null,
         source: "ove_wallet",
       },
     });

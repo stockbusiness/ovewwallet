@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { z } from "zod";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
+import { AdminMailConfigService } from "./admin-mail-config.service";
 import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminAgencySetupService } from "./admin-agency-setup.service";
@@ -12,6 +14,8 @@ import {
   AgencyLinkUnlinkSchema,
   ServiceIntegrationActionSchema,
   CommonUserHubConfigUpdateSchema,
+  MailConfigUpdateSchema,
+  MailTestSendSchema,
   ProfileConfigUpdateSchema,
 } from "./dto/admin-integrations.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
@@ -27,6 +31,7 @@ export class AdminIntegrationsController {
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly agencySetup: AdminAgencySetupService,
     private readonly agencyConnectionTest: AdminAgencyConnectionTestService,
+    private readonly mailConfig: AdminMailConfigService,
     private readonly profileConfig: AdminProfileConfigService,
   ) {}
 
@@ -114,6 +119,45 @@ export class AdminIntegrationsController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.serviceIntegrations.rotateSigningSecret(id, req.admin.id, body.reason);
+  }
+
+  /**
+   * メール送信設定 (docs/login-methods.md)。ワンタイムコードの配信に使う。
+   * APIキーの生値は返さない (末尾4文字のみのマスク表示)。
+   */
+  @Get("mail-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async getMailConfig() {
+    return this.mailConfig.get();
+  }
+
+  /** APIキーを空欄で保存すると現在の鍵を維持する。 */
+  @Post("mail-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async updateMailConfig(
+    @Body(new ZodValidationPipe(MailConfigUpdateSchema)) body: z.infer<typeof MailConfigUpdateSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.mailConfig.update({ apiKey: body.apiKey, mailFrom: body.mailFrom }, req.admin.id, body.reason);
+  }
+
+  /**
+   * 保存済みの設定でテストメールを1通送る。
+   *
+   * 本番の鍵をそのまま使う外部への発信なので、参照権限しかないAUDITORには開けない。
+   * 乱用防止に1つの発信元から5分3回までとし、宛先を監査ログへ残す。
+   */
+  @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @Post("mail-config/test")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async sendTestMail(
+    @Body(new ZodValidationPipe(MailTestSendSchema)) body: z.infer<typeof MailTestSendSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.mailConfig.sendTest(body.to, req.admin.id);
   }
 
   /**

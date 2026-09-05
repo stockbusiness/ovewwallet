@@ -7,6 +7,7 @@ import { SESSION_COOKIE_NAME, SESSION_COOKIE_OPTIONS } from "@ove/auth";
 import { AgencySsoLoginRequestSchema, type AgencySsoLoginRequest } from "@ove/shared-types";
 import { AuthService, type SessionMeta } from "./auth.service";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { MailService } from "../mail/mail.service";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { SkipTermsConsent } from "../accounts/terms-consent";
 import { availableLoginMethods, isLoginMethodEnabled, type LoginMethod } from "./login-methods";
@@ -47,17 +48,34 @@ function assertLoginMethodEnabled(method: LoginMethod): void {
 @ApiTags("auth")
 @Controller("api/v1/auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly mail: MailService,
+  ) {}
 
   /**
    * 利用できるログイン方法。ログイン画面が「どのボタンを出すか」を決めるために叩く。
    * 未ログインで呼ぶ必要があるため認証は不要。真偽値のみで機微な情報は含まない。
+   *
+   * メールは環境変数で有効にしていても、**送信の設定が済むまでは出さない**。
+   * 押してもコードが届かないボタンを見せないため (`docs/login-methods.md`)。
+   * 設定は管理画面から変えられるので、ここで毎回確かめる。
    */
   @Get("methods")
-  loginMethods() {
-    return availableLoginMethods();
+  async loginMethods() {
+    const methods = availableLoginMethods();
+    return { ...methods, email: methods.email && (await this.mail.isConfigured()) };
   }
 
+  /**
+   * ワンタイムコードの発行と送信。
+   *
+   * **1つのIPから5分に5回まで**に絞る。`EmailOtpService`にはアドレス単位の60秒
+   * クールダウンがあるが、宛先を変えれば回避できるため防御にならない。絞らないと
+   * グローバル上限 (120回/60秒) まで任意の宛先へメールを撃ててしまい、
+   * メール爆撃・送信費用・送信ドメインの評判低下に直結する。
+   */
+  @Throttle({ default: { limit: 5, ttl: 300_000 } })
   @Post("email/request-otp")
   async requestOtp(@Body(new ZodValidationPipe(RequestOtpSchema)) body: z.infer<typeof RequestOtpSchema>) {
     assertLoginMethodEnabled("email");
@@ -76,14 +94,22 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     assertLoginMethodEnabled("email");
-    const session = await this.auth.verifyEmailOtpAndLogin(
-      body.email,
-      body.code,
-      body.termsAccepted,
-      sessionMetaFromRequest(req),
-    );
-    setSessionCookie(res, session.token, session.expiresAt);
-    return { ove_account_id: session.oveAccountId };
+    // 紹介Cookieの扱いはLINEログインと揃える。メール登録でも紹介を成立させるため。
+    const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
+    try {
+      const session = await this.auth.verifyEmailOtpAndLogin(
+        body.email,
+        body.code,
+        body.termsAccepted,
+        sessionMetaFromRequest(req),
+        referralCookieToken,
+      );
+      setSessionCookie(res, session.token, session.expiresAt);
+      return { ove_account_id: session.oveAccountId };
+    } finally {
+      // LINEログインと同じく、成功・失敗にかかわらず使い切りとして削除する。
+      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS);
+    }
   }
 
   /** LINEログイン。`AUTH_MODE=production` のとき実チャネルのIDトークンを検証する。 */

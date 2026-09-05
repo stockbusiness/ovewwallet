@@ -12,6 +12,12 @@
  *   (`allowed-origins.ts`)の唯一の入力。未設定だと許可リストが空になり、
  *   CSRF対策のオリジン検証が「何が正当なオリジンか不明」として素通しになる
  *   (`csrf-protection.middleware.ts`参照)。
+ *
+ * メール送信のAPIキーはここで見ない。管理画面 (`mail_config`) からも設定できる
+ * ようになったため、起動時の環境変数だけでは設定済みかを判断できない
+ * (`MailConfigService`)。未設定のまま`ENABLE_EMAIL_LOGIN=true`にしても、
+ * `GET /auth/methods`がメールを「使えない」と返してログイン画面にボタンが出ず、
+ * APIを直接叩いても本番では503になる (`docs/login-methods.md`)。
  */
 export function assertProductionEnvSafe(env: NodeJS.ProcessEnv = process.env): void {
   if (env.NODE_ENV !== "production") return;

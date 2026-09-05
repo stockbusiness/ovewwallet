@@ -29,6 +29,21 @@ export const WalletReferralManualAttachSchema = z.object({
 });
 
 /**
+ * メール送信設定 (docs/login-methods.md)。APIキーを空欄で保存すると現在の鍵を維持する
+ * (共通顧客HUB送信設定と同じ挙動)。
+ */
+export const MailConfigUpdateSchema = z.object({
+  apiKey: z.string().min(1).max(500).optional(),
+  mailFrom: z.string().email().optional(),
+  reason: z.string().min(1),
+});
+
+/** テスト送信の宛先。 */
+export const MailTestSendSchema = z.object({
+  to: z.string().email(),
+});
+
+/**
  * プロフィール項目の要求レベル設定 (docs/account-profile.md)。省略した項目は現状維持。
  * REQUIRED にしてもウォレットの利用は止まらない (促す帯が出るだけ)。
  */

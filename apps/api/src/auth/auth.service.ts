@@ -1,4 +1,4 @@
-import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import {
   EmailOtpService,
   OtpVerificationError,
@@ -16,6 +16,9 @@ import { KV_STORE } from "../common/kv-store.module";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
 import { AgencyService } from "../agency/agency.service";
+import { MailService, MailNotConfiguredError } from "../mail/mail.service";
+import { buildOtpMail } from "../mail/otp-mail";
+import { MailSendError } from "../mail/resend-mail-sender";
 import { ReferralsService } from "../referrals/referrals.service";
 
 /** ログインデバイス一覧 (docs/login-devices.md参照) 向けに記録する接続元情報。 */
@@ -43,6 +46,7 @@ export class AuthService {
     private readonly accounts: AccountsService,
     private readonly agencyService: AgencyService,
     private readonly referrals: ReferralsService,
+    private readonly mail: MailService,
   ) {
     this.emailOtp = new EmailOtpService(kv);
     this.sengokuSso = new SengokuSsoService(kv);
@@ -57,17 +61,45 @@ export class AuthService {
     });
   }
 
+  /**
+   * ワンタイムコードを発行してメールで送る。
+   *
+   * **送信の失敗を握り潰さない**。ここで例外を飲み込むと、画面には「送信しました」と
+   * 出るのに利用者はコードを待ち続けることになる (`ResendMailSender`参照)。
+   *
+   * 発行済みのコードは送信に失敗しても消さない。60秒のクールダウン中に再送を
+   * 求められても、KVには最新のコードが残っているため、送信さえ復旧すれば
+   * 同じコードで先へ進める。
+   */
   async requestEmailOtp(email: string): Promise<{ devCode?: string }> {
     const code = await this.emailOtp.issue(email);
+    try {
+      await this.mail.send(buildOtpMail({ to: email, code }));
+    } catch (err) {
+      if (err instanceof MailSendError || err instanceof MailNotConfiguredError) {
+        // 「送信しました」と表示させない。利用者が届かないコードを待ち続けるため。
+        throw new ServiceUnavailableException("failed to send the verification code");
+      }
+      throw err;
+    }
     // 開発環境のみ、コードをレスポンスに含めてメール送信基盤なしで検証できるようにする
     return { devCode: process.env.NODE_ENV !== "production" ? code : undefined };
   }
 
+  /**
+   * ワンタイムコードを検証してログインさせる。新規なら登録も行う。
+   *
+   * `referralCookieToken`はLINEログインと同じ紹介セッションCookieの値
+   * (`docs/agency-integration.md`)。**メール登録でも紹介が成立するように
+   * 同じ扱いをする**。ここが抜けていると、紹介URL経由でメール登録した人が
+   * 代理店に紐付かず、しかも画面上は普通に登録成功して見えるため気づけない。
+   */
   async verifyEmailOtpAndLogin(
     email: string,
     code: string,
     termsAccepted?: boolean,
     sessionMeta?: SessionMeta,
+    referralCookieToken?: string,
   ) {
     let ok: boolean;
     try {
@@ -80,12 +112,17 @@ export class AuthService {
     }
     if (!ok) throw new UnauthorizedException("invalid verification code");
 
+    const referral = await this.referrals.resolvePendingSession(referralCookieToken);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "EMAIL",
       provider: "EMAIL",
       providerSubject: email.toLowerCase(),
       email,
       termsAccepted,
+      onNewAccountCreated: referral
+        ? // LINEを経由していないので lineUserId は無い。代理店へは line_verified: false で送る。
+          (tx, newAccount) => this.referrals.attachToNewAccount(tx, referral, newAccount, null)
+        : undefined,
     });
     return this.createSessionForAccount(account.id, sessionMeta);
   }

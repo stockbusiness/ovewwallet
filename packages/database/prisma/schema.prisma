@@ -369,6 +369,29 @@ model CommonUserHubConfig {
   @@map("common_user_hub_config")
 }
 
+/// メール送信 (ワンタイムコードの配信) の設定。単一行 (`id = "default"`、
+/// CommonUserHubConfigと同じ方式) で、管理画面 (/mail-config) から編集する。
+///
+/// 環境変数 `RESEND_API_KEY` でも設定できるが、**この行が優先**される。
+/// 鍵の入れ替えにデプロイを待たせないため (docs/login-methods.md)。
+model MailConfig {
+  id String @id
+
+  /// Resend (https://resend.com) のAPIキー。ENCRYPTION_KEYによる可逆暗号化
+  /// (AES-256-GCM、CommonUserHubConfig.apiKeyEncryptedと同方式)。
+  apiKeyEncrypted String? @map("api_key_encrypted")
+  /// 管理画面表示用のマスク済みプレビュー (例: "****abcd")。生値は含まない。
+  apiKeyPreview   String? @map("api_key_preview")
+
+  /// 差出人アドレス。SPF/DKIMを設定したドメインのものであること。
+  mailFrom String? @map("mail_from")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("mail_config")
+}
+
 /// プロフィール項目の要求レベル。管理画面から項目ごとに切り替える。
 enum ProfileFieldRequirement {
   /// 入力欄自体を出さない。
