@@ -31,6 +31,8 @@ export default function WalletMenuPage() {
   const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
   const [collectionEnabled, setCollectionEnabled] = useState(false);
   const [linkedServicesEnabled, setLinkedServicesEnabled] = useState(false);
+  /** 公開済みの法的文書だけをメニューに出す (docs/legal-documents.md)。 */
+  const [legalSlugs, setLegalSlugs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [closingAccount, setClosingAccount] = useState(false);
@@ -66,6 +68,14 @@ export default function WalletMenuPage() {
       } catch {
         setCollectionEnabled(false);
         setLinkedServicesEnabled(false);
+      }
+      // 未公開の文書へのリンクを出さない。取得に失敗したときは何も出さず、
+      // 「開いたら公開されていません」と言われる導線を作らない。
+      try {
+        const legal = await apiFetch<{ slugs: string[] }>("/api/v1/legal");
+        setLegalSlugs(legal.slugs);
+      } catch {
+        setLegalSlugs([]);
       }
     })();
   }, [router]);
@@ -151,7 +161,9 @@ export default function WalletMenuPage() {
         <MenuLink href="/wallet/profile" label="お客様情報" />
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
         <MenuLink href="/about" label="ORIについて" />
-        <MenuLink href="/terms" label="利用規約" />
+        {legalSlugs.includes("terms") && <MenuLink href="/terms" label="利用規約" />}
+        {legalSlugs.includes("privacy") && <MenuLink href="/privacy" label="プライバシーポリシー" />}
+        {legalSlugs.includes("company") && <MenuLink href="/company" label="運営会社" />}
       </section>
 
       <button

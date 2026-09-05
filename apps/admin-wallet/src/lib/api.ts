@@ -595,3 +595,15 @@ export interface ProfileConfig {
   updatedAt: string | null;
   updatedBy: string | null;
 }
+
+/** `GET /api/v1/admin/legal` (docs/legal-documents.md)。本文はプレーンテキスト。 */
+export interface LegalDocument {
+  slug: "terms" | "privacy" | "company";
+  title: string;
+  body: string;
+  /** 利用規約はこれを変えると全利用者に再同意を求めることになる。 */
+  version: string;
+  published: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}

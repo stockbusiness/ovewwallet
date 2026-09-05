@@ -392,6 +392,32 @@ model MailConfig {
   @@map("mail_config")
 }
 
+/// 利用規約・プライバシーポリシー・会社情報など、画面に出す法的文書。
+/// 管理画面 (/legal) から編集する。コード修正とデプロイ無しで直せるようにするため。
+///
+/// 本文はプレーンテキストで保存し、`## `で始まる行を見出しとして描画する
+/// (HTMLは保存も描画もしない。docs/legal-documents.md)。
+model LegalDocument {
+  /// "terms" | "privacy" | "company"。増やすときは`legal-slugs.ts`にも足す。
+  slug String @id
+
+  title String
+  body  String
+
+  /// 利用規約はこの値が`ove_accounts.terms_version`と突き合わされ、
+  /// **変えると全利用者に再同意を求めることになる** (docs/terms-consent.md)。
+  /// 誤字直しのように再同意が不要な変更では、上げないこと。
+  version String
+
+  /// false の間は利用者側の画面に出さない。書きかけの規約を公開しないため。
+  published Boolean @default(false)
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("legal_documents")
+}
+
 /// プロフィール項目の要求レベル。管理画面から項目ごとに切り替える。
 enum ProfileFieldRequirement {
   /// 入力欄自体を出さない。

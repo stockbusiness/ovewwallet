@@ -19,6 +19,8 @@ import { AdminCollectiblesController } from "./admin-collectibles.controller";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
 import { AdminNoticesService } from "./admin-notices.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
+import { AdminLegalController } from "./admin-legal.controller";
+import { AdminLegalService } from "./admin-legal.service";
 import { AdminMailConfigService } from "./admin-mail-config.service";
 import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminCollectiblesService } from "./admin-collectibles.service";
@@ -53,6 +55,7 @@ import { AdminService } from "./admin.service";
     AdminApprovalsController,
     AdminCollectiblesController,
     AdminUsersController,
+    AdminLegalController,
   ],
   providers: [
     AdminService,
@@ -70,6 +73,7 @@ import { AdminService } from "./admin.service";
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
+    AdminLegalService,
     AdminMailConfigService,
     AdminProfileConfigService,
     AdminCollectiblesService,

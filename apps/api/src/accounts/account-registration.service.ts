@@ -11,10 +11,18 @@ import {
 } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { CommonUserLinkingService } from "./common-user-linking.service";
+import { LegalDocumentsService } from "../legal/legal-documents.service";
 import { AccountRepository } from "./account.repository";
 import { anonymizationHashKey, anonymizeSubject } from "./anonymized-identity";
 
-/** OVE利用規約の現行バージョン。新規アカウント作成時にこの値を terms_version として記録する。 */
+/**
+ * OVE利用規約の現行バージョンの既定値。
+ *
+ * 実際の値は管理画面から編集する`legal_documents`が持つ
+ * (`LegalDocumentsService.currentTermsVersion`、docs/legal-documents.md)。
+ * ここに残しているのは、文書がまだ入っていないDBでも動くようにするための
+ * フォールバックと、既存の呼び出し元との互換のため。
+ */
 export const CURRENT_TERMS_VERSION = "1.0";
 
 export interface FindOrCreateIdentityParams {
@@ -54,6 +62,7 @@ export class AccountRegistrationService {
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly commonUserLinking: CommonUserLinkingService,
     private readonly accountRepository: AccountRepository,
+    private readonly legal: LegalDocumentsService,
   ) {}
 
   /**
@@ -110,6 +119,11 @@ export class AccountRegistrationService {
       throw new BadRequestException("terms of service agreement is required to create a new account");
     }
 
+    // 登録時に記録するバージョンも管理画面の値に合わせる。コード上の定数のままだと、
+    // 管理画面でバージョンを上げた直後に登録した人が、登録した瞬間に再同意を
+    // 求められることになる。
+    const termsVersion = await this.legal.currentTermsVersion();
+
     let createdAccount: OveAccount;
     try {
       createdAccount = await this.db.$transaction(async (tx) => {
@@ -122,7 +136,7 @@ export class AccountRegistrationService {
           primaryEmail: params.email,
           primaryPhone: params.phone,
           termsAgreedAt: new Date(),
-          termsVersion: CURRENT_TERMS_VERSION,
+          termsVersion,
         });
 
         await tx.accountIdentity.create({
@@ -160,7 +174,7 @@ export class AccountRegistrationService {
               accountCode,
               identityType: params.identityType,
               provider: params.provider,
-              termsVersion: CURRENT_TERMS_VERSION,
+              termsVersion,
             },
           },
         });
