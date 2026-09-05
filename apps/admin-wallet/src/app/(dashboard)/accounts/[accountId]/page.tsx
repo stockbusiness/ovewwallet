@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import AccountProfileSection from "@/components/accounts/AccountProfileSection";
 import { apiFetch, ApiError, type AccountDetailItem } from "@/lib/api";
 import { toDisplayCode } from "@ove/shared-ui";
 
@@ -207,6 +208,8 @@ export default function AccountDetailPage() {
             {reviewMessage}
           </p>
         )}
+
+        <AccountProfileSection profile={account.profile} />
 
         <section className="mb-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-4">
           <h2 className="mb-3 text-sm font-semibold">連携ID (ログイン手段)</h2>

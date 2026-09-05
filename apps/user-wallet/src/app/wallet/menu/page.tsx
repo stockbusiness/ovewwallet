@@ -148,6 +148,7 @@ export default function WalletMenuPage() {
         <MenuLink href="/wallet/earn" label="ORIを貯める" />
         <MenuLink href="/wallet/use" label="ORIを使う" />
         {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}
+        <MenuLink href="/wallet/profile" label="お客様情報" />
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
         <MenuLink href="/about" label="ORIについて" />
         <MenuLink href="/terms" label="利用規約" />

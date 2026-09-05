@@ -3,6 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { z } from "zod";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
+import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminAgencyLinksService } from "./admin-agency-links.service";
 import { AdminAgencySetupService } from "./admin-agency-setup.service";
 import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test.service";
@@ -11,6 +12,7 @@ import {
   AgencyLinkUnlinkSchema,
   ServiceIntegrationActionSchema,
   CommonUserHubConfigUpdateSchema,
+  ProfileConfigUpdateSchema,
 } from "./dto/admin-integrations.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
@@ -25,6 +27,7 @@ export class AdminIntegrationsController {
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly agencySetup: AdminAgencySetupService,
     private readonly agencyConnectionTest: AdminAgencyConnectionTestService,
+    private readonly profileConfig: AdminProfileConfigService,
   ) {}
 
   /**
@@ -111,6 +114,29 @@ export class AdminIntegrationsController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.serviceIntegrations.rotateSigningSecret(id, req.admin.id, body.reason);
+  }
+
+  /**
+   * プロフィール項目 (氏名・電話・住所) をどこまで求めるかの設定
+   * (docs/account-profile.md)。利用者側の入力画面はこの設定に従う。
+   */
+  @Get("profile-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async getProfileConfig() {
+    return this.profileConfig.get();
+  }
+
+  /** 指定された項目だけを更新する (省略した項目は現状維持)。 */
+  @Post("profile-config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async updateProfileConfig(
+    @Body(new ZodValidationPipe(ProfileConfigUpdateSchema)) body: z.infer<typeof ProfileConfigUpdateSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    const { reason, ...params } = body;
+    return this.profileConfig.update(params, req.admin.id, reason);
   }
 
   /**

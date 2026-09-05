@@ -1,10 +1,12 @@
-import { Controller, Get, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, NotFoundException, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { AccountsService } from "./accounts.service";
-import { TermsConsentService } from "./terms-consent.service";
-import { SkipTermsConsent } from "./terms-consent";
 import { SessionAuthGuard, type AuthenticatedUserRequest } from "../common/session-auth.guard";
-import { Req } from "@nestjs/common";
+import { ZodValidationPipe } from "../common/zod-validation.pipe";
+import { AccountProfileUpdateSchema, type AccountProfileUpdate } from "./account-profile.dto";
+import { AccountProfileService } from "./account-profile.service";
+import { AccountsService } from "./accounts.service";
+import { SkipTermsConsent } from "./terms-consent";
+import { TermsConsentService } from "./terms-consent.service";
 
 @ApiTags("accounts")
 @Controller("api/v1/accounts")
@@ -12,6 +14,7 @@ export class AccountsController {
   constructor(
     private readonly accounts: AccountsService,
     private readonly termsConsent: TermsConsentService,
+    private readonly profile: AccountProfileService,
   ) {}
 
   /** 利用規約の同意状態 (docs/terms-consent.md)。再同意が必要かをここで判定する。 */
@@ -38,6 +41,39 @@ export class AccountsController {
   @UseGuards(SessionAuthGuard)
   async me(@Req() req: AuthenticatedUserRequest) {
     return req.account;
+  }
+
+  /**
+   * プロフィール (氏名・電話・住所) と、項目ごとの要求レベル。
+   *
+   * 画面はここで返る`config`を見て入力欄を出し分ける。ビルド時の値ではなくAPIから
+   * 取るのは、管理画面で設定を変えても再ビルドが要らないようにするため
+   * (`docs/login-methods.md`のログイン方法と同じ考え方)。
+   */
+  @Get("me/profile")
+  @UseGuards(SessionAuthGuard)
+  async getProfile(@Req() req: AuthenticatedUserRequest) {
+    return this.profile.get(req.account.id);
+  }
+
+  /** 指定された項目だけを更新する (省略は現状維持、空文字は削除)。 */
+  @Put("me/profile")
+  @UseGuards(SessionAuthGuard)
+  async updateProfile(
+    @Req() req: AuthenticatedUserRequest,
+    @Body(new ZodValidationPipe(AccountProfileUpdateSchema)) body: AccountProfileUpdate,
+  ) {
+    return this.profile.update(req.account.id, body);
+  }
+
+  /**
+   * 「入力しない」を記録する。促す帯を止めるためだけでなく、未入力のまま
+   * 放置しているのか明示的に断ったのかを区別するため (docs/account-profile.md)。
+   */
+  @Post("me/profile/decline")
+  @UseGuards(SessionAuthGuard)
+  async declineProfile(@Req() req: AuthenticatedUserRequest) {
+    return this.profile.decline(req.account.id);
   }
 
   /** ログインデバイス一覧 (docs/login-devices.md参照)。 */

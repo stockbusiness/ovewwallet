@@ -27,3 +27,19 @@ export const WalletReferralManualAttachSchema = z.object({
   account: z.string().min(1).max(255),
   reason: z.string().min(1),
 });
+
+/**
+ * プロフィール項目の要求レベル設定 (docs/account-profile.md)。省略した項目は現状維持。
+ * REQUIRED にしてもウォレットの利用は止まらない (促す帯が出るだけ)。
+ */
+const ProfileFieldRequirementSchema = z.enum(["HIDDEN", "OPTIONAL", "REQUIRED"]);
+
+export const ProfileConfigUpdateSchema = z.object({
+  fullName: ProfileFieldRequirementSchema.optional(),
+  fullNameKana: ProfileFieldRequirementSchema.optional(),
+  phone: ProfileFieldRequirementSchema.optional(),
+  postalCode: ProfileFieldRequirementSchema.optional(),
+  address: ProfileFieldRequirementSchema.optional(),
+  promptEnabled: z.boolean().optional(),
+  reason: z.string().min(1),
+});
