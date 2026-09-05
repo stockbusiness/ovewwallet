@@ -32,6 +32,20 @@
 決めるので、**付与の正本がウォレットへ移る**。代理店には引き続き
 「誰が紹介経由で登録したか」を通知するため、紹介の実績管理は変わらない。
 
+### ウォレット側の受け口も閉じてある
+
+先方の作業漏れや設定の巻き戻りに備え、管理画面 `/reward-rules` で
+`SENGOKU_REGISTRATION_BONUS` を無効化すれば代理店からの3000を確実に拒否できる。
+
+これは自明ではなかった。`reward_rules` の既定は「ルールが未登録・非ACTIVEなら
+上限を検証せず素通しする」(fail-open) で、**無効化してもむしろ上限チェックが
+外れて緩くなる**。運用担当者が止めたつもりの操作が何も止めていない状態になるため、
+`REGISTRATION_BONUS` を `REWARD_RULE_REQUIRED_TRANSACTION_TYPES`
+(`apps/api/src/rewards/reward-rule-limits.ts`) に加え、非ACTIVEなら400で拒否する
+ようにした (`apps/api/src/e2e/registration-bonus-fail-closed.test.ts`)。
+
+代理店側の付与を再開するときは、先にこのルールをACTIVEへ戻すこと。
+
 ## 金額はコードに書かない
 
 `reward_rules.reward_amount` を読む。管理画面 (`/reward-rules`) から運用中に

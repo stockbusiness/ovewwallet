@@ -18,6 +18,12 @@ type Db = PrismaClient | Prisma.TransactionClient;
  */
 const REWARD_RULE_REQUIRED_TRANSACTION_TYPES = new Set<TransactionType>([
   "LEARNING_JOURNEY_REWARD",
+  // 段階付与(docs/milestone-rewards.md)への移行に伴い、代理店システムからの
+  // 登録特典3000を管理画面から止められるようにする。fail-openのままだと
+  // `SENGOKU_REGISTRATION_BONUS`を無効化しても上限検証が飛ばされるだけで付与は通り、
+  // ウォレット側の1000+1000と重なって合計5000になる。運用担当者が「無効化」した
+  // つもりの操作が実際には何も止めていない、という状態を作らないため。
+  "REGISTRATION_BONUS",
 ]);
 
 export interface EnforceRewardRuleLimitsParams {
