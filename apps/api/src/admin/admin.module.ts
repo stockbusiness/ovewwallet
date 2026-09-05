@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AccountsModule } from "../accounts/accounts.module";
 import { AuthModule } from "../auth/auth.module";
+import { CollectibleImagesModule } from "../collectible-images/collectible-images.module";
 import { CollectiblesModule } from "../collectibles/collectibles.module";
 import { LineBroadcastService } from "../notices/line-broadcast.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
@@ -45,7 +46,14 @@ import { AdminService } from "./admin.service";
   // IntegrationsModule: 代理店システムへの接続テスト (AdminAgencyConnectionTestService) が
   // IntegrationHttpClient / IntegrationConfigProvider を使う。
   // AuthModule は EmailDomainPolicyService (使い捨てドメイン判定のキャッシュ破棄) のため。
-  imports: [AccountsModule, AuthModule, CollectiblesModule, IntegrationsModule, OutboxModule],
+  imports: [
+    AccountsModule,
+    AuthModule,
+    CollectibleImagesModule,
+    CollectiblesModule,
+    IntegrationsModule,
+    OutboxModule,
+  ],
   controllers: [
     AdminController,
     AdminAuthController,

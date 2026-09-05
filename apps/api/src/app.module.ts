@@ -9,6 +9,7 @@ import { AuthModule } from "./auth/auth.module";
 import { CommonEventsModule } from "./common-events/common-events.module";
 import { CollectiblesModule } from "./collectibles/collectibles.module";
 import { CollectibleClaimsModule } from "./collectible-claims/collectible-claims.module";
+import { CollectibleImagesModule } from "./collectible-images/collectible-images.module";
 import { csrfProtectionMiddleware } from "./common/csrf-protection.middleware";
 import { KeyValueStoreModule } from "./common/kv-store.module";
 import { maintenanceModeMiddleware } from "./common/maintenance-mode.middleware";
@@ -49,6 +50,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     CommonEventsModule,
     CollectiblesModule,
     CollectibleClaimsModule,
+    CollectibleImagesModule,
     SchedulerModule,
   ],
   controllers: [HealthController],

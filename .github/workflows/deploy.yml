@@ -449,6 +449,14 @@ jobs:
             # 運用方針により設定していないため、歯止めは使い捨てアドレス対策のみ。
             # 累計発行額を定期的に確認すること。
             "ENABLE_WALLET_MILESTONE_REWARDS=true"
+            # カード画像のウォレット側保管 (docs/collectible-images.md)。
+            # 3つとも揃ったときだけ有効になり、未設定の間は取り込みを行わず
+            # これまでどおり外部URLをそのまま表示する (起動は止めない)。
+            # R2 を使う場合は ENDPOINT も設定する (S3なら不要)。
+            "COLLECTIBLE_IMAGE_STORAGE_BUCKET=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_BUCKET }}"
+            "COLLECTIBLE_IMAGE_STORAGE_ACCESS_KEY_ID=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_ACCESS_KEY_ID }}"
+            "COLLECTIBLE_IMAGE_STORAGE_SECRET_ACCESS_KEY=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_SECRET_ACCESS_KEY }}"
+            "COLLECTIBLE_IMAGE_STORAGE_ENDPOINT=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_ENDPOINT }}"
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
             # 代理店SSOの検証条件 (連携先回答 2026-09-04)。issuer / JWKS URL は
             # AuthServiceの既定値と同一だが、連携先の設定を変えずに追随できるよう

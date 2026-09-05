@@ -20,9 +20,15 @@ export const DEFAULT_EXPIRY_NOTICE_CRON = "0 1 * * *"; // 10:00 JST (通知が�
 export const DEFAULT_LIABILITY_SNAPSHOT_CRON = "0 0 2 * *";
 // 毎日 05:30 JST。整合性チェック (05:00 JST) の後、業務時間前に済ませる。
 export const DEFAULT_ANONYMIZATION_CRON = "30 20 * * *";
+// 15分ごと。取り込みに失敗したカード画像を拾い直す。付与そのものは成立しているので
+// 急ぐ処理ではないが、放置すると外部URLに依存したままになるため定期的に試みる。
+export const DEFAULT_COLLECTIBLE_IMAGE_CRON = "*/15 * * * *";
 
 /** 1回のOutbox処理で回すバッチ数の上限。`processPendingEvents()`は既定20件/回。 */
 export const OUTBOX_MAX_BATCHES_PER_TICK = 10;
+
+/** 1回の再取得で試みる画像の枚数。外部への通信なので控えめにする。 */
+export const COLLECTIBLE_IMAGE_MAX_PER_TICK = 20;
 
 /**
  * ジョブごとの排他ロックの保持時間。実行時間より十分長く、かつ異常終了時に
@@ -43,7 +49,8 @@ export function cronExpression(
     | "RETENTION_CRON"
     | "EXPIRY_NOTICE_CRON"
     | "LIABILITY_SNAPSHOT_CRON"
-    | "ANONYMIZATION_CRON",
+    | "ANONYMIZATION_CRON"
+    | "COLLECTIBLE_IMAGE_CRON",
   fallback: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string {

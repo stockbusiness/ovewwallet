@@ -11,6 +11,7 @@ import {
   type CommonEventBody,
 } from "@ove/shared-types";
 import type { z } from "zod";
+import { CollectibleImagesService } from "../../collectible-images/collectible-images.service";
 import {
   DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE,
   NFT_MARKET_SOURCE_SYSTEM_KEYS,
@@ -127,6 +128,7 @@ export class EntitlementGrantedHandler implements CommonEventHandler<Entitlement
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accountResolver: CommonEventAccountResolver,
     private readonly grantCollectible: GrantCollectibleUseCase,
+    private readonly images: CollectibleImagesService,
   ) {}
 
   async handle(
@@ -246,6 +248,11 @@ export class EntitlementGrantedHandler implements CommonEventHandler<Entitlement
         entitlement_id: envelope.entitlement_id,
       };
     }
+
+    // 画像はトランザクションの外でベストエフォートに取り込む。外部への通信を
+    // トランザクション内で行うと、相手が遅いだけでDBの接続を掴み続けることになる。
+    // 取り込めなくても付与は成立させる (docs/collectible-images.md)。
+    await this.images.registerAndIngest([imageUrl, thumbnailUrl]);
 
     return {
       action: "granted",
