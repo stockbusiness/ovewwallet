@@ -18,6 +18,7 @@ import {
   DEFAULT_EXPIRY_NOTICE_CRON,
   DEFAULT_ANONYMIZATION_CRON,
   DEFAULT_COLLECTIBLE_IMAGE_CRON,
+  COLLECTIBLE_IMAGE_BACKFILL_PER_TICK,
   COLLECTIBLE_IMAGE_MAX_PER_TICK,
   DEFAULT_LIABILITY_SNAPSHOT_CRON,
   DEFAULT_OUTBOX_CRON,
@@ -229,8 +230,14 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
    */
   async runCollectibleImageIngest(): Promise<boolean> {
     return this.withLock(JOB_COLLECTIBLE_IMAGE_INGEST, async () => {
+      // 先に取りこぼしを拾う。保管先を設定する前に登録されたカードには
+      // `collectible_images`の行が無く、これをやらないと永久に取り込まれない
+      // (docs/collectible-images.md)。
+      const registered = await this.collectibleImages.backfillFromCatalog(
+        COLLECTIBLE_IMAGE_BACKFILL_PER_TICK,
+      );
       const result = await this.collectibleImages.retryPending(COLLECTIBLE_IMAGE_MAX_PER_TICK);
-      return `attempted=${result.attempted} stored=${result.stored}`;
+      return `registered=${registered} attempted=${result.attempted} stored=${result.stored}`;
     });
   }
 

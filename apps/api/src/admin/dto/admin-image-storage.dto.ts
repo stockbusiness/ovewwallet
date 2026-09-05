@@ -12,3 +12,15 @@ export const ImageStorageConfigUpdateSchema = z.object({
   secretAccessKey: z.string().max(500).optional(),
   reason: z.string().min(1).max(500),
 });
+
+/**
+ * カード画像の取り込みを手動で走らせる。
+ *
+ * `resetExhausted`は、試行回数の上限に達して定期実行が拾わなくなったものを
+ * 対象へ戻す。取得元の不具合が直ったときに使うため、既定では行わない
+ * (壊れたURLを毎回叩き直さないため)。
+ */
+export const CollectibleImageIngestSchema = z.object({
+  resetExhausted: z.boolean().optional(),
+  reason: z.string().min(1).max(500),
+});

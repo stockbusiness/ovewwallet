@@ -613,6 +613,39 @@ export interface ImageStorageConfig {
   updatedBy: string | null;
 }
 
+/** `GET /api/v1/admin/collectible-images/status` (docs/collectible-images.md)。 */
+export interface CollectibleImageIngestStatus {
+  /** 保管先が設定されているか。未設定の間は取り込み自体が動かない。 */
+  configured: boolean;
+  /** 諦めるまでの試行回数。 */
+  maxAttempts: number;
+  counts: {
+    pending: number;
+    stored: number;
+    failed: number;
+    /** 試行回数の上限に達し、定期実行が拾わなくなったもの。 */
+    exhausted: number;
+    /** カードに載っているのに取り込み対象へ入っていないURLの件数。 */
+    unregistered: number;
+  };
+  /** 直近の失敗。運用者向けで、利用者の画面には出さない。 */
+  recentFailures: {
+    sourceUrl: string;
+    attemptCount: number;
+    lastAttemptAt: string | null;
+    lastError: string | null;
+  }[];
+}
+
+/** `POST /api/v1/admin/collectible-images/ingest` の結果。 */
+export interface CollectibleImageIngestResult {
+  configured: boolean;
+  reset: number;
+  registered: number;
+  attempted: number;
+  stored: number;
+}
+
 export interface ImageStorageTestResult {
   outcome: "ok" | "failed" | "not_configured";
   message: string;

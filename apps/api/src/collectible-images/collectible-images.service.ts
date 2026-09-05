@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { generateId, type CollectibleImage, type PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
 import { extensionFor, type DetectedImageFormat } from "./image-bytes";
+import { countUnregisteredCatalogUrls, findUnregisteredCatalogUrls } from "./image-catalog";
 import { fetchCollectibleImage, ImageFetchError, type FetchLike } from "./image-fetcher";
 import { ObjectStorageService } from "./object-storage";
 
@@ -10,6 +11,20 @@ export const COLLECTIBLE_IMAGE_PATH_PREFIX = "/api/v1/collectible-images";
 
 /** 何度失敗しても諦めない、ということはしない。無駄な外部アクセスを繰り返さないため。 */
 export const MAX_INGEST_ATTEMPTS = 5;
+
+/** 取り込み状況の内訳。管理画面に出す (docs/collectible-images.md)。 */
+export interface CollectibleImageStats {
+  /** 取り込み待ち。まだ一度も成功していないが、再試行の余地がある。 */
+  pending: number;
+  /** 取り込み済み。ウォレット自身が配信している。 */
+  stored: number;
+  /** 失敗したが、まだ再試行の対象。 */
+  failed: number;
+  /** 試行回数の上限に達し、定期実行が拾わなくなったもの。 */
+  exhausted: number;
+  /** カードに載っているのに取り込み対象へ入っていないURLの件数。 */
+  unregistered: number;
+}
 
 /**
  * 外部マーケットのカード画像をウォレット側へ取り込み、こちらから配信する
@@ -136,11 +151,20 @@ export class CollectibleImagesService {
   }
 
   /**
-   * 取り込めていないものを拾い直す。定期実行から呼ぶ。
+   * 取り込めていないものを拾い直す。定期実行と管理画面の手動実行から呼ぶ。
    *
-   * 試行回数の上限に達したものは対象外。運用者が管理画面から手動で再試行できる。
+   * 試行回数の上限に達したものは対象外。運用者が管理画面から
+   * `resetExhausted()`で再試行の対象へ戻せる。
+   *
+   * `deadline`(エポックミリ秒)を渡すと、その時刻を過ぎた時点で打ち切る。手動実行は
+   * HTTPリクエストの中で走り、1件あたり最大10秒かかりうるため、応答が返らなくなる
+   * のを避ける。打ち切った分は次の定期実行が拾う。
    */
-  async retryPending(limit: number, fetchImpl?: FetchLike): Promise<{ attempted: number; stored: number }> {
+  async retryPending(
+    limit: number,
+    fetchImpl?: FetchLike,
+    deadline?: number,
+  ): Promise<{ attempted: number; stored: number }> {
     if (!(await this.storage.isConfigured())) return { attempted: 0, stored: 0 };
 
     const rows = await this.db.collectibleImage.findMany({
@@ -150,12 +174,79 @@ export class CollectibleImagesService {
       select: { sourceUrl: true },
     });
 
+    let attempted = 0;
     let stored = 0;
     for (const row of rows) {
+      if (deadline !== undefined && Date.now() >= deadline) break;
+      attempted += 1;
       const result = await this.ingest(row.sourceUrl, fetchImpl);
       if (result?.status === "STORED") stored += 1;
     }
-    return { attempted: rows.length, stored };
+    return { attempted, stored };
+  }
+
+  /**
+   * カードに載っているのに取り込み対象へ入っていないURLを登録する。
+   *
+   * 取得はここでは行わない (登録だけで戻る)。続けて`retryPending()`が拾う。
+   * ストレージ未設定の間は何もしない — 取り込めないものを待ち行列に積んでも、
+   * 試行回数だけが減っていくため。
+   */
+  async backfillFromCatalog(limit: number): Promise<number> {
+    if (!(await this.storage.isConfigured())) return 0;
+
+    const urls = await findUnregisteredCatalogUrls(this.db, limit);
+    for (const url of urls) {
+      await this.register(url);
+    }
+    return urls.length;
+  }
+
+  /**
+   * 試行回数の上限に達したものを、もう一度定期実行の対象へ戻す。
+   *
+   * 失敗の理由(`lastError`)は消さない。取得元が直ったのかどうかを、戻したあとも
+   * 運用者が読めるようにするため。
+   */
+  async resetExhausted(): Promise<number> {
+    const result = await this.db.collectibleImage.updateMany({
+      where: { status: { not: "STORED" }, attemptCount: { gte: MAX_INGEST_ATTEMPTS } },
+      data: { status: "PENDING", attemptCount: 0 },
+    });
+    return result.count;
+  }
+
+  /** 取り込み状況の内訳。管理画面の表示に使う。 */
+  async stats(): Promise<CollectibleImageStats> {
+    const [pending, stored, failed, exhausted, unregistered] = await Promise.all([
+      this.db.collectibleImage.count({
+        where: { status: "PENDING", attemptCount: { lt: MAX_INGEST_ATTEMPTS } },
+      }),
+      this.db.collectibleImage.count({ where: { status: "STORED" } }),
+      this.db.collectibleImage.count({
+        where: { status: "FAILED", attemptCount: { lt: MAX_INGEST_ATTEMPTS } },
+      }),
+      this.db.collectibleImage.count({
+        where: { status: { not: "STORED" }, attemptCount: { gte: MAX_INGEST_ATTEMPTS } },
+      }),
+      countUnregisteredCatalogUrls(this.db),
+    ]);
+    return { pending, stored, failed, exhausted, unregistered };
+  }
+
+  /** 直近の失敗。原因を運用者が読めるようにするためで、利用者には見せない。 */
+  async recentFailures(limit: number) {
+    return this.db.collectibleImage.findMany({
+      where: { status: "FAILED" },
+      orderBy: [{ lastAttemptAt: { sort: "desc", nulls: "last" } }],
+      take: limit,
+      select: {
+        sourceUrl: true,
+        attemptCount: true,
+        lastAttemptAt: true,
+        lastError: true,
+      },
+    });
   }
 }
 

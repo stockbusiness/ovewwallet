@@ -17,6 +17,8 @@ import { AdminAuthController } from "./admin-auth.controller";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminLoginThrottleService } from "./admin-login-throttle.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
+import { AdminCollectibleImagesController } from "./admin-collectible-images.controller";
+import { AdminCollectibleImagesService } from "./admin-collectible-images.service";
 import { AdminCollectiblesController } from "./admin-collectibles.controller";
 import { AdminWalletReferralsService } from "./admin-wallet-referrals.service";
 import { AdminNoticesService } from "./admin-notices.service";
@@ -71,6 +73,7 @@ import { AdminService } from "./admin.service";
     AdminUsersController,
     AdminLegalController,
     AdminEmailDomainsController,
+    AdminCollectibleImagesController,
     AdminImageStorageController,
   ],
   providers: [
@@ -93,6 +96,7 @@ import { AdminService } from "./admin.service";
     AdminMailConfigService,
     AdminProfileConfigService,
     AdminEmailDomainsService,
+    AdminCollectibleImagesService,
     AdminImageStorageService,
     AdminCollectiblesService,
     AdminUsersService,
