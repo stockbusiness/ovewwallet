@@ -12,6 +12,7 @@ import {
 import { PRISMA } from "../common/prisma.module";
 import { CommonUserLinkingService } from "./common-user-linking.service";
 import { LegalDocumentsService } from "../legal/legal-documents.service";
+import { MilestoneRewardsService } from "../rewards/milestone-rewards.service";
 import { AccountRepository } from "./account.repository";
 import { anonymizationHashKey, anonymizeSubject } from "./anonymized-identity";
 
@@ -63,6 +64,7 @@ export class AccountRegistrationService {
     private readonly commonUserLinking: CommonUserLinkingService,
     private readonly accountRepository: AccountRepository,
     private readonly legal: LegalDocumentsService,
+    private readonly milestoneRewards: MilestoneRewardsService,
   ) {}
 
   /**
@@ -208,6 +210,11 @@ export class AccountRegistrationService {
     if (!params.skipCommonUserHubLink) {
       await this.commonUserLinking.tryLinkCommonUser(createdAccount);
     }
+
+    // 新規登録特典 (docs/milestone-rewards.md)。付与できなくても登録は成功させる
+    // ため、トランザクションの外でベストエフォートに行う。
+    await this.milestoneRewards.grantSignupBonus(createdAccount.id);
+
     return createdAccount;
   }
 }

@@ -3,6 +3,7 @@ import {
   DEFAULT_PROFILE_FIELD_CONFIG,
   decideProfilePrompt,
   isFieldEditable,
+  isProfileComplete,
   toEffectiveConfig,
   type EffectiveProfileConfig,
 } from "./profile-fields";
@@ -144,5 +145,50 @@ describe("入力を促すかどうか", () => {
       show: false,
       missingRequired: [],
     });
+  });
+});
+
+describe("お客様情報の登録が完了したか (特典の付与条件)", () => {
+  it("必須にした項目がすべて埋まっていれば完了", () => {
+    const c = config({ fullName: "REQUIRED", phone: "REQUIRED" });
+    expect(
+      isProfileComplete({ config: c, profile: profile({ fullName: "田中太郎", phone: "09012345678" }) }),
+    ).toBe(true);
+  });
+
+  it("必須項目が1つでも欠けていれば完了ではない", () => {
+    const c = config({ fullName: "REQUIRED", phone: "REQUIRED" });
+    expect(isProfileComplete({ config: c, profile: profile({ fullName: "田中太郎" }) })).toBe(false);
+  });
+
+  it("任意項目は条件に含めない", () => {
+    // 必須にした項目だけが対象 (2026-09-05 運用判断)
+    const c = config({ fullName: "REQUIRED", phone: "OPTIONAL", address: "OPTIONAL" });
+    expect(isProfileComplete({ config: c, profile: profile({ fullName: "田中太郎" }) })).toBe(true);
+  });
+
+  it("必須項目が1つも無ければ完了にしない", () => {
+    // 埋めるべきものが無い状態を完了と扱うと、何も入力していない人に特典が出てしまう
+    expect(isProfileComplete({ config: config(), profile: profile() })).toBe(false);
+    expect(
+      isProfileComplete({ config: config(), profile: profile({ fullName: "田中太郎" }) }),
+    ).toBe(false);
+  });
+
+  it("住所は県・市区町村・番地が揃って初めて完了", () => {
+    const c = config({ address: "REQUIRED" });
+    expect(
+      isProfileComplete({ config: c, profile: profile({ prefecture: "東京都", city: "千代田区" }) }),
+    ).toBe(false);
+    expect(
+      isProfileComplete({
+        config: c,
+        profile: profile({ prefecture: "東京都", city: "千代田区", addressLine: "1-1-1" }),
+      }),
+    ).toBe(true);
+  });
+
+  it("プロフィールが無ければ完了ではない", () => {
+    expect(isProfileComplete({ config: config({ fullName: "REQUIRED" }), profile: null })).toBe(false);
   });
 });

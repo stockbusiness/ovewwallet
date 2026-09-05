@@ -1,9 +1,11 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import type { AccountProfile, PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { MilestoneRewardsService } from "../rewards/milestone-rewards.service";
 import {
   decideProfilePrompt,
   isFieldEditable,
+  isProfileComplete,
   toEffectiveConfig,
   type EffectiveProfileConfig,
   type ProfilePromptState,
@@ -70,7 +72,10 @@ function blankToNull(value: string | null | undefined): string | null | undefine
  */
 @Injectable()
 export class AccountProfileService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly milestoneRewards: MilestoneRewardsService,
+  ) {}
 
   private async effectiveConfig(): Promise<EffectiveProfileConfig> {
     const config = await this.db.accountProfileConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -122,6 +127,13 @@ export class AccountProfileService {
       // 入力があった時点で「断った」状態は解除する。
       update: { ...data, declinedAt: null },
     });
+
+    // お客様情報の登録特典 (docs/milestone-rewards.md)。管理画面で必須にした項目が
+    // すべて埋まったときに1回だけ付与する。付与できなくても保存は成功させる。
+    if (isProfileComplete({ config, profile })) {
+      await this.milestoneRewards.grantProfileCompletionBonus(oveAccountId);
+    }
+
     return this.toView(profile, config);
   }
 
