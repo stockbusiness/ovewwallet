@@ -17,6 +17,7 @@ import { RepositoriesModule } from "./common/repositories.module";
 import { requestIdMiddleware } from "./common/request-id.middleware";
 import { DailyBonusModule } from "./daily-bonus/daily-bonus.module";
 import { HealthController } from "./health.controller";
+import { LegalModule } from "./legal/legal.module";
 import { MailModule } from "./mail/mail.module";
 import { OutboxModule } from "./outbox/outbox.module";
 import { ReferralsModule } from "./referrals/referrals.module";
@@ -31,6 +32,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     PrismaModule,
     RepositoriesModule,
     KeyValueStoreModule,
+    LegalModule,
     MailModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     AccountsModule,

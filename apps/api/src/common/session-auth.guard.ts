@@ -12,6 +12,7 @@ import { hashSessionToken, SESSION_COOKIE_NAME } from "@ove/auth";
 import type { PrismaClient, OveAccount } from "@ove/database";
 import { PRISMA } from "./prisma.module";
 import { AccountRepository } from "../accounts/account.repository";
+import { LegalDocumentsService } from "../legal/legal-documents.service";
 import {
   SKIP_TERMS_CONSENT,
   TERMS_CONSENT_REQUIRED_CODE,
@@ -38,6 +39,7 @@ export class SessionAuthGuard implements CanActivate {
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly accountRepository: AccountRepository,
     private readonly reflector: Reflector,
+    private readonly legal: LegalDocumentsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -59,7 +61,7 @@ export class SessionAuthGuard implements CanActivate {
     // 全セッションを失効させるため通らないはずだが、多層防御として置く)。
     if (account.status === "CLOSED") throw new UnauthorizedException("this account has been closed");
 
-    this.assertTermsConsent(context, req, account);
+    await this.assertTermsConsent(context, req, account);
 
     await this.db.userSession.update({
       where: { id: session.id },
@@ -78,13 +80,19 @@ export class SessionAuthGuard implements CanActivate {
    * 応答には機械可読コードを載せる。フロントエンドは英語のメッセージ文字列ではなく
    * これを見て再同意画面へ誘導する。
    */
-  private assertTermsConsent(context: ExecutionContext, req: Request, account: OveAccount): void {
+  private async assertTermsConsent(
+    context: ExecutionContext,
+    req: Request,
+    account: OveAccount,
+  ): Promise<void> {
     const skip = this.reflector.getAllAndOverride<boolean>(SKIP_TERMS_CONSENT, [
       context.getHandler(),
       context.getClass(),
     ]);
+    // 読み取り・除外指定のときは、規約バージョンを引かずに済ませる
+    // (認証が必要なリクエストのたびに走る経路なので、無駄なDBアクセスを作らない)。
     if (isAllowedWithoutConsent(req.method, skip === true)) return;
-    if (!isTermsConsentRequired(account)) return;
+    if (!isTermsConsentRequired(account, await this.legal.currentTermsVersion())) return;
 
     throw new ForbiddenException({
       statusCode: 403,

@@ -1,6 +1,5 @@
 import { SetMetadata } from "@nestjs/common";
 import type { OveAccount } from "@ove/database";
-import { CURRENT_TERMS_VERSION } from "./account-registration.service";
 
 /**
  * 再同意を求めずに通すエンドポイントに付けるデコレータ。
@@ -26,9 +25,15 @@ export const TERMS_CONSENT_REQUIRED_CODE = "terms_consent_required";
  *
  * `termsVersion`がnullのアカウント (同意の記録を始める前に作られたもの) も対象に含める。
  * 「記録が無い」と「同意していない」を区別できない以上、同意を取り直す方が安全なため。
+ *
+ * 現行バージョンを引数で受けるのは、値の出どころが管理画面 (`legal_documents`)へ
+ * 移ったため (docs/legal-documents.md)。この関数自体はDBに触らない。
  */
-export function isTermsConsentRequired(account: Pick<OveAccount, "termsVersion">): boolean {
-  return account.termsVersion !== CURRENT_TERMS_VERSION;
+export function isTermsConsentRequired(
+  account: Pick<OveAccount, "termsVersion">,
+  currentVersion: string,
+): boolean {
+  return account.termsVersion !== currentVersion;
 }
 
 /** 再同意前でも通してよいリクエストか。 */

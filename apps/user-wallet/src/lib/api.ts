@@ -290,3 +290,14 @@ export interface AccountProfileResponse {
     missingRequired: ProfileFieldKey[];
   };
 }
+
+/** `GET /api/v1/legal/{slug}` (docs/legal-documents.md)。本文はプレーンテキスト。 */
+export interface LegalDocument {
+  slug: string;
+  title: string;
+  body: string;
+  version: string;
+  published: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}

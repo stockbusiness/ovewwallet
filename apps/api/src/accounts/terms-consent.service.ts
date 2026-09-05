@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import type { PrismaClient } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
-import { CURRENT_TERMS_VERSION } from "./account-registration.service";
+import { LegalDocumentsService } from "../legal/legal-documents.service";
 import { isTermsConsentRequired } from "./terms-consent";
 
 export interface TermsConsentStatus {
@@ -17,18 +17,22 @@ export interface TermsConsentStatus {
 /** 利用規約の同意状態の参照と、再同意の記録 (docs/terms-consent.md)。 */
 @Injectable()
 export class TermsConsentService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly legal: LegalDocumentsService,
+  ) {}
 
   async getStatus(oveAccountId: string): Promise<TermsConsentStatus> {
     const account = await this.db.oveAccount.findUniqueOrThrow({
       where: { id: oveAccountId },
       select: { termsVersion: true, termsAgreedAt: true },
     });
+    const currentVersion = await this.legal.currentTermsVersion();
     return {
-      current_version: CURRENT_TERMS_VERSION,
+      current_version: currentVersion,
       agreed_version: account.termsVersion,
       agreed_at: account.termsAgreedAt?.toISOString() ?? null,
-      consent_required: isTermsConsentRequired(account),
+      consent_required: isTermsConsentRequired(account, currentVersion),
     };
   }
 
@@ -39,7 +43,7 @@ export class TermsConsentService {
   async accept(oveAccountId: string): Promise<TermsConsentStatus> {
     await this.db.oveAccount.update({
       where: { id: oveAccountId },
-      data: { termsVersion: CURRENT_TERMS_VERSION, termsAgreedAt: new Date() },
+      data: { termsVersion: await this.legal.currentTermsVersion(), termsAgreedAt: new Date() },
     });
     return this.getStatus(oveAccountId);
   }
