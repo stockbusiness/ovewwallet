@@ -11,7 +11,8 @@ import { MailService } from "../mail/mail.service";
 import { SessionAuthGuard } from "../common/session-auth.guard";
 import { SkipTermsConsent } from "../accounts/terms-consent";
 import { availableLoginMethods, isLoginMethodEnabled, type LoginMethod } from "./login-methods";
-import { REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS } from "../referrals/referrals.controller";
+import { referralCookieOptions } from "../referrals/referral-cookie";
+import { REFERRAL_SESSION_COOKIE_NAME } from "../referrals/referrals.controller";
 
 /** ログインデバイス一覧向けに、リクエストから接続元情報を取り出す。 */
 function sessionMetaFromRequest(req: Request): SessionMeta {
@@ -108,7 +109,8 @@ export class AuthController {
       return { ove_account_id: session.oveAccountId };
     } finally {
       // LINEログインと同じく、成功・失敗にかかわらず使い切りとして削除する。
-      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS);
+      // 発行時とまったく同じ属性 (domainを含む) を渡す。食い違うとブラウザが削除を無視する。
+      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, referralCookieOptions(req.hostname));
     }
   }
 
@@ -135,7 +137,8 @@ export class AuthController {
       // アカウント作成トランザクション内で既に消費(usedAt設定)されている可能性があるため、
       // 成功/失敗にかかわらず削除する (finally)。発行時と同じオプション
       // (httpOnly/secure/sameSite) を指定しないとブラウザが削除を無視しうるため揃える。
-      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, REFERRAL_COOKIE_OPTIONS);
+      // 発行時とまったく同じ属性 (domainを含む) を渡す。食い違うとブラウザが削除を無視する。
+      if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, referralCookieOptions(req.hostname));
     }
   }
 

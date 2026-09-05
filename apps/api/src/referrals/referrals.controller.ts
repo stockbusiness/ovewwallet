@@ -2,20 +2,10 @@ import { Controller, Get, Query, Req, Res } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { sha256Hex } from "@ove/auth";
+import { referralCookieOptions } from "./referral-cookie";
 import { ReferralsService } from "./referrals.service";
 
 export const REFERRAL_SESSION_COOKIE_NAME = "referral_session";
-
-// フロントエンド(Vercel)とAPI(Railway)が別ドメインの構成のため、既存のセッションCookie
-// (packages/auth/src/session.ts) と同じくsameSite=noneで発行する。clearCookie側でも
-// 同じオプションを指定する必要があるため (指定が食い違うとブラウザが削除を無視しうる)、
-// auth.controller.tsから参照できるようexportする。
-export const REFERRAL_COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: true,
-  sameSite: "none" as const,
-  path: "/",
-};
 
 /**
  * 代理店紹介URL (`/invite/{token}`) の受付 (実装指示書 v1.0、Cookie発行方式の技術判断書)。
@@ -61,7 +51,10 @@ export class ReferralsController {
       });
       if (result) {
         res.cookie(REFERRAL_SESSION_COOKIE_NAME, result.cookieToken, {
-          ...REFERRAL_COOKIE_OPTIONS,
+          // ウォレットドメインへも届くようにする (`referral-cookie.ts`)。
+          // ここを取り違えるとログイン時にCookieが送られず、登録は成功するのに
+          // 紹介だけが静かに成立しない。
+          ...referralCookieOptions(req.hostname),
           expires: result.expiresAt,
         });
       }
