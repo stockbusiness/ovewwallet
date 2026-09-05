@@ -156,4 +156,13 @@ export default tseslint.config(
       complexity: "off",
     },
   },
+  {
+    // 生成物は行数上限の対象外にする。使い捨てメールドメインの一覧のように、
+    // 外部のリストをそのまま取り込むファイルは分割しても読みやすくならず、
+    // 分割の仕方が更新のたびに変わってしまうため (docs/email-domain-policy.md)。
+    files: ["**/*.generated.ts"],
+    rules: {
+      "max-lines": "off",
+    },
+  },
 );

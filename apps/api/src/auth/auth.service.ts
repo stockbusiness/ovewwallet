@@ -1,4 +1,10 @@
-import { Inject, Injectable, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import {
   EmailOtpService,
   OtpVerificationError,
@@ -20,6 +26,9 @@ import { MailService, MailNotConfiguredError } from "../mail/mail.service";
 import { buildOtpMail } from "../mail/otp-mail";
 import { MailSendError } from "../mail/resend-mail-sender";
 import { ReferralsService } from "../referrals/referrals.service";
+import { EmailDomainPolicyService } from "./email-domain-policy.service";
+import { DISPOSABLE_EMAIL_ERROR_CODE } from "./email-error-codes";
+import { resolveEmailProviderSubject } from "./email-identity-subject";
 
 /** ログインデバイス一覧 (docs/login-devices.md参照) 向けに記録する接続元情報。 */
 export interface SessionMeta {
@@ -47,6 +56,7 @@ export class AuthService {
     private readonly agencyService: AgencyService,
     private readonly referrals: ReferralsService,
     private readonly mail: MailService,
+    private readonly emailDomainPolicy: EmailDomainPolicyService,
   ) {
     this.emailOtp = new EmailOtpService(kv);
     this.sengokuSso = new SengokuSsoService(kv);
@@ -72,6 +82,20 @@ export class AuthService {
    * 同じコードで先へ進める。
    */
   async requestEmailOtp(email: string): Promise<{ devCode?: string }> {
+    // 使い捨てアドレスはコードを発行する前に弾く。発行してから弾いても、
+    // 送信費用とクールダウンだけが消費されるため (docs/email-domain-policy.md)。
+    // 理由を明示するのは、誕生日ドメイン等で誤って弾かれた利用者が
+    // 「コードが届かない」と待ち続けないようにするため。
+    if (await this.emailDomainPolicy.isDisposable(email)) {
+      // `error` は画面が日本語の文言を出すための機械可読コード
+      // (`ApiError.code`、`apps/user-wallet/src/lib/api.ts`)。
+      throw new BadRequestException({
+        statusCode: 400,
+        error: DISPOSABLE_EMAIL_ERROR_CODE,
+        message: "this email address cannot be used for registration",
+      });
+    }
+
     const code = await this.emailOtp.issue(email);
     try {
       await this.mail.send(buildOtpMail({ to: email, code }));
@@ -113,10 +137,13 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException("invalid verification code");
 
     const referral = await this.referrals.resolvePendingSession(referralCookieToken);
+    const providerSubject = await resolveEmailProviderSubject(email, (provider, subject) =>
+      this.accounts.hasIdentity(provider, subject),
+    );
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "EMAIL",
       provider: "EMAIL",
-      providerSubject: email.toLowerCase(),
+      providerSubject,
       email,
       termsAccepted,
       onNewAccountCreated: referral
