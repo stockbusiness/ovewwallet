@@ -60,6 +60,8 @@ export async function createTestCollectible(
       collectibleAssetId: asset.id,
       entitlementId: `ent_pw_${generateId()}`,
       sourceSystemKey: "sengoku-market",
+      // 保有権の同一性は論理Market単位 (docs/collectible-multi-market.md)。
+      logicalMarket: "nft-art-market",
       acquiredAt: new Date(),
       ...overrides,
     },
