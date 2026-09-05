@@ -214,6 +214,8 @@ export class AdminCollectiblesService {
     if (!holding) throw new NotFoundException("collectible holding not found");
     const result = await this.revokeCollectible.execute({
       entitlementId: holding.entitlementId,
+      // 対象Holdingの値をそのまま使う。管理者IDからは論理Marketを引けないため。
+      logicalMarket: holding.logicalMarket,
       reason,
       sourceSystemKey: adminId,
       actorType: "ADMIN",

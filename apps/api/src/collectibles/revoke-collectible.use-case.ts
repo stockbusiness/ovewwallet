@@ -13,10 +13,19 @@ import {
   ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES,
   KNOWN_COLLECTIBLE_REVOKE_REASON_CODES,
   entitlementAdvisoryLockKey,
+  logicalMarketFor,
 } from "./constants";
 
 export interface RevokeCollectibleParams {
   entitlementId: string;
+  /**
+   * 保有権の同一性の単位 (docs/collectible-multi-market.md)。
+   *
+   * **管理画面からの取消でのみ渡す。** そこでは`sourceSystemKey`に管理者IDが入るため、
+   * 論理Marketを引けないから。外部イベント起点では省略し、認証済みの
+   * `sourceSystemKey`から引く (受理できない送信元だったことも監査ログに残すため)。
+   */
+  logicalMarket?: string;
   reason: string;
   /** PR-W3-a: 構造化された取消理由コード(例: "full_refund")。既知語彙は
    * KNOWN_COLLECTIBLE_REVOKE_REASON_CODES参照。未知でも取消は継続し、別途監査記録する。 */
@@ -72,13 +81,26 @@ export class RevokeCollectibleUseCase {
     const actorType = params.actorType ?? "EXTERNAL_SERVICE";
     const isAutomated = actorType !== "ADMIN";
 
+    // 外部イベント起点では認証済みのsource_system_keyから引く。管理画面起点では
+    // 対象Holdingの値が渡ってくる。
+    const requesterMarket = isAutomated
+      ? logicalMarketFor(params.sourceSystemKey)
+      : (params.logicalMarket ?? null);
+
+    // 受理できない送信元 (未知のsource_system_key)。どのマーケットの
+    // entitlement_idか決められないため、絞り込まずに探して監査ログだけ残す。
+    if (requesterMarket === null) {
+      return this.rejectUnknownSource(params, actorType);
+    }
+
     return this.db.$transaction(async (tx) => {
       // 契約v2指示書23章。`collectible_holdings`への行ロックは対象行が無ければ何も守らないため、
       // Holding未作成のままentitlement_idを直列化するadvisory lockを別途取る
       // (grant-collectible.use-caseの同名キーと衝突させ、tombstone作成とHolding作成を排他する)。
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(params.entitlementId)}))`;
-      await this.holdings.lockByEntitlementId(params.entitlementId, tx);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${entitlementAdvisoryLockKey(requesterMarket, params.entitlementId)}))`;
+      await this.holdings.lockByEntitlementId(requesterMarket, params.entitlementId, tx);
       const holding = await this.holdings.findByEntitlementId(
+        requesterMarket,
         params.entitlementId,
         tx,
       );
@@ -86,6 +108,7 @@ export class RevokeCollectibleUseCase {
         if (!isAutomated) return { status: "not_found" };
 
         const existingTombstone = await this.tombstones.findByEntitlementId(
+          requesterMarket,
           params.entitlementId,
           tx,
         );
@@ -95,6 +118,7 @@ export class RevokeCollectibleUseCase {
               id: generateId(),
               entitlementId: params.entitlementId,
               sourceSystemKey: params.sourceSystemKey,
+              logicalMarket: requesterMarket,
               eventId: params.eventId,
               reason: params.reason,
               reasonCode: params.reasonCode ?? null,
@@ -119,16 +143,12 @@ export class RevokeCollectibleUseCase {
         return { status: "already_revoked", holding };
 
       if (isAutomated) {
-        // PR-W3-a: 生のsource_system_key文字列同士の比較ではなく、論理Market単位で比較する。
-        // sennokuni-nft-market/sengoku-marketは同一論理Marketの別名(ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES
-        // 参照)のため、片方で付与しもう片方で取消しても一致として扱う。未知のsource_system_key
-        // (戦国マーケットのsengoku-commerce等)や、異なる論理Marketからの取消は引き続き拒否する。
-        const requesterMarket =
-          ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES[params.sourceSystemKey];
+        // 検索自体が論理Marketで絞られているため、ここへ来た時点で通常は一致している。
+        // 残しているのは、過去に受理していたsource_system_keyを対応表から外した等で
+        // 食い違いが生じたときに、黙って取り消してしまわないため (二重の歯止め)。
         const holdingMarket =
           ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES[holding.sourceSystemKey];
-        const sourceMismatch =
-          !requesterMarket || requesterMarket !== holdingMarket;
+        const sourceMismatch = requesterMarket !== holdingMarket;
         if (sourceMismatch) {
           await this.recordFailure(tx, holding, {
             actorType,
@@ -246,6 +266,29 @@ export class RevokeCollectibleUseCase {
    * 呼び出し元の`$transaction`内で実行するため、この後に例外を投げてもAuditLogは
    * ロールバックされない (HTTPステータスの決定はUseCaseの外・ハンドラ側で行う)。
    */
+  /**
+   * 受理できない送信元からの取消。**取り消さないが、記録は残す。**
+   *
+   * どのマーケットのentitlement_idか決められないので絞り込まずに探す。見つかれば
+   * 「他所のカードを取り消そうとした」記録を残せる (`COLLECTIBLE_REVOKE_SOURCE_CONFLICT`)。
+   */
+  private async rejectUnknownSource(
+    params: RevokeCollectibleParams,
+    actorType: CreatedByType,
+  ): Promise<RevokeCollectibleResult> {
+    const holding = await this.holdings.findAnyByEntitlementId(params.entitlementId);
+    if (!holding) return { status: "not_found" };
+
+    await this.recordFailure(this.db, holding, {
+      actorType,
+      actorId: params.sourceSystemKey,
+      actionType: "COLLECTIBLE_REVOKE_SOURCE_CONFLICT",
+      reason: `revoke source mismatch: authenticated source_system_key="${params.sourceSystemKey}" is not a known NFT market, holding.sourceSystemKey="${holding.sourceSystemKey}"`,
+      eventId: params.eventId,
+    });
+    return { status: "source_conflict", holding };
+  }
+
   private async recordFailure(
     tx: Prisma.TransactionClient,
     holding: CollectibleHolding,

@@ -60,6 +60,9 @@ export class EntitlementRevokedHandler implements CommonEventHandler<Entitlement
       "entitlement.revoked",
     );
 
+    // 論理Marketは`sourceSystemKey`からUseCase側で引く。ここで弾いてしまうと、
+    // 受理できない送信元からの取消要求が監査ログに残らなくなる
+    // (`COLLECTIBLE_REVOKE_SOURCE_CONFLICT`)。
     const result = await this.revokeCollectible.execute({
       entitlementId,
       reason,

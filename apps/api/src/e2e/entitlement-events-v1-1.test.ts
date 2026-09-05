@@ -146,7 +146,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
       const res = await postEvent(body, key).expect(201);
       expect(res.body.result.action).toBe("revoked");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
       });
       expect(holding.status).toBe("REVOKED");
@@ -303,7 +303,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
       const res = await postEvent(body, key).expect(201);
       expect(res.body.result.action).toBe("revoked");
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
       });
       expect(holding.status).toBe("REVOKED");
@@ -330,7 +330,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
       });
       await postEvent(body, key).expect(201);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
       });
       const auditRows = await prisma.auditLog.findMany({
@@ -374,7 +374,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
       const res2 = await postEvent(body, key).expect(201); // 同一event_id・同一payloadの再送(冪等キャッシュ)
       expect(res2.body.cached).toBe(true);
 
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
       });
       const auditRows = await prisma.auditLog.findMany({
@@ -409,7 +409,7 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
       expect(res.body.error.code).toBe("FORBIDDEN");
 
       // Holdingは変更されず、ACTIVEのままであることを確認する(誤って別Marketが取消せない)。
-      const holding = await prisma.collectibleHolding.findUniqueOrThrow({
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
         where: { entitlementId },
       });
       expect(holding.status).toBe("ACTIVE");

@@ -15,6 +15,7 @@ export interface CreateCollectibleHoldingParams {
   collectibleAssetId: string;
   entitlementId: string;
   sourceSystemKey: string;
+  logicalMarket: string;
   orderId?: string | null;
   orderItemId?: string | null;
   acquiredAt: Date;
@@ -101,19 +102,37 @@ export class CollectibleHoldingsRepository {
   }
 
   async findByEntitlementId(
+    logicalMarket: string,
     entitlementId: string,
     client: Db = this.db,
   ): Promise<CollectibleHolding | null> {
-    return client.collectibleHolding.findUnique({ where: { entitlementId } });
+    return client.collectibleHolding.findUnique({
+      where: { logicalMarket_entitlementId: { logicalMarket, entitlementId } },
+    });
+  }
+
+  /**
+   * 論理Marketを絞らずに探す。**取消の可否判断には使わない。**
+   *
+   * 受理できない送信元からの取消要求を監査ログに残すためだけの検索
+   * (`RevokeCollectibleUseCase.rejectUnknownSource`)。複数マーケットが同じ
+   * entitlement_idを持ちうるので、どれが返るかは決まらない。
+   */
+  async findAnyByEntitlementId(
+    entitlementId: string,
+    client: Db = this.db,
+  ): Promise<CollectibleHolding | null> {
+    return client.collectibleHolding.findFirst({ where: { entitlementId } });
   }
 
   /** PR#2最終修正 P0-2: 再送の一致検証に`collectibleAsset.assetCode`が要るため、Asset込みで取得する。 */
   async findByEntitlementIdWithAsset(
+    logicalMarket: string,
     entitlementId: string,
     client: Db = this.db,
   ): Promise<CollectibleHoldingWithAsset | null> {
     return client.collectibleHolding.findUnique({
-      where: { entitlementId },
+      where: { logicalMarket_entitlementId: { logicalMarket, entitlementId } },
       include: HOLDING_WITH_ASSET_INCLUDE,
     });
   }
@@ -124,10 +143,13 @@ export class CollectibleHoldingsRepository {
    * 現在状態の再取得より前に呼ぶこと。
    */
   async lockByEntitlementId(
+    logicalMarket: string,
     entitlementId: string,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    await tx.$executeRaw`SELECT id FROM collectible_holdings WHERE entitlement_id = ${entitlementId} FOR UPDATE`;
+    // 論理Marketでも絞る。別マーケットの同じentitlement_idの行まで巻き込んで
+    // ロックしないため。
+    await tx.$executeRaw`SELECT id FROM collectible_holdings WHERE logical_market = ${logicalMarket} AND entitlement_id = ${entitlementId} FOR UPDATE`;
   }
 
   async create(
