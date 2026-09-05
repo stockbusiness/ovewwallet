@@ -12,10 +12,13 @@ import { DataRetentionService } from "./data-retention.service";
 import { ExpiryNoticeService } from "./expiry-notice.service";
 import { PointLiabilityService } from "../reporting/point-liability.service";
 import { AccountAnonymizationService } from "../accounts/account-anonymization.service";
+import { CollectibleImagesService } from "../collectible-images/collectible-images.service";
 import {
   DEFAULT_EXPIRY_CRON,
   DEFAULT_EXPIRY_NOTICE_CRON,
   DEFAULT_ANONYMIZATION_CRON,
+  DEFAULT_COLLECTIBLE_IMAGE_CRON,
+  COLLECTIBLE_IMAGE_MAX_PER_TICK,
   DEFAULT_LIABILITY_SNAPSHOT_CRON,
   DEFAULT_OUTBOX_CRON,
   DEFAULT_RECONCILIATION_CRON,
@@ -33,6 +36,7 @@ export const JOB_DATA_RETENTION = "data-retention";
 export const JOB_EXPIRY_NOTICE = "expiry-notice";
 export const JOB_LIABILITY_SNAPSHOT = "liability-snapshot";
 export const JOB_ACCOUNT_ANONYMIZATION = "account-anonymization";
+export const JOB_COLLECTIBLE_IMAGE_INGEST = "collectible-image-ingest";
 
 /**
  * 運用処理の定期実行。
@@ -59,6 +63,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly expiryNotice: ExpiryNoticeService,
     private readonly pointLiability: PointLiabilityService,
     private readonly anonymization: AccountAnonymizationService,
+    private readonly collectibleImages: CollectibleImagesService,
     @Inject(KV_STORE) private readonly kv: KeyValueStore,
   ) {}
 
@@ -94,6 +99,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       JOB_ACCOUNT_ANONYMIZATION,
       cronExpression("ANONYMIZATION_CRON", DEFAULT_ANONYMIZATION_CRON),
       () => this.runAccountAnonymization(),
+    );
+    this.register(
+      JOB_COLLECTIBLE_IMAGE_INGEST,
+      cronExpression("COLLECTIBLE_IMAGE_CRON", DEFAULT_COLLECTIBLE_IMAGE_CRON),
+      () => this.runCollectibleImageIngest(),
     );
   }
 
@@ -210,6 +220,17 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       }
 
       return `processed=${processed} failed=${failed} batches=${batches}`;
+    });
+  }
+
+  /**
+   * 取り込めていないカード画像を拾い直す (`docs/collectible-images.md`)。
+   * ストレージが未設定の間は何もしない (件数0で終わる)。
+   */
+  async runCollectibleImageIngest(): Promise<boolean> {
+    return this.withLock(JOB_COLLECTIBLE_IMAGE_INGEST, async () => {
+      const result = await this.collectibleImages.retryPending(COLLECTIBLE_IMAGE_MAX_PER_TICK);
+      return `attempted=${result.attempted} stored=${result.stored}`;
     });
   }
 

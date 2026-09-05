@@ -1,4 +1,5 @@
 import { SchedulerRegistry } from "@nestjs/schedule";
+import { CollectibleImagesService } from "../collectible-images/collectible-images.service";
 import { InMemoryKeyValueStore } from "@ove/auth";
 import {
   SchedulerService,
@@ -6,6 +7,7 @@ import {
   JOB_DATA_RETENTION,
   JOB_EXPIRY_NOTICE,
   JOB_ACCOUNT_ANONYMIZATION,
+  JOB_COLLECTIBLE_IMAGE_INGEST,
   JOB_LIABILITY_SNAPSHOT,
   JOB_OUTBOX_DISPATCH,
   JOB_RECONCILIATION,
@@ -26,6 +28,7 @@ function build(overrides: {
   expiryNotice?: Partial<ExpiryNoticeService>;
   pointLiability?: Partial<PointLiabilityService>;
   anonymization?: Partial<AccountAnonymizationService>;
+  collectibleImages?: Partial<CollectibleImagesService>;
   kv?: InMemoryKeyValueStore;
 } = {}) {
   const kv = overrides.kv ?? new InMemoryKeyValueStore();
@@ -64,6 +67,11 @@ function build(overrides: {
     ...overrides.anonymization,
   } as unknown as AccountAnonymizationService;
 
+  const collectibleImages = {
+    retryPending: jest.fn().mockResolvedValue({ attempted: 3, stored: 2 }),
+    ...overrides.collectibleImages,
+  } as unknown as CollectibleImagesService;
+
   const registry = new SchedulerRegistry();
   const service = new SchedulerService(
     registry,
@@ -74,9 +82,22 @@ function build(overrides: {
     expiryNotice,
     pointLiability,
     anonymization,
+    collectibleImages,
     kv,
   );
-  return { service, registry, admin, rewardRules, outbox, retention, expiryNotice, pointLiability, anonymization, kv };
+  return {
+    service,
+    registry,
+    admin,
+    rewardRules,
+    outbox,
+    retention,
+    expiryNotice,
+    pointLiability,
+    anonymization,
+    collectibleImages,
+    kv,
+  };
 }
 
 describe("SchedulerService", () => {
@@ -100,6 +121,7 @@ describe("SchedulerService", () => {
       expect(registry.getCronJob(JOB_EXPIRY_NOTICE)).toBeDefined();
       expect(registry.getCronJob(JOB_LIABILITY_SNAPSHOT)).toBeDefined();
       expect(registry.getCronJob(JOB_ACCOUNT_ANONYMIZATION)).toBeDefined();
+      expect(registry.getCronJob(JOB_COLLECTIBLE_IMAGE_INGEST)).toBeDefined();
 
       service.onModuleDestroy();
       // 停止後はタイマーが残らない (プロセスが終了できる)
@@ -193,6 +215,12 @@ describe("SchedulerService", () => {
       const { service, anonymization } = build();
       await expect(service.runAccountAnonymization()).resolves.toBe(true);
       expect(anonymization.anonymizeClosedAccounts).toHaveBeenCalledTimes(1);
+    });
+
+    it("runs the collectible image ingest job", async () => {
+      const { service, collectibleImages } = build();
+      await expect(service.runCollectibleImageIngest()).resolves.toBe(true);
+      expect(collectibleImages.retryPending).toHaveBeenCalledTimes(1);
     });
 
     it("メンテナンス中はジョブを走らせない", async () => {

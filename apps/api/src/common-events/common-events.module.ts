@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AccountResolutionModule } from "../accounts/account-resolution.module";
 import { AdminModule } from "../admin/admin.module";
+import { CollectibleImagesModule } from "../collectible-images/collectible-images.module";
 import { CollectiblesModule } from "../collectibles/collectibles.module";
 import { ReferralsModule } from "../referrals/referrals.module";
 import { RewardsModule } from "../rewards/rewards.module";
@@ -35,6 +36,7 @@ import { PointAwardRecipientResolver } from "./point-award-recipient.resolver";
     ReferralsModule,
     RewardsModule,
     CollectiblesModule,
+    CollectibleImagesModule,
     AccountResolutionModule,
   ],
   controllers: [

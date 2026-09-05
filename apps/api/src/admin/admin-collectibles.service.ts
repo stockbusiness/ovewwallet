@@ -12,6 +12,7 @@ import {
   type Prisma,
   type PrismaClient,
 } from "@ove/database";
+import { CollectibleImagesService } from "../collectible-images/collectible-images.service";
 import {
   CollectibleAssetsRepository,
   type CreateCollectibleAssetParams,
@@ -64,6 +65,7 @@ export class AdminCollectiblesService {
     private readonly assets: CollectibleAssetsRepository,
     private readonly holdings: CollectibleHoldingsRepository,
     private readonly revokeCollectible: RevokeCollectibleUseCase,
+    private readonly images: CollectibleImagesService,
   ) {}
 
   async listAssets(limit = DEFAULT_LIST_LIMIT): Promise<CollectibleAsset[]> {
@@ -86,7 +88,7 @@ export class AdminCollectiblesService {
         `collectible asset ${params.assetCode} already exists`,
       );
 
-    return this.db.$transaction(async (tx) => {
+    const asset = await this.db.$transaction(async (tx) => {
       const asset = await this.assets.create(
         { id: generateId(), ...params },
         tx,
@@ -109,6 +111,11 @@ export class AdminCollectiblesService {
       });
       return asset;
     });
+
+    // 取り込みはトランザクションの外で行う (外部への通信のため)。失敗しても
+    // カードマスターの登録は成立させる (docs/collectible-images.md)。
+    await this.images.registerAndIngest([asset.imageUrl, asset.thumbnailUrl]);
+    return asset;
   }
 
   async updateAsset(
@@ -118,8 +125,9 @@ export class AdminCollectiblesService {
   ): Promise<CollectibleAsset> {
     const before = await this.getAsset(id);
 
-    return this.db.$transaction(async (tx) => {
-      const updated = await this.assets.update(id, params, tx);
+    const updated = await this.db.$transaction(async (tx) => {
+      const row = await this.assets.update(id, params, tx);
+      const updated = row;
       await tx.auditLog.create({
         data: {
           id: generateId(),
@@ -153,6 +161,9 @@ export class AdminCollectiblesService {
       });
       return updated;
     });
+
+    await this.images.registerAndIngest([updated.imageUrl, updated.thumbnailUrl]);
+    return updated;
   }
 
   private updateActionType(

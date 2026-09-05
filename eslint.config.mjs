@@ -46,6 +46,7 @@ export default tseslint.config(
             "apps/api/src/admin/*.test.ts",
             "apps/api/src/auth/*.test.ts",
             "apps/api/src/collectible-claims/*.test.ts",
+            "apps/api/src/collectible-images/*.test.ts",
             "apps/api/src/collectibles/*.test.ts",
             "apps/api/src/common/*.test.ts",
             "apps/api/src/common-events/*.test.ts",

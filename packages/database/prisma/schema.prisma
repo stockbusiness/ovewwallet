@@ -455,6 +455,55 @@ model EmailDomainRule {
   @@map("email_domain_rules")
 }
 
+/// カード画像の取り込み状態。
+enum CollectibleImageStatus {
+  /// 取り込み待ち。表示は取得元URLのままになる。
+  PENDING
+  /// 取り込み済み。ウォレット自身が配信する。
+  STORED
+  /// 取り込みに失敗した。表示は取得元URLのままで、再取得の対象になる。
+  FAILED
+}
+
+/// 外部マーケットのカード画像を、ウォレット側へ取り込んだ控え
+/// (docs/collectible-images.md)。
+///
+/// 保有 (`collectible_holdings`) ではなく**取得元URL**を単位にしている。同じURLは
+/// 同じ画像なので、カードの種類や保有者をまたいで1件で足りる。付与時のスナップショット
+/// (`image_url_snapshot`) との突き合わせもURLで行うため、既に配布済みのカードの
+/// 見た目を変えずに後から取り込める。
+model CollectibleImage {
+  id String @id
+
+  /// 取得元。マーケットから届いた、あるいは管理画面で入力されたURL。
+  sourceUrl String                 @unique @map("source_url")
+  status    CollectibleImageStatus @default(PENDING)
+
+  /// オブジェクトストレージ上のキー。内容のハッシュから決まるため、同じ画像なら
+  /// 同じキーになる (別URLで同じ画像が来ても二重に持たない)。
+  storageKey  String? @map("storage_key")
+  /// 実体のマジックナンバーから判定した値。送り手の申告は使わない。
+  contentType String? @map("content_type")
+  byteSize    Int?    @map("byte_size")
+  sha256      String? @map("sha256")
+
+  /// リダイレクトを追った結果、実際に取得できたURL。調査用。
+  resolvedUrl String? @map("resolved_url")
+
+  attemptCount  Int       @default(0) @map("attempt_count")
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  /// 失敗の理由。運用者が原因を追えるようにするためで、利用者には見せない。
+  lastError     String?   @map("last_error")
+  storedAt      DateTime? @map("stored_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, lastAttemptAt])
+  @@index([sha256])
+  @@map("collectible_images")
+}
+
 /// プロフィール項目の要求レベル。管理画面から項目ごとに切り替える。
 enum ProfileFieldRequirement {
   /// 入力欄自体を出さない。

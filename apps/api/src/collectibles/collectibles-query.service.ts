@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { CollectibleImagesService } from "../collectible-images/collectible-images.service";
 import {
   CollectibleHoldingsRepository,
   type CollectibleHoldingWithAsset,
@@ -24,7 +25,10 @@ export interface ListMyCollectiblesParams {
  */
 @Injectable()
 export class CollectiblesQueryService {
-  constructor(private readonly holdings: CollectibleHoldingsRepository) {}
+  constructor(
+    private readonly holdings: CollectibleHoldingsRepository,
+    private readonly images: CollectibleImagesService,
+  ) {}
 
   async listMyCollectibles(
     oveAccountId: string,
@@ -42,7 +46,8 @@ export class CollectiblesQueryService {
     });
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
-    const items = page.map((holding) => this.toDto(holding));
+    const stored = await this.resolveImages(page);
+    const items = page.map((holding) => this.toDto(holding, stored));
     return { items, next_cursor: hasMore ? page[page.length - 1]!.id : null };
   }
 
@@ -53,10 +58,26 @@ export class CollectiblesQueryService {
       oveAccountId,
     );
     if (!holding) throw new NotFoundException("collectible holding not found");
-    return this.toDto(holding);
+    return this.toDto(holding, await this.resolveImages([holding]));
   }
 
-  private toDto(holding: CollectibleHoldingWithAsset) {
+  /**
+   * 取り込み済みならウォレット自身の配信URLへ差し替える。取り込めていないものは
+   * 取得元URLのまま返す (画像が出ないより、外部URLでも出た方がよいため)。
+   */
+  private async resolveImages(
+    holdings: CollectibleHoldingWithAsset[],
+  ): Promise<Map<string, string>> {
+    const urls = holdings.flatMap((holding) => [
+      holding.imageUrlSnapshot ?? holding.asset.imageUrl,
+      holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl,
+    ]);
+    return this.images.resolveStoredUrls(urls);
+  }
+
+  private toDto(holding: CollectibleHoldingWithAsset, stored: Map<string, string>) {
+    const imageUrl = holding.imageUrlSnapshot ?? holding.asset.imageUrl;
+    const thumbnailUrl = holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl;
     return {
       holding_id: holding.id,
       status: holding.status,
@@ -71,9 +92,8 @@ export class CollectiblesQueryService {
         asset_code: holding.asset.assetCode,
         name: holding.displayNameSnapshot ?? holding.asset.name,
         description: holding.descriptionSnapshot ?? holding.asset.description,
-        image_url: holding.imageUrlSnapshot ?? holding.asset.imageUrl,
-        thumbnail_url:
-          holding.thumbnailUrlSnapshot ?? holding.asset.thumbnailUrl,
+        image_url: stored.get(imageUrl) ?? imageUrl,
+        thumbnail_url: thumbnailUrl === null ? null : (stored.get(thumbnailUrl) ?? thumbnailUrl),
         rarity: holding.raritySnapshot ?? holding.asset.rarity,
         category: holding.asset.category,
         edition_size: holding.asset.editionSize,
