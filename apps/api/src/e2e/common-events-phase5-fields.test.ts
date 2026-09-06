@@ -10,6 +10,7 @@ import {
   createTestCommonEventSigningKey,
   commonEventSignedHeaders,
   type TestCommonEventSigningKey,
+  ensureCommonEventRewardRule,
 } from "./test-helpers";
 
 const ENDPOINT = "/api/integrations/events";
@@ -25,6 +26,9 @@ describe("共通イベント: 正式フィールド (Phase 5) 経由の送信", 
   let key: TestCommonEventSigningKey;
 
   beforeAll(async () => {
+    // reward.granted はルール未登録だと拒否される (docs/point-exchange.md)。
+    await ensureCommonEventRewardRule("AIART-ANNUAL");
+    await ensureCommonEventRewardRule();
     app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());

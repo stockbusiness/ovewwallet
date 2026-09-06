@@ -10,6 +10,7 @@ import {
   createTestCommonEventSigningKey,
   commonEventSignedHeaders,
   type TestCommonEventSigningKey,
+  ensureCommonEventRewardRule,
 } from "./test-helpers";
 
 const ENDPOINT = "/api/integrations/events";
@@ -24,6 +25,9 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
   let key: TestCommonEventSigningKey;
 
   beforeAll(async () => {
+    // reward.granted はルール未登録だと拒否される (docs/point-exchange.md)。
+    await ensureCommonEventRewardRule("AIART-ANNUAL");
+    await ensureCommonEventRewardRule();
     app = await NestFactory.create(AppModule, { logger: false, rawBody: true });
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
@@ -357,6 +361,59 @@ describe("POST /api/integrations/events (共通実装契約6章)", () => {
       const originalAfterReversal = await prisma.oveTransaction.findUniqueOrThrow({ where: { id: transactionId } });
       expect(originalAfterReversal.status).toBe("REVERSED");
       expect(originalAfterReversal.amount.toString()).toBe("5000");
+    });
+
+    it("付与ルールが未登録なら拒否する (上限を素通りさせない)", async () => {
+      // この経路は署名鍵さえあれば任意の額を発行でき、代理店経路のような
+      // service_integrations の上限も効かない。ルールが無いまま通すと歯止めが
+      // 1つも無い状態になる (docs/point-exchange.md)。
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+
+      const body = baseBody({
+        event_type: "reward.granted",
+        common_user_id: commonUserId,
+        product_code: `UNREGISTERED-${generateId()}`,
+        metadata: { amount: 1000 },
+      });
+      const res = await request(app.getHttpServer())
+        .post(ENDPOINT)
+        .set(commonEventSignedHeaders(key, body))
+        .send(body)
+        .expect(400);
+      expect(JSON.stringify(res.body)).toContain("not registered or not ACTIVE");
+
+      const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
+      expect(wallet.availableBalance.toString()).toBe("0");
+    });
+
+    it("ルールを止めれば付与も止まる (交換の停止手段になる)", async () => {
+      const productCode = `PAUSE-${generateId()}`;
+      await ensureCommonEventRewardRule(productCode);
+      await prisma.rewardRule.update({
+        where: { ruleCode: `COMMON_EVENT_REWARD:${productCode}` },
+        data: { status: "INACTIVE" },
+      });
+
+      const { accountId, walletId } = await createAccountWithWallet();
+      const commonUserId = `cu_${generateId()}`;
+      await prisma.oveAccount.update({ where: { id: accountId }, data: { commonUserId } });
+
+      const body = baseBody({
+        event_type: "reward.granted",
+        common_user_id: commonUserId,
+        product_code: productCode,
+        metadata: { amount: 1000 },
+      });
+      await request(app.getHttpServer())
+        .post(ENDPOINT)
+        .set(commonEventSignedHeaders(key, body))
+        .send(body)
+        .expect(400);
+
+      const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
+      expect(wallet.availableBalance.toString()).toBe("0");
     });
 
     it("does not move OVE when ENABLE_EXTERNAL_REWARD_TYPES is disabled", async () => {

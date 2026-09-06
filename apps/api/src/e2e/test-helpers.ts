@@ -162,3 +162,31 @@ export async function ensureRegistrationBonusRule(): Promise<void> {
     },
   });
 }
+
+/**
+ * `reward.granted` 用の付与ルールを用意する (docs/point-exchange.md)。
+ *
+ * この経路はルール未登録なら**付与を拒否する** (`requireRule`)。署名鍵さえあれば任意の額を
+ * 発行でき、代理店経路のような `service_integrations` の上限も効かないため、上限が
+ * 素通りする状態を作らせない。テストでも実運用と同じく、先にルールを登録しておく。
+ *
+ * 上限は指定しない (未指定 = 無制限)。ここで確かめたいのは上限値そのものではなく、
+ * 「ルールがあれば通る」ことだから。上限値の検証は common-events-p0.test.ts が行う。
+ */
+export async function ensureCommonEventRewardRule(productCode = "default"): Promise<void> {
+  const ruleCode = `COMMON_EVENT_REWARD:${productCode}`;
+  await prisma.rewardRule.upsert({
+    where: { ruleCode },
+    update: { status: "ACTIVE" },
+    create: {
+      id: generateId(),
+      ruleCode,
+      ruleName: `共通イベント連携特典 (${productCode})`,
+      sourceService: "SENGOKU_PASSPORT",
+      rewardAmount: 0,
+      approvalType: "AUTOMATIC",
+      status: "ACTIVE",
+      displayName: "共通イベント連携特典",
+    },
+  });
+}

@@ -464,10 +464,18 @@ jobs:
             # 許可したevent_typeであることまで求める (common-events.controller.ts)。
             # 鍵は管理画面「共通イベント署名鍵」から発行する。
             #
-            # ORI残高が動く経路は開いていない。reward.granted/reward.reversed は
-            # ENABLE_EXTERNAL_REWARD_TYPES (false のまま) で別にゲートされており、
-            # 受信箱を開けただけでは記録のみで残高は動かない
+            # ORI残高が動く reward.granted/reward.reversed は ENABLE_EXTERNAL_REWARD_TYPES
+            # で別にゲートしている (下記)。受信箱を開けただけでは残高は動かない
             # (common-events/handlers/reward-granted.handler.ts)。
+            # ポイント交換 (docs/point-exchange.md)。外部システムが自社ポイントを減らし、
+            # その分のORIを reward.granted で送ってくる。交換の操作と減算は先方の画面で
+            # 行うため、ウォレット側は受けるだけになる。
+            #
+            # この経路は署名鍵さえあれば任意の額を発行でき、代理店経路のような
+            # service_integrations の上限も効かない。そのため付与ルールの登録を必須に
+            # している (未登録なら400、reward-granted.handler.ts の requireRule)。
+            # 上限は管理画面 /reward-rules から変更できる (デプロイ不要)。
+            "ENABLE_EXTERNAL_REWARD_TYPES=true"
             "ENABLE_COMMON_EVENT_INBOX=true"
             "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX=true"
             "ENABLE_DIGITAL_COLLECTION=true"

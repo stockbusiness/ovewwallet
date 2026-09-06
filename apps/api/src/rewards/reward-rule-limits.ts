@@ -37,6 +37,16 @@ export interface EnforceRewardRuleLimitsParams {
    * 等) に、他ルールの発行量が混ざらないようにするため。省略時は従来通り`transactionType`
    * のみで集計する (`RewardsService.grant`の既存挙動を変えない)。 */
   extraWhere?: Prisma.OveTransactionWhereInput;
+  /**
+   * ルールが未登録・非ACTIVEなら**付与を拒否する**。
+   *
+   * 既定 (false) は fail-open で、上限検証を飛ばして付与を通す。上限を「置いたつもり」で
+   * 素通りするのを避けたい経路だけ true にする。`transactionType` 単位で決め打ちできない
+   * のは、`COMMON_EVENT_REWARD` を代理店の付与経路と共有しており、そちらは既に本番で
+   * 稼働しているため (`REWARD_RULE_REQUIRED_TRANSACTION_TYPES` に足すと、そちらの
+   * ルール未登録分まで止まってしまう)。
+   */
+  requireRule?: boolean;
 }
 
 /**
@@ -64,6 +74,11 @@ export async function enforceRewardRuleLimits(
     params;
   const rule = await rewardRules.findByRuleCode(ruleCode, db);
   if (!rule || rule.status !== "ACTIVE") {
+    if (params.requireRule) {
+      throw new BadRequestException(
+        `reward rule "${ruleCode}" is not registered or not ACTIVE; refusing to grant without a limit`,
+      );
+    }
     if (REWARD_RULE_REQUIRED_TRANSACTION_TYPES.has(transactionType)) {
       throw new BadRequestException(
         `reward rule ${ruleCode} is required for transaction_type "${transactionType}" but is not registered or not ACTIVE`,
