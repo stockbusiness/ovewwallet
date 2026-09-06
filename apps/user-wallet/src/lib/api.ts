@@ -301,3 +301,38 @@ export interface LegalDocument {
   updatedAt: string | null;
   updatedBy: string | null;
 }
+
+/** お問い合わせ (docs/support-inquiries.md)。 */
+export type SupportInquiryCategory =
+  | "REWARD_NOT_GRANTED"
+  | "BALANCE_MISMATCH"
+  | "LOGIN_OR_ACCOUNT"
+  | "COLLECTIBLE"
+  | "OTHER";
+
+export type SupportInquiryStatus = "OPEN" | "IN_PROGRESS" | "ANSWERED" | "CLOSED";
+
+export interface SupportInquiry {
+  inquiry_code: string;
+  category: SupportInquiryCategory;
+  message: string;
+  status: SupportInquiryStatus;
+  created_at: string;
+  answered_at: string | null;
+}
+
+export const SUPPORT_CATEGORY_LABEL: Record<SupportInquiryCategory, string> = {
+  REWARD_NOT_GRANTED: "ORIが付与されない",
+  BALANCE_MISMATCH: "残高・履歴が合わない",
+  LOGIN_OR_ACCOUNT: "ログイン・アカウント",
+  COLLECTIBLE: "カード (NFTコレクション)",
+  OTHER: "その他",
+};
+
+/** 利用者向けの言い方にする。運用側の状態名をそのまま出さない。 */
+export const SUPPORT_STATUS_LABEL: Record<SupportInquiryStatus, string> = {
+  OPEN: "受付済み",
+  IN_PROGRESS: "確認中",
+  ANSWERED: "お返事済み",
+  CLOSED: "対応済み",
+};

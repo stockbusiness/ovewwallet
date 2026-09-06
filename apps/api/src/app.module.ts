@@ -25,6 +25,7 @@ import { ReferralsModule } from "./referrals/referrals.module";
 import { ReportingModule } from "./reporting/reporting.module";
 import { RewardsModule } from "./rewards/rewards.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
+import { SupportModule } from "./support/support.module";
 import { TransactionsModule } from "./transactions/transactions.module";
 import { WalletsModule } from "./wallets/wallets.module";
 
@@ -37,6 +38,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     MailModule,
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     AccountsModule,
+    SupportModule,
     WalletsModule,
     RewardsModule,
     TransactionsModule,

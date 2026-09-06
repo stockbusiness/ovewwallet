@@ -11,6 +11,7 @@ import { AdminAgencySetupService } from "./admin-agency-setup.service";
 import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test.service";
 import { IntegrationsModule } from "../integrations/integrations.module";
 import { OutboxModule } from "../outbox/outbox.module";
+import { SupportModule } from "../support/support.module";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -40,6 +41,8 @@ import { AdminReferralsController } from "./admin-referrals.controller";
 import { AdminRewardRulesService } from "./admin-reward-rules.service";
 import { AdminRewardsController } from "./admin-rewards.controller";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
+import { AdminSupportInquiriesController } from "./admin-support-inquiries.controller";
+import { AdminSupportInquiriesService } from "./admin-support-inquiries.service";
 import { AdminUsersController } from "./admin-users.controller";
 import { AdminUsersService } from "./admin-users.service";
 import { AdminWalletsController } from "./admin-wallets.controller";
@@ -54,6 +57,7 @@ import { AdminService } from "./admin.service";
     AccountsModule,
     AuthModule,
     CollectibleImagesModule,
+    SupportModule,
     CollectiblesModule,
     IntegrationsModule,
     OutboxModule,
@@ -73,6 +77,7 @@ import { AdminService } from "./admin.service";
     AdminUsersController,
     AdminLegalController,
     AdminEmailDomainsController,
+    AdminSupportInquiriesController,
     AdminCollectibleImagesController,
     AdminImageStorageController,
   ],
@@ -96,6 +101,7 @@ import { AdminService } from "./admin.service";
     AdminMailConfigService,
     AdminProfileConfigService,
     AdminEmailDomainsService,
+    AdminSupportInquiriesService,
     AdminCollectibleImagesService,
     AdminImageStorageService,
     AdminCollectiblesService,
