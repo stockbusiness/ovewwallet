@@ -32,9 +32,15 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
 function matchesFilter(t: TransactionSummary, filter: FilterKey): boolean {
   if (filter === "ALL") return true;
   if (filter === "HELD") return t.status === "HELD";
-  if (filter === "EXPIRED") return t.transaction_type === "EXPIRATION";
+  if (filter === "EXPIRED")
+    return t.transaction_type === "EXPIRATION" || t.transaction_type === "ACCOUNT_CLOSURE_FORFEIT";
   if (filter === "CREDIT") return t.direction === "CREDIT" && t.status === "COMPLETED";
-  return t.direction === "DEBIT" && t.status === "COMPLETED" && t.transaction_type !== "EXPIRATION";
+  return (
+    t.direction === "DEBIT" &&
+    t.status === "COMPLETED" &&
+    t.transaction_type !== "EXPIRATION" &&
+    t.transaction_type !== "ACCOUNT_CLOSURE_FORFEIT"
+  );
 }
 
 function monthGroupLabel(iso: string): string {

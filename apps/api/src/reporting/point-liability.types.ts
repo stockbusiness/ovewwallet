@@ -13,6 +13,8 @@ export interface LiabilityMovement {
   used: string;
   /** 有効期限切れによる失効 (EXPIRATION)。 */
   expired: string;
+  /** 退会時の残高の放棄 (ACCOUNT_CLOSURE_FORFEIT)。失効とは分けて並べる。 */
+  forfeited: string;
   /** 発行の取消 (REVERSALのうちDEBIT側)。負債を減らす。 */
   reversedIssuance: string;
   /** 利用の取消 (REVERSALのうちCREDIT側)。負債を戻す。 */

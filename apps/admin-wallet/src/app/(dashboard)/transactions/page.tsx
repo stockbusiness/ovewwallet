@@ -35,6 +35,7 @@ const TRANSACTION_TYPE_OPTIONS = [
   "BLOCKCHAIN_MIGRATION",
   "MIGRATION_REVERSAL",
   "EXPIRATION",
+  "ACCOUNT_CLOSURE_FORFEIT",
 ];
 
 export default function TransactionsPage() {

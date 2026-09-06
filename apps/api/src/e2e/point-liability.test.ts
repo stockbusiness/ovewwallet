@@ -197,6 +197,38 @@ describe("ポイント負債レポート", () => {
       expect(grant.id).toBeDefined();
     });
 
+    it("退会による放棄は「利用」ではなく専用の欄に入る", async () => {
+      // 利用として数えると、使われていないORIが使われたことになり、負債の増減表が
+      // 実態とずれる (docs/account-closure.md)。
+      const walletId = await createWallet();
+      await creditWallet({
+        walletId,
+        amount: 3000,
+        transactionType: "ADMIN_GRANT",
+        idempotencyKey: generateId(),
+        displayName: "放棄テスト付与",
+        createdByType: "ADMIN",
+      });
+      const before = await thisMonth();
+
+      await debitWallet({
+        walletId,
+        amount: 3000,
+        transactionType: "ACCOUNT_CLOSURE_FORFEIT",
+        idempotencyKey: generateId(),
+        displayName: "退会による失効",
+        createdByType: "USER",
+      });
+
+      const after = await thisMonth();
+      expect(BigInt(after.movement.forfeited) - BigInt(before.movement.forfeited)).toBe(3000n);
+      expect(BigInt(after.movement.used) - BigInt(before.movement.used)).toBe(0n);
+      expect(BigInt(after.movement.expired) - BigInt(before.movement.expired)).toBe(0n);
+      // 検算 (期首 + 増減 = 期末) を狂わせないこと。放棄を差し引き忘れるとここに3000出る。
+      // 差異そのものは他のテストが作った分を含むため、この操作による増分で見る。
+      expect(BigInt(after.discrepancy) - BigInt(before.discrepancy)).toBe(0n);
+    });
+
     it("保留は増減表に載らない (発行にも利用にも入らない)", async () => {
       const walletId = await createWallet();
       await creditWallet({
@@ -378,6 +410,7 @@ describe("ポイント負債レポート", () => {
       expect(res.headers["content-type"]).toContain("text/csv");
       const lines = res.text.split("\r\n");
       expect(lines[0]).toContain("対象月");
+      expect(lines[0]).toContain("退会による放棄");
       expect(lines[0]).toContain("期末残高");
       expect(lines).toHaveLength(3); // ヘッダー + 2か月
     });

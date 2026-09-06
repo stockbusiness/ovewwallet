@@ -51,6 +51,7 @@ export const TRANSACTION_TYPE_LABEL: Record<string, string> = {
   RELEASE: "保留解除",
   CAMPAIGN_REWARD: "キャンペーン特典",
   EXPIRATION: "ORI失効",
+  ACCOUNT_CLOSURE_FORFEIT: "退会による失効",
   DAILY_LOGIN_BONUS: "継続ログインボーナス",
 };
 
