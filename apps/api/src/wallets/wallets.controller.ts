@@ -163,6 +163,7 @@ export class MeController {
     @Query("include_revoked") includeRevoked?: string,
     @Query("limit") limit?: string,
     @Query("cursor") cursor?: string,
+    @Query("kind") kind?: string,
   ) {
     if (!isFeatureEnabled("ENABLE_DIGITAL_COLLECTION")) {
       throw new ServiceUnavailableException(
@@ -173,6 +174,8 @@ export class MeController {
       includeRevoked: includeRevoked === "true",
       limit: limit ? Number(limit) : undefined,
       cursor,
+      // 未知の値は絞り込みなしとして扱う (エラーにして画面を止めない)。
+      kind: kind === "MEMBERSHIP_PASS" || kind === "DIGITAL_COLLECTIBLE" ? kind : undefined,
     });
   }
 

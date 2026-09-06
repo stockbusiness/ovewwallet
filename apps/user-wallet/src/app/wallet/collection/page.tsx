@@ -13,17 +13,29 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { CollectibleCardImage } from "@/components/CollectibleCardImage";
-import { apiFetch, ApiError, type CollectibleHoldingSummary } from "@/lib/api";
-import { collectibleStatusLabel } from "@/lib/collectible-status";
+import CollectibleGrid from "@/components/CollectibleGrid";
+import {
+  apiFetch,
+  ApiError,
+  COLLECTIBLE_KIND_LABEL,
+  type CollectibleHoldingKind,
+  type CollectibleHoldingSummary,
+} from "@/lib/api";
 
 const PAGE_SIZE = 20;
+
+/**
+ * 表示する種類。カードと会員券は性質が違う (会員券には期限がある) ので、
+ * 混ぜずに切り替えて出す。先方の希望でもある (2026-09-06)。
+ */
+const KINDS: CollectibleHoldingKind[] = ["DIGITAL_COLLECTIBLE", "MEMBERSHIP_PASS"];
 
 export default function CollectionListPage() {
   const router = useRouter();
   const [items, setItems] = useState<CollectibleHoldingSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [includeRevoked, setIncludeRevoked] = useState(false);
+  const [kind, setKind] = useState<CollectibleHoldingKind>("DIGITAL_COLLECTIBLE");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +45,7 @@ export default function CollectionListPage() {
       try {
         const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
         if (includeRevoked) params.set("include_revoked", "true");
+        params.set("kind", kind);
         if (opts.cursor) params.set("cursor", opts.cursor);
         const res = await apiFetch<{ items: CollectibleHoldingSummary[]; next_cursor: string | null }>(
           `/api/v1/me/collectibles?${params.toString()}`,
@@ -51,7 +64,7 @@ export default function CollectionListPage() {
         setError(err instanceof ApiError ? err.message : "読み込みに失敗しました");
       }
     },
-    [includeRevoked, router],
+    [includeRevoked, kind, router],
   );
 
   useEffect(() => {
@@ -77,6 +90,23 @@ export default function CollectionListPage() {
         <ThemeToggle className="h-8 w-8 border-none" />
       </header>
 
+      <div className="flex gap-2">
+        {KINDS.map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setKind(value)}
+            className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+              kind === value
+                ? "bg-sengoku-accent text-black"
+                : "border border-sengoku-border text-sengoku-muted"
+            }`}
+          >
+            {COLLECTIBLE_KIND_LABEL[value]}
+          </button>
+        ))}
+      </div>
+
       <button
         type="button"
         onClick={() => setIncludeRevoked((v) => !v)}
@@ -92,33 +122,11 @@ export default function CollectionListPage() {
 
       {!loading && !error && items.length === 0 && (
         <p className="rounded-xl border border-sengoku-border bg-sengoku-navy p-4 text-center text-xs text-sengoku-faint">
-          まだカードを保有していません
+          まだ{COLLECTIBLE_KIND_LABEL[kind]}を保有していません
         </p>
       )}
 
-      {!loading && !error && items.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          {items.map((item) => {
-            const label = collectibleStatusLabel(item.status);
-            return (
-              <Link
-                key={item.holding_id}
-                href={`/wallet/collection/${item.holding_id}`}
-                className="overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy"
-              >
-                <div className="relative aspect-square w-full">
-                  <CollectibleCardImage src={item.asset.thumbnail_url ?? item.asset.image_url} alt={item.asset.name} />
-                </div>
-                <div className="p-2">
-                  <p className="truncate text-sm font-semibold text-sengoku-text">{item.asset.name}</p>
-                  {item.serial_number && <p className="mt-0.5 text-[10px] text-sengoku-faint">#{item.serial_number}</p>}
-                  <p className="mt-1 text-[10px] text-sengoku-muted">{label.primary}</p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      {!loading && !error && items.length > 0 && <CollectibleGrid items={items} />}
 
       {nextCursor && (
         <button

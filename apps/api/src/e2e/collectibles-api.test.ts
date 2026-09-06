@@ -354,4 +354,70 @@ describe("NFTコレクション API (Phase 3)", () => {
       expect(log?.actorType).toBe("ADMIN");
     });
   });
+
+  describe("会員券と有効期限", () => {
+    it("種類で絞り込める (カードと会員券を混ぜない)", async () => {
+      const { cookie, oveAccountId } = await loginAsNewUser();
+      const asset = await createAsset();
+      await createHolding(oveAccountId, asset.id);
+      await createHolding(oveAccountId, asset.id, {
+        kind: "MEMBERSHIP_PASS",
+        logicalMarket: "membership-market",
+      });
+
+      const passes = await request(app.getHttpServer())
+        .get("/api/v1/me/collectibles?kind=MEMBERSHIP_PASS")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(passes.body.items).toHaveLength(1);
+      expect(passes.body.items[0].kind).toBe("MEMBERSHIP_PASS");
+
+      const cards = await request(app.getHttpServer())
+        .get("/api/v1/me/collectibles?kind=DIGITAL_COLLECTIBLE")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(cards.body.items).toHaveLength(1);
+      expect(cards.body.items[0].kind).toBe("DIGITAL_COLLECTIBLE");
+    });
+
+    it("期限を過ぎた会員券は is_expired が true になる", async () => {
+      // 期限切れは日付から都度求める。statusは書き換えない (取消とは別の事実なので)。
+      const { cookie, oveAccountId } = await loginAsNewUser();
+      const asset = await createAsset();
+      await createHolding(oveAccountId, asset.id, {
+        kind: "MEMBERSHIP_PASS",
+        logicalMarket: "membership-market",
+        validTo: new Date(Date.now() - 1000),
+      });
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/me/collectibles?kind=MEMBERSHIP_PASS")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.items[0].is_expired).toBe(true);
+      // 期限切れでも取り上げない。持っていた事実は残る。
+      expect(res.body.items[0].status).toBe("ACTIVE");
+    });
+
+    it("期限内・期限なしは is_expired が false になる", async () => {
+      const { cookie, oveAccountId } = await loginAsNewUser();
+      const asset = await createAsset();
+      await createHolding(oveAccountId, asset.id, {
+        kind: "MEMBERSHIP_PASS",
+        logicalMarket: "membership-market",
+        validTo: new Date(Date.now() + 86_400_000),
+      });
+      await createHolding(oveAccountId, asset.id, {
+        kind: "MEMBERSHIP_PASS",
+        logicalMarket: "membership-market",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get("/api/v1/me/collectibles?kind=MEMBERSHIP_PASS")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.items.every((i: { is_expired: boolean }) => i.is_expired === false)).toBe(true);
+    });
+  });
 });

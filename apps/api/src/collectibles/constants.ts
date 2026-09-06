@@ -11,6 +11,13 @@ export const SENGOKU_MARKET_SOURCE_SYSTEM_KEY = "sengoku-market";
 export const SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY = "sennokuni-nft-market";
 
 /**
+ * 会員券を扱う千ノ国マーケット (旧・戦国マーケット) の正式 source_system_key
+ * (5システム決定1)。上のNFTアートマーケットとは**別のマーケット**で、クローズドな
+ * 環境で会員券のNFTを売る。
+ */
+export const SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY = "sengoku-commerce";
+
+/**
  * `entitlement.granted`/`entitlement.revoked`を受理する source_system_key と、それが
  * 指す**論理Market**の対応。
  *
@@ -29,6 +36,10 @@ export const SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY = "sennokuni-nft-market";
 export const ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES: Record<string, string> = {
   [SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
   [SENGOKU_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
+  // 会員券の千ノ国マーケット。**論理Marketを別の値にしている。** 同じにすると
+  // ID空間を共有する前提になり、両者が同じ entitlement_id を採番したときに
+  // 他方の保有権を上書きしうる。
+  [SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY]: "membership-market",
 };
 
 /**
@@ -49,6 +60,32 @@ export const NFT_MARKET_SOURCE_SYSTEM_KEYS = new Set(
 export const KNOWN_COLLECTIBLE_REVOKE_REASON_CODES = new Set(["full_refund"]);
 
 export const DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE = "digital_collectible";
+
+/** 会員券。カードと同じ保有権の仕組みに乗せ、種類だけを分けて持つ。 */
+export const MEMBERSHIP_PASS_ENTITLEMENT_TYPE = "membership_pass";
+
+/**
+ * 正規化済みの entitlement_type → 保有権の種類。
+ *
+ * 会員券の種別値はウォレット側で決めてよい、と先方から回答を得ている
+ * (2026-09-06)。`MEMBERSHIP_PASS` を正式値とする。
+ */
+export const ENTITLEMENT_TYPE_TO_HOLDING_KIND: Record<
+  string,
+  "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS"
+> = {
+  [DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE]: "DIGITAL_COLLECTIBLE",
+  [MEMBERSHIP_PASS_ENTITLEMENT_TYPE]: "MEMBERSHIP_PASS",
+};
+
+/**
+ * マーケットごとに受け付ける保有権の種類。**アートマーケットから会員券は受け取らない。**
+ * 送信元を取り違えた設定ミスを、こちら側で気づけるようにするため。
+ */
+export const LOGICAL_MARKET_ALLOWED_KINDS: Record<string, ReadonlySet<string>> = {
+  "nft-art-market": new Set([DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE]),
+  "membership-market": new Set([MEMBERSHIP_PASS_ENTITLEMENT_TYPE]),
+};
 
 /**
  * 契約v2指示書23章。`entitlement.granted`/`entitlement.revoked`はat-least-once・順序保証

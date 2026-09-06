@@ -12,6 +12,7 @@ export interface ListMyCollectiblesParams {
   includeRevoked: boolean;
   limit?: number;
   cursor?: string;
+  kind?: "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
 }
 
 /**
@@ -41,6 +42,7 @@ export class CollectiblesQueryService {
     const rows = await this.holdings.listForAccount({
       oveAccountId,
       includeRevoked: params.includeRevoked,
+      kind: params.kind,
       limit: limit + 1,
       cursor: params.cursor,
     });
@@ -88,6 +90,13 @@ export class CollectiblesQueryService {
       // 表示しない。フロントエンドはrevoke_reason_codeを固定文言表(collectible-revoke-reason.ts)
       // へマッピングして表示する(未知コードは汎用文言へフォールバック)。
       revoke_reason_code: holding.revokeReasonCode,
+      // カードと会員券は画面で分けて出す (docs/collectible-multi-market.md)。
+      kind: holding.kind,
+      valid_from: holding.validFrom,
+      valid_to: holding.validTo,
+      // **期限切れは日付から都度求める。** statusを書き換えていないのは、取消と
+      // 期限切れが別の事実で、時間の経過だけで状態が変わる更新を持ちたくないため。
+      is_expired: isExpired(holding.validTo),
       asset: {
         asset_code: holding.asset.assetCode,
         name: holding.displayNameSnapshot ?? holding.asset.name,
@@ -109,4 +118,9 @@ export class CollectiblesQueryService {
       },
     };
   }
+}
+
+/** 有効期限を過ぎているか。期限なし (null) は常に false。 */
+function isExpired(validTo: Date | null, now: Date = new Date()): boolean {
+  return validTo !== null && validTo.getTime() <= now.getTime();
 }

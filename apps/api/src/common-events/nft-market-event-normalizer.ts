@@ -10,6 +10,9 @@ export { NFT_MARKET_WALLET_TARGET_SITE_KEY };
 const NFT_MARKET_ENTITLEMENT_TYPE_ALIASES: Record<string, string> = {
   DIGITAL_COLLECTIBLE: "digital_collectible",
   digital_collectible: "digital_collectible",
+  // 会員券 (千ノ国マーケット)。種別値はウォレット側で決めてよいと回答を得ている。
+  MEMBERSHIP_PASS: "membership_pass",
+  membership_pass: "membership_pass",
 };
 
 /** 指示書17章「対象」5フィールド。 */

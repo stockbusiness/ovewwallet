@@ -29,6 +29,9 @@ export interface CreateCollectibleHoldingParams {
   raritySnapshot?: string | null;
   /** PR#2最終修正 P1-4: マーケット側の不変値。未送信ならnull。 */
   serialNumber?: string | null;
+  kind?: "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
+  validFrom?: Date | null;
+  validTo?: Date | null;
 }
 
 export interface ListMyHoldingsParams {
@@ -37,6 +40,8 @@ export interface ListMyHoldingsParams {
   limit: number;
   /** 前ページ最後のholding.id (キーセットページネーション)。 */
   cursor?: string;
+  /** カードだけ・会員券だけを出すための絞り込み (docs/collectible-multi-market.md)。 */
+  kind?: "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
 }
 
 export interface AdminListHoldingsParams {
@@ -187,6 +192,7 @@ export class CollectibleHoldingsRepository {
       where: {
         oveAccountId: params.oveAccountId,
         status: params.includeRevoked ? undefined : "ACTIVE",
+        kind: params.kind,
       },
       include: HOLDING_WITH_ASSET_INCLUDE,
       orderBy: [{ acquiredAt: "desc" }, { id: "desc" }],

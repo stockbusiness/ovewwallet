@@ -13,7 +13,9 @@ import {
 import type { z } from "zod";
 import { CollectibleImagesService } from "../../collectible-images/collectible-images.service";
 import {
-  DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE,
+  ENTITLEMENT_TYPE_TO_HOLDING_KIND,
+  LOGICAL_MARKET_ALLOWED_KINDS,
+  logicalMarketFor,
   NFT_MARKET_SOURCE_SYSTEM_KEYS,
 } from "../../collectibles/constants";
 import { GrantCollectibleUseCase } from "../../collectibles/grant-collectible.use-case";
@@ -37,8 +39,6 @@ import {
 
 type EntitlementGrantedBody = z.infer<typeof EntitlementGrantedEventSchema>;
 
-const EXPECTED_ENTITLEMENT_TYPE = DIGITAL_COLLECTIBLE_ENTITLEMENT_TYPE;
-
 interface CardMetadata {
   assetCode: string;
   name: string;
@@ -48,6 +48,11 @@ interface CardMetadata {
   imageHash?: string;
   rarity?: string;
   serialNumber?: string;
+  /** カードか会員券か。マーケットから来た entitlement_type を正規化した値。 */
+  kind: "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
+  /** 会員券の有効期間。期限のないもの・カードはnull。 */
+  validFrom: Date | null;
+  validTo: Date | null;
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -68,17 +73,23 @@ function requireValidImageUrl(url: string, field: string): void {
   }
 }
 
-function extractCardMetadata(body: CommonEventBody): CardMetadata {
+function extractCardMetadata(body: CommonEventBody, logicalMarket: string): CardMetadata {
   const metadata =
     (body.metadata as Record<string, unknown> | null | undefined) ?? {};
   // 契約v2指示書18章。新Market`DIGITAL_COLLECTIBLE`と旧`digital_collectible`の両方を受理し
   // 内部正式値へ正規化する。未知のtypeは拒否する (勝手にlowercaseして受理しない)。
-  if (
-    normalizeEntitlementType(metadata["entitlement_type"]) !==
-    EXPECTED_ENTITLEMENT_TYPE
-  ) {
+  const entitlementType = normalizeEntitlementType(metadata["entitlement_type"]);
+  if (entitlementType === null) {
     throw new BadRequestException(
-      `metadata.entitlement_type must be "DIGITAL_COLLECTIBLE" or "${EXPECTED_ENTITLEMENT_TYPE}"`,
+      "metadata.entitlement_type must be \"DIGITAL_COLLECTIBLE\" or \"MEMBERSHIP_PASS\"",
+    );
+  }
+  // マーケットごとに受け付ける種類を絞る。アートマーケットの鍵で会員券が送られてきたら、
+  // 送信元かカード側の設定を取り違えている。こちらで気づけるようにする。
+  const allowed = LOGICAL_MARKET_ALLOWED_KINDS[logicalMarket];
+  if (allowed && !allowed.has(entitlementType)) {
+    throw new BadRequestException(
+      `metadata.entitlement_type "${entitlementType}" is not accepted from this market ("${logicalMarket}")`,
     );
   }
 
@@ -106,7 +117,25 @@ function extractCardMetadata(body: CommonEventBody): CardMetadata {
     // PR#2最終修正 P1-4: serial_numberはマーケット側の値をそのまま保存する不変値
     // (数値ではなく"0034"のような桁固定表記もあるため文字列として扱う)。
     serialNumber: optionalString(metadata["serial_number"]),
+    kind: ENTITLEMENT_TYPE_TO_HOLDING_KIND[entitlementType]!,
+    // 会員券には期限のあるものと無いものがある (先方回答 2026-09-06)。
+    // 未送信ならnullのままで、期限なしとして扱う。
+    validFrom: optionalDate(body.valid_from, "valid_from"),
+    validTo: optionalDate(body.valid_to, "valid_to"),
   };
+}
+
+/** 日付として読めない値は捨てずに拒否する。期限を黙って落とすと期限なしになってしまう。 */
+function optionalDate(raw: unknown, field: string): Date | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw !== "string") {
+    throw new BadRequestException(`${field} must be an ISO 8601 string`);
+  }
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`${field} is not a valid ISO 8601 datetime`);
+  }
+  return parsed;
 }
 
 /**
@@ -142,6 +171,10 @@ export class EntitlementGrantedHandler implements CommonEventHandler<Entitlement
         `entitlement.granted must originate from a known NFT market source_system_key (authenticated source: "${context.authenticatedSourceSystemKey}")`,
       );
     }
+    // 送信元が指す論理Market。上のガードを通っている以上必ず引けるが、`extractCardMetadata`
+    // で「このマーケットから受け付ける種類か」を見るために取っておく。
+    const logicalMarket = logicalMarketFor(context.authenticatedSourceSystemKey)!;
+
     // 契約v2指示書19章。target_site_keyが付与されていれば、このWallet宛てかを検証する。
     assertTargetSiteKeyMatchesWallet(body);
 
@@ -169,7 +202,10 @@ export class EntitlementGrantedHandler implements CommonEventHandler<Entitlement
       imageHash,
       rarity,
       serialNumber,
-    } = extractCardMetadata(body);
+      kind,
+      validFrom,
+      validTo,
+    } = extractCardMetadata(body, logicalMarket);
 
     const resolved = await this.accountResolver.resolveByCommonUserId(
       envelope.common_user_id,
@@ -221,6 +257,9 @@ export class EntitlementGrantedHandler implements CommonEventHandler<Entitlement
       imageHash,
       rarity,
       serialNumber,
+      kind,
+      validFrom,
+      validTo,
       productCode: envelope.product_code,
       sourceSystemKey: context.authenticatedSourceSystemKey,
       orderId: envelope.order_id,
