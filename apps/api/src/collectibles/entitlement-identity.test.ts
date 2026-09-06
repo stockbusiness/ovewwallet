@@ -3,7 +3,8 @@ import {
   LOGICAL_MARKET_ALLOWED_KINDS,
   logicalMarketFor,
   NFT_MARKET_SOURCE_SYSTEM_KEYS,
-  SENGOKU_MARKET_SOURCE_SYSTEM_KEY,
+  SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY,
+  SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY,
   SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY,
 } from "./constants";
 
@@ -12,11 +13,19 @@ import {
  * 回帰テスト。
  */
 describe("logicalMarketFor", () => {
-  it("同一マーケットの新旧表記は同じ論理Marketへ寄る", () => {
+  it("同一マーケットの2つの表記は同じ論理Marketへ寄る", () => {
     // 片方で付与しもう片方で取消しても一致として扱えるようにするため。
-    expect(logicalMarketFor(SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY)).toBe(
-      logicalMarketFor(SENGOKU_MARKET_SOURCE_SYSTEM_KEY),
+    // 会員券マーケットは、先方の既存値と文書上の正式値の2つを受け付ける。
+    expect(logicalMarketFor(SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY)).toBe(
+      logicalMarketFor(SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY),
     );
+  });
+
+  it("sengoku-market は会員券マーケットを指す (NFTアートではない)", () => {
+    // 2026-09-06に帰属を移した。取り違えると、会員券がNFTアート側のID空間へ
+    // 入り込む (docs/collectible-multi-market.md)。
+    expect(logicalMarketFor(SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY)).toBe("membership-market");
+    expect(logicalMarketFor(SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY)).toBe("nft-art-market");
   });
 
   it("受理しない送信元では null を返す", () => {
@@ -49,9 +58,9 @@ describe("entitlementAdvisoryLockKey", () => {
     );
   });
 
-  it("同一マーケットの新旧表記では同じキーになる", () => {
-    const a = logicalMarketFor(SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY)!;
-    const b = logicalMarketFor(SENGOKU_MARKET_SOURCE_SYSTEM_KEY)!;
+  it("同一マーケットの2つの表記では同じキーになる", () => {
+    const a = logicalMarketFor(SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY)!;
+    const b = logicalMarketFor(SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY)!;
     expect(entitlementAdvisoryLockKey(a, "ent_1")).toBe(entitlementAdvisoryLockKey(b, "ent_1"));
   });
 

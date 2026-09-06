@@ -3,7 +3,7 @@
   "event_type": "entitlement.revoked",
   "event_version": "1.0",
   "occurred_at": "2026-07-25T00:10:00Z",
-  "source_system_key": "sengoku-market",
+  "source_system_key": "sennokuni-nft-market",
   "common_user_id": "cu_xxx",
   "source_user_id": "market-user-id",
   "order_id": "order-id",
