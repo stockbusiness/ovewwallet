@@ -19,6 +19,11 @@ export interface GrantCollectibleParams {
   rarity?: string | null;
   /** PR#2最終修正 P1-4: マーケット側の不変値。未送信ならnull。 */
   serialNumber?: string | null;
+  /** カードか会員券か (docs/collectible-multi-market.md)。 */
+  kind?: "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
+  /** 会員券の有効期間。期限のないもの・カードはnull。 */
+  validFrom?: Date | null;
+  validTo?: Date | null;
   sourceSystemKey: string;
   orderId?: string | null;
   orderItemId?: string | null;
@@ -173,34 +178,7 @@ export class GrantCollectibleUseCase {
         }
 
         const holding = await this.holdings.create(
-          {
-            id: generateId(),
-            oveAccountId: params.oveAccountId,
-            collectibleAssetId: asset.id,
-            entitlementId: params.entitlementId,
-            sourceSystemKey: params.sourceSystemKey,
-            logicalMarket,
-            orderId: params.orderId,
-            orderItemId: params.orderItemId,
-            acquiredAt: params.acquiredAt,
-            // PR#2最終修正 P1-3: 専用snapshot列を表示用の主データとする。metadataは
-            // 専用列導入以前からの非公式スナップショットとして引き続き書き込む
-            // (破壊的変更禁止、後方互換のため)。
-            displayNameSnapshot: params.name,
-            descriptionSnapshot: params.description ?? null,
-            imageUrlSnapshot: params.imageUrl,
-            thumbnailUrlSnapshot: params.thumbnailUrl ?? null,
-            imageHashSnapshot: params.imageHash ?? null,
-            raritySnapshot: params.rarity ?? null,
-            serialNumber: params.serialNumber ?? null,
-            metadata: {
-              assetCode: params.assetCode,
-              name: params.name,
-              imageUrl: params.imageUrl,
-              thumbnailUrl: params.thumbnailUrl ?? null,
-              rarity: params.rarity ?? null,
-            } as unknown as Prisma.InputJsonValue,
-          },
+          holdingCreateInput(params, asset.id, logicalMarket),
           tx,
         );
 
@@ -277,4 +255,46 @@ export class GrantCollectibleUseCase {
 
     return { status: "conflict", existingHolding: existing };
   }
+}
+
+/**
+ * 保有権の作成内容。`execute`の中に直接書くと、既定値の`??`が積み上がって
+ * 分岐が読みにくくなるため切り出している。
+ */
+function holdingCreateInput(
+  params: GrantCollectibleParams,
+  collectibleAssetId: string,
+  logicalMarket: string,
+) {
+  return {
+    id: generateId(),
+    oveAccountId: params.oveAccountId,
+    collectibleAssetId,
+    entitlementId: params.entitlementId,
+    sourceSystemKey: params.sourceSystemKey,
+    logicalMarket,
+    orderId: params.orderId,
+    orderItemId: params.orderItemId,
+    acquiredAt: params.acquiredAt,
+    // PR#2最終修正 P1-3: 専用snapshot列を表示用の主データとする。metadataは
+    // 専用列導入以前からの非公式スナップショットとして引き続き書き込む
+    // (破壊的変更禁止、後方互換のため)。
+    displayNameSnapshot: params.name,
+    descriptionSnapshot: params.description ?? null,
+    imageUrlSnapshot: params.imageUrl,
+    thumbnailUrlSnapshot: params.thumbnailUrl ?? null,
+    imageHashSnapshot: params.imageHash ?? null,
+    raritySnapshot: params.rarity ?? null,
+    serialNumber: params.serialNumber ?? null,
+    kind: params.kind ?? ("DIGITAL_COLLECTIBLE" as const),
+    validFrom: params.validFrom ?? null,
+    validTo: params.validTo ?? null,
+    metadata: {
+      assetCode: params.assetCode,
+      name: params.name,
+      imageUrl: params.imageUrl,
+      thumbnailUrl: params.thumbnailUrl ?? null,
+      rarity: params.rarity ?? null,
+    } as unknown as Prisma.InputJsonValue,
+  };
 }

@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CollectibleCardImage } from "@/components/CollectibleCardImage";
-import { apiFetch, ApiError, type CollectibleHoldingSummary } from "@/lib/api";
+import CollectibleValidityRows, {
+  CollectibleExpiredBanner,
+} from "@/components/CollectibleValidityRows";
+import {
+  apiFetch,
+  ApiError,
+  COLLECTIBLE_KIND_LABEL,
+  type CollectibleHoldingSummary,
+} from "@/lib/api";
 import { resolveRevokeReasonDisplay } from "@/lib/collectible-revoke-reason";
 import { collectibleStatusLabel } from "@/lib/collectible-status";
 
@@ -97,7 +105,10 @@ export default function CollectionDetailPage() {
         </section>
       )}
 
+      <CollectibleExpiredBanner item={item} />
+
       <section className="divide-y divide-sengoku-border overflow-hidden rounded-xl border border-sengoku-border bg-sengoku-navy">
+        <DetailRow label="種類" value={COLLECTIBLE_KIND_LABEL[item.kind]} />
         <DetailRow label="ステータス" value={label.primary} />
         {label.secondary && (
           <DetailRow label="Mint状態" value={label.secondary} />
@@ -106,6 +117,7 @@ export default function CollectionDetailPage() {
           label="取得日"
           value={new Date(item.acquired_at).toLocaleString("ja-JP")}
         />
+        <CollectibleValidityRows item={item} Row={DetailRow} />
         {item.asset.category && (
           <DetailRow label="カテゴリ" value={item.asset.category} />
         )}

@@ -1,5 +1,6 @@
 import {
   entitlementAdvisoryLockKey,
+  LOGICAL_MARKET_ALLOWED_KINDS,
   logicalMarketFor,
   NFT_MARKET_SOURCE_SYSTEM_KEYS,
   SENGOKU_MARKET_SOURCE_SYSTEM_KEY,
@@ -19,8 +20,8 @@ describe("logicalMarketFor", () => {
   });
 
   it("受理しない送信元では null を返す", () => {
-    // 会員券の千ノ国マーケット (sengoku-commerce) はまだ受け口を開けていない。
-    expect(logicalMarketFor("sengoku-commerce")).toBeNull();
+    // 会員券の千ノ国マーケットは別の論理Marketとして受け付ける (下のdescribe参照)。
+    expect(logicalMarketFor("unknown-market")).toBeNull();
     expect(logicalMarketFor("agency-system")).toBeNull();
     expect(logicalMarketFor("")).toBeNull();
   });
@@ -57,5 +58,32 @@ describe("entitlementAdvisoryLockKey", () => {
   it("マーケット名とIDの区切りが曖昧にならない", () => {
     // 区切りを入れずに連結すると "ab"+"c" と "a"+"bc" が同じキーになる。
     expect(entitlementAdvisoryLockKey("ab", "c")).not.toBe(entitlementAdvisoryLockKey("a", "bc"));
+  });
+});
+
+describe("会員券の千ノ国マーケット", () => {
+  it("NFTアートマーケットとは別の論理Marketになる", () => {
+    // 同じ値にするとID空間を共有する前提になり、両者が同じ entitlement_id を
+    // 採番したときに他方の保有権を上書きしうる (docs/collectible-multi-market.md)。
+    expect(logicalMarketFor("sengoku-commerce")).toBe("membership-market");
+    expect(logicalMarketFor("sengoku-commerce")).not.toBe(
+      logicalMarketFor("sennokuni-nft-market"),
+    );
+  });
+
+  it("ロックキーがマーケットごとに分かれる", () => {
+    expect(entitlementAdvisoryLockKey("membership-market", "ent-1")).not.toBe(
+      entitlementAdvisoryLockKey("nft-art-market", "ent-1"),
+    );
+  });
+
+  it("マーケットごとに受け付ける種類が分かれている", () => {
+    // アートマーケットの鍵で会員券を送られたら、送信元かカード側の設定の
+    // 取り違えなので受け付けない。
+    expect(LOGICAL_MARKET_ALLOWED_KINDS["nft-art-market"]?.has("membership_pass")).toBe(false);
+    expect(LOGICAL_MARKET_ALLOWED_KINDS["membership-market"]?.has("membership_pass")).toBe(true);
+    expect(LOGICAL_MARKET_ALLOWED_KINDS["membership-market"]?.has("digital_collectible")).toBe(
+      false,
+    );
   });
 });

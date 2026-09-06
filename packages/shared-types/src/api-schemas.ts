@@ -191,6 +191,8 @@ export const CommonEventBodySchema = z
     entitlement_id: z.string().max(255).nullable().optional(),
     quantity: z.number().nullable().optional(),
     valid_from: z.string().nullable().optional(),
+    /** 会員券の有効期限 (docs/collectible-multi-market.md)。期限のないものは未送信。 */
+    valid_to: z.string().nullable().optional(),
     valid_until: z.string().nullable().optional(),
     correlation_id: z.string().max(255).nullable().optional(),
     /**

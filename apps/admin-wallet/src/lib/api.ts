@@ -530,12 +530,24 @@ export type CollectibleHoldingStatus =
   | "BURNED"
   | "ERROR";
 
+export type CollectibleHoldingKind = "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
+
+export const COLLECTIBLE_KIND_LABEL: Record<CollectibleHoldingKind, string> = {
+  DIGITAL_COLLECTIBLE: "カード",
+  MEMBERSHIP_PASS: "会員券",
+};
+
 export interface CollectibleHoldingItem {
   id: string;
   oveAccountId: string;
   collectibleAssetId: string;
   entitlementId: string;
   sourceSystemKey: string;
+  /** カードか会員券か (docs/collectible-multi-market.md)。 */
+  kind: CollectibleHoldingKind;
+  /** 会員券の有効期間。期限のないもの・カードは null。 */
+  validFrom: string | null;
+  validTo: string | null;
   orderId: string | null;
   orderItemId: string | null;
   acquiredAt: string;

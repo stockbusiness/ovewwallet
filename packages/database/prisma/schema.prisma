@@ -1364,6 +1364,15 @@ enum CollectibleHoldingStatus {
   ERROR
 }
 
+/// 保有権の種類。マーケットの `metadata.entitlement_type` を正規化した値
+/// (docs/collectible-multi-market.md)。
+enum CollectibleHoldingKind {
+  /// アート作品などのデジタルカード。
+  DIGITAL_COLLECTIBLE
+  /// 会員券。有効期限を持つものがある。
+  MEMBERSHIP_PASS
+}
+
 /// カードのマスターデータ。同じ`assetCode`を複数ユーザーが保有しうる
 /// (`CollectibleHolding`側で保有者ごとに行を分ける)。
 model CollectibleAsset {
@@ -1445,6 +1454,16 @@ model CollectibleHolding {
   /// 動的COUNTによる算出 (旧`countAcquiredBeforeOrAt`) は他Holdingの増減で値が変動する
   /// ため廃止した。
   serialNumber         String? @map("serial_number")
+
+  /// 保有権の種類 (docs/collectible-multi-market.md)。カード (DIGITAL_COLLECTIBLE) と
+  /// 会員券 (MEMBERSHIP_PASS) を画面で分けて出すために持つ。
+  kind CollectibleHoldingKind @default(DIGITAL_COLLECTIBLE)
+
+  /// 有効期間。会員券のうち期限のあるものだけが入る (期限のない会員券・カードはnull)。
+  /// **期限切れは日付から都度判定する。** status を書き換えないのは、取消 (REVOKED) と
+  /// 期限切れが別の事実で、時間の経過だけで状態が変わる更新を持ちたくないため。
+  validFrom DateTime? @map("valid_from")
+  validTo   DateTime? @map("valid_to")
 
   // --- 将来Mint項目 (指示書18章)。MVPでは書き込まない。すべてnullableのまま。 ---
   network         String?

@@ -190,6 +190,13 @@ export type CollectibleHoldingStatus =
   | "BURNED"
   | "ERROR";
 
+export type CollectibleHoldingKind = "DIGITAL_COLLECTIBLE" | "MEMBERSHIP_PASS";
+
+export const COLLECTIBLE_KIND_LABEL: Record<CollectibleHoldingKind, string> = {
+  DIGITAL_COLLECTIBLE: "カード",
+  MEMBERSHIP_PASS: "会員券",
+};
+
 export interface CollectibleAssetSummary {
   asset_code: string;
   name: string;
@@ -221,6 +228,13 @@ export interface CollectibleHoldingSummary {
   // PR-W3-a: 外部システムからの自由記述は通常のAPIから返らない。
   // revoke_reason_codeを固定文言表(collectible-revoke-reason.ts)へマッピングして表示する。
   revoke_reason_code: string | null;
+  /** カードか会員券か (docs/collectible-multi-market.md)。画面で分けて出す。 */
+  kind: CollectibleHoldingKind;
+  /** 会員券の有効期間。期限のないもの・カードは null。 */
+  valid_from: string | null;
+  valid_to: string | null;
+  /** 有効期限を過ぎているか。サーバー側で日付から判定した結果。 */
+  is_expired: boolean;
   asset: CollectibleAssetSummary;
   onchain: CollectibleOnchainInfo;
 }

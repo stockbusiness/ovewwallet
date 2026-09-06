@@ -15,7 +15,7 @@ import {
 const ENDPOINT = "/api/integrations/events";
 const SENGOKU_MARKET = "sengoku-market";
 const SENNOKUNI_NFT_MARKET = "sennokuni-nft-market";
-const SENGOKU_COMMERCE = "sengoku-commerce"; // 戦国マーケットの正式source_system_key(5システム決定1)。entitlement系では常に拒否される想定。
+const SENGOKU_COMMERCE = "sengoku-commerce"; // 会員券の千ノ国マーケット。NFTアートマーケットとは別の論理Market。
 
 /**
  * PR-W3-a: 千ノ国NFTマーケット契約M3a (event_version 1.1) と、PR-W3-aで追加した
@@ -388,31 +388,124 @@ describe("共通イベント: entitlement.granted / entitlement.revoked (PR-W3-a
   });
 
   describe("Market別名の信頼境界", () => {
-    it("戦国マーケットの正式source_system_key(sengoku-commerce)からのentitlement.grantedは拒否される", async () => {
+    it("会員券マーケットからカード(digital_collectible)は受け取らない", async () => {
+      // 送信元かカード側の設定を取り違えている。こちらで気づけるようにする。
       const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
       const { commonUserId } = await createAccountWithCommonUserId();
       const body = grantedBodyV1_1(commonUserId, {
         source_system_key: SENGOKU_COMMERCE,
       });
-      await postEvent(body, key).expect(400);
+      const res = await postEvent(body, key).expect(400);
+      expect(JSON.stringify(res.body)).toContain("not accepted from this market");
     });
 
-    it("戦国マーケットの正式source_system_key(sengoku-commerce)からのentitlement.revokedは拒否される(403、source_conflict)", async () => {
+    it("会員券マーケットからの取消は、NFTアートマーケットのカードに影響しない", async () => {
+      // 保有権の同一性は論理Market単位なので、別マーケットが同じ entitlement_id を
+      // 名指ししても他方のカードは取り消されない (docs/collectible-multi-market.md)。
       const { commonUserId } = await createAccountWithCommonUserId();
       const entitlementId = await grantActiveHolding(commonUserId);
       const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
       const body = revokedBodyV1_1(entitlementId, commonUserId, {
         source_system_key: SENGOKU_COMMERCE,
       });
-      const res = await postEvent(body, key).expect(403);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error.code).toBe("FORBIDDEN");
+      await postEvent(body, key).expect(201);
 
-      // Holdingは変更されず、ACTIVEのままであることを確認する(誤って別Marketが取消せない)。
       const holding = await prisma.collectibleHolding.findFirstOrThrow({
-        where: { entitlementId },
+        where: { logicalMarket: "nft-art-market", entitlementId },
       });
       expect(holding.status).toBe("ACTIVE");
+      expect(holding.revokedAt).toBeNull();
+    });
+  });
+
+  describe("会員券 (千ノ国マーケット)", () => {
+    /** 会員券のイベント。期限は呼び出し側で足す (期限のあるもの・無いものの両方があるため)。 */
+    function membershipBody(commonUserId: string, overrides: Record<string, unknown> = {}) {
+      return grantedBodyV1_1(commonUserId, {
+        source_system_key: SENGOKU_COMMERCE,
+        metadata: {
+          entitlement_type: "MEMBERSHIP_PASS",
+          asset_code: `PASS-${generateId()}`,
+          name: "千ノ国 会員券",
+          image_url: "https://example.com/passes/gold.png",
+        },
+        ...overrides,
+      });
+    }
+
+    it("有効期限つきの会員券を受け取り、期限を保存する", async () => {
+      const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const validTo = "2099-03-31T14:59:59.000Z";
+      const body = membershipBody(commonUserId, {
+        valid_from: "2026-04-01T00:00:00.000Z",
+        valid_to: validTo,
+      });
+      await postEvent(body, key).expect(201);
+
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
+        where: { logicalMarket: "membership-market", entitlementId: body.data.entitlement_id },
+      });
+      expect(holding.kind).toBe("MEMBERSHIP_PASS");
+      expect(holding.validTo?.toISOString()).toBe(validTo);
+      expect(holding.status).toBe("ACTIVE");
+    });
+
+    it("期限のない会員券も受け取れる", async () => {
+      // 種類によって期限のないものもある (先方回答 2026-09-06)。
+      const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const body = membershipBody(commonUserId);
+      await postEvent(body, key).expect(201);
+
+      const holding = await prisma.collectibleHolding.findFirstOrThrow({
+        where: { logicalMarket: "membership-market", entitlementId: body.data.entitlement_id },
+      });
+      expect(holding.kind).toBe("MEMBERSHIP_PASS");
+      expect(holding.validTo).toBeNull();
+    });
+
+    it("日付として読めない期限は拒否する (黙って期限なしにしない)", async () => {
+      const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const body = membershipBody(commonUserId, { valid_to: "2026年3月31日" });
+      await postEvent(body, key).expect(400);
+    });
+
+    it("NFTアートマーケットから会員券は受け取らない", async () => {
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const body = grantedBodyV1_1(commonUserId, {
+        metadata: {
+          entitlement_type: "MEMBERSHIP_PASS",
+          asset_code: `PASS-${generateId()}`,
+          name: "紛れ込んだ会員券",
+          image_url: "https://example.com/passes/x.png",
+        },
+      });
+      const res = await postEvent(body).expect(400);
+      expect(JSON.stringify(res.body)).toContain("not accepted from this market");
+    });
+
+    it("両マーケットが同じ entitlement_id を採番しても別々の保有権になる", async () => {
+      const key = await createTestCommonEventSigningKey(SENGOKU_COMMERCE);
+      const { commonUserId } = await createAccountWithCommonUserId();
+      const shared = `ent_shared_${generateId()}`;
+
+      const card = grantedBodyV1_1(commonUserId);
+      card.data.entitlement_id = shared;
+      await postEvent(card).expect(201);
+
+      const pass = membershipBody(commonUserId);
+      pass.data.entitlement_id = shared;
+      await postEvent(pass, key).expect(201);
+
+      const rows = await prisma.collectibleHolding.findMany({
+        where: { entitlementId: shared },
+        orderBy: { logicalMarket: "asc" },
+      });
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.logicalMarket)).toEqual(["membership-market", "nft-art-market"]);
+      expect(rows.map((r) => r.kind)).toEqual(["MEMBERSHIP_PASS", "DIGITAL_COLLECTIBLE"]);
     });
   });
 });
