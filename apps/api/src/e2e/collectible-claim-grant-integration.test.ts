@@ -10,7 +10,8 @@ import { AppModule } from "../app.module";
 import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import { createTestCommonEventSigningKey, commonEventSignedHeaders, type TestCommonEventSigningKey } from "./test-helpers";
 
-const SENGOKU_MARKET = "sengoku-market";
+// 千ノ国NFTマーケットの正式値。`sengoku-market` は会員券マーケットへ移した。
+const SENGOKU_MARKET = "sennokuni-nft-market";
 const EVENTS_ENDPOINT = "/api/integrations/events";
 
 /**

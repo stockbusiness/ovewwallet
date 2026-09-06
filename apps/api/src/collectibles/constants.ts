@@ -3,17 +3,27 @@
  * metadata.entitlement_type検証で共有する定数。common-events配下のハンドラと
  * collectibles配下のUseCaseの双方から参照するため、両者が依存できるこの層に置く。
  *
- * 千ノ国NFTマーケット契約v2指示書15章: 正式値は`sennokuni-nft-market`。
- * `sengoku-market`は旧接続が必要な間だけのLegacy値として引き続き許可する
- * (Legacy廃止時期は別途決定、単一文字列のハードコードを避けるためSetにする)。
+ * `sengoku-market` の帰属を移した (2026-09-06)。もともとは千ノ国NFTマーケットの
+ * Legacy表記として `nft-art-market` へ寄せていたが、**会員券の千ノ国マーケットが
+ * 全連携先で共通して使っている既存値がこれ**だと分かったため、そちら側へ渡した。
+ *
+ * 移せた理由は、この時点で `sengoku-market` 由来の保有権が1件も無かったこと。
+ * entitlementの受信を本番で開けたのが同日で、かつ署名鍵を未発行だったため、どの
+ * マーケットからも1件も届いていない。データを壊さずに入れ替えられる最後の機会だった。
+ *
+ * 千ノ国NFTマーケット側は正式値 `sennokuni-nft-market` の1本になる (契約v2指示書15章の
+ * 正式値そのもので、`sengoku-market` は元から旧称扱いだった)。
  */
-export const SENGOKU_MARKET_SOURCE_SYSTEM_KEY = "sengoku-market";
+export const SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY = "sengoku-market";
 export const SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY = "sennokuni-nft-market";
 
 /**
  * 会員券を扱う千ノ国マーケット (旧・戦国マーケット) の正式 source_system_key
  * (5システム決定1)。上のNFTアートマーケットとは**別のマーケット**で、クローズドな
- * 環境で会員券のNFTを売る。
+ * 環境で会員券を売る。
+ *
+ * 先方の実装は `sengoku-market` を送るため、実際に使われるのは上の Legacy 値の方に
+ * なる見込み。**両方受け付ける**ことで、先方が送信値を変えずに済むようにしている。
  */
 export const SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY = "sengoku-commerce";
 
@@ -35,11 +45,14 @@ export const SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY = "sengoku-commerce";
  */
 export const ENTITLEMENT_SOURCE_SYSTEM_KEY_ALIASES: Record<string, string> = {
   [SENNOKUNI_NFT_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
-  [SENGOKU_MARKET_SOURCE_SYSTEM_KEY]: "nft-art-market",
   // 会員券の千ノ国マーケット。**論理Marketを別の値にしている。** 同じにすると
   // ID空間を共有する前提になり、両者が同じ entitlement_id を採番したときに
   // 他方の保有権を上書きしうる。
+  //
+  // 2つの値が同じマーケットを指すのは、先方の既存実装が `sengoku-market` を送り、
+  // 文書上の正式値が `sengoku-commerce` であるため。どちらでも通るようにしてある。
   [SENNOKUNI_COMMERCE_SOURCE_SYSTEM_KEY]: "membership-market",
+  [SENNOKUNI_COMMERCE_LEGACY_SOURCE_SYSTEM_KEY]: "membership-market",
 };
 
 /**

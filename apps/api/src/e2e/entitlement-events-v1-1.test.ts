@@ -13,7 +13,8 @@ import {
 } from "./test-helpers";
 
 const ENDPOINT = "/api/integrations/events";
-const SENGOKU_MARKET = "sengoku-market";
+// 千ノ国NFTマーケットの正式値。`sengoku-market` は会員券マーケットへ移した。
+const SENGOKU_MARKET = "sennokuni-nft-market";
 const SENNOKUNI_NFT_MARKET = "sennokuni-nft-market";
 const SENGOKU_COMMERCE = "sengoku-commerce"; // 会員券の千ノ国マーケット。NFTアートマーケットとは別の論理Market。
 

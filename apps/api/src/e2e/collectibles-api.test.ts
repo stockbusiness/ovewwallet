@@ -79,7 +79,7 @@ describe("NFTコレクション API (Phase 3)", () => {
         oveAccountId,
         collectibleAssetId: assetId,
         entitlementId: `ent_api_${generateId()}`,
-        sourceSystemKey: "sengoku-market",
+        sourceSystemKey: "sennokuni-nft-market",
         logicalMarket: "nft-art-market",
         acquiredAt: new Date(),
         ...overrides,
