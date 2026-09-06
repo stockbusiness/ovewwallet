@@ -109,6 +109,10 @@ export class RewardGrantedHandler implements CommonEventHandler {
       ruleLimitsExtraWhere: body.product_code
         ? { metadata: { path: ["productCode"], equals: body.product_code } }
         : undefined,
+      // ルールが無ければ拒否する。この経路は署名鍵さえあれば任意の額を発行でき、
+      // `service_integrations` の上限も効かない。ルール未登録のまま素通りさせると
+      // **歯止めが1つも無い状態**になるため (docs/point-exchange.md)。
+      requireRule: true,
     });
 
     return { ove_account_id: account.id, ...serializeTransaction(transaction) };

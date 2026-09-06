@@ -34,6 +34,8 @@ export interface GrantRewardParams {
   ruleCode?: string;
   /** monthly/global集計の絞り込み (商品コード単位の上限等)。ruleCode指定時のみ有効。 */
   ruleLimitsExtraWhere?: Prisma.OveTransactionWhereInput;
+  /** ルール未登録なら付与を拒否する (上限が素通りするのを避ける経路で使う)。 */
+  requireRule?: boolean;
 }
 
 export interface GrantRewardResult {
@@ -110,6 +112,7 @@ export class GrantRewardUseCase {
         transactionType: params.transactionType,
         eventId: params.sourceReferenceId ?? params.idempotencyKey,
         amount: params.amount,
+        requireRule: params.requireRule,
         extraWhere: params.ruleLimitsExtraWhere,
       });
       expiryDays = rule?.expiryDays ?? null;
