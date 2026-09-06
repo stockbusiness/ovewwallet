@@ -138,6 +138,7 @@ export default function WalletMenuPage() {
         {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}
         <MenuLink href="/wallet/profile" label="お客様情報" />
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
+        <MenuLink href="/wallet/support" label="お問い合わせ" />
         <MenuLink href="/about" label="ORIについて" />
         {legalSlugs.includes("terms") && <MenuLink href="/terms" label="利用規約" />}
         {legalSlugs.includes("privacy") && <MenuLink href="/privacy" label="プライバシーポリシー" />}

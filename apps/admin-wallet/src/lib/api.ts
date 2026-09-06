@@ -679,3 +679,44 @@ export interface LegalDocument {
   updatedAt: string | null;
   updatedBy: string | null;
 }
+
+/** 利用者からの問い合わせ (docs/support-inquiries.md)。 */
+export type SupportInquiryCategory =
+  | "REWARD_NOT_GRANTED"
+  | "BALANCE_MISMATCH"
+  | "LOGIN_OR_ACCOUNT"
+  | "COLLECTIBLE"
+  | "OTHER";
+
+export type SupportInquiryStatus = "OPEN" | "IN_PROGRESS" | "ANSWERED" | "CLOSED";
+
+export interface SupportInquiryItem {
+  id: string;
+  inquiry_code: string;
+  account_code: string;
+  display_name: string | null;
+  category: SupportInquiryCategory;
+  message: string;
+  status: SupportInquiryStatus;
+  /** 運用メモ。**利用者向けの経路には出さない値**。 */
+  internal_note: string | null;
+  reply_notice_id: string | null;
+  answered_at: string | null;
+  answered_by: string | null;
+  created_at: string;
+}
+
+export const SUPPORT_CATEGORY_LABEL: Record<SupportInquiryCategory, string> = {
+  REWARD_NOT_GRANTED: "ORIが付与されない",
+  BALANCE_MISMATCH: "残高・履歴が合わない",
+  LOGIN_OR_ACCOUNT: "ログイン・アカウント",
+  COLLECTIBLE: "カード (NFTコレクション)",
+  OTHER: "その他",
+};
+
+export const SUPPORT_STATUS_LABEL: Record<SupportInquiryStatus, string> = {
+  OPEN: "未対応",
+  IN_PROGRESS: "調査中",
+  ANSWERED: "返信済み",
+  CLOSED: "完了",
+};

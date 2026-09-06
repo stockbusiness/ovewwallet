@@ -308,6 +308,7 @@ model OveAccount {
   collectibleHoldings CollectibleHolding[]
   /// 氏名・電話・住所。ORI付与を入口にしたリスト取りのために任意で預かる。
   profile             AccountProfile?
+  supportInquiries    SupportInquiry[]
 
   @@index([commonUserId])
   @@map("ove_accounts")
@@ -1182,6 +1183,64 @@ model Notice {
   /// 個別通知を宛先で引くための索引 (全員向けはnullなので対象外)。
   @@index([oveAccountId])
   @@map("notices")
+}
+
+/// 利用者からの問い合わせの種類。運用側が優先度をつけられるように分けている。
+enum SupportInquiryCategory {
+  /// 付与されるはずのORIが入っていない。
+  REWARD_NOT_GRANTED
+  /// 残高・履歴が想定と合わない。
+  BALANCE_MISMATCH
+  /// ログイン・アカウントに関すること。
+  LOGIN_OR_ACCOUNT
+  /// NFTコレクションのカードに関すること。
+  COLLECTIBLE
+  OTHER
+}
+
+enum SupportInquiryStatus {
+  /// 受け付けたが、まだ誰も見ていない。
+  OPEN
+  /// 調査中。
+  IN_PROGRESS
+  /// 返信済み。
+  ANSWERED
+  /// 対応を終えた (返信不要だったものを含む)。
+  CLOSED
+}
+
+/// 利用者からの問い合わせ (docs/support-inquiries.md)。
+///
+/// メールアドレスを案内するだけにしなかったのは、**問い合わせの内容だけでは
+/// 誰のことか分からない**ため。「付与されない」「残高が合わない」は、どの
+/// アカウントのどの時点の話かが分からないと調べようがない。本人のセッションから
+/// 受けることで、アカウントを確実に紐付ける。
+model SupportInquiry {
+  id String @id
+  /// 利用者・運用者が引用するための番号。
+  inquiryCode  String                 @unique @map("inquiry_code")
+  oveAccountId String                 @map("ove_account_id")
+  category     SupportInquiryCategory
+  message      String
+  status       SupportInquiryStatus   @default(OPEN)
+
+  /// 運用メモ。**利用者には見せない** (調査の経過を残すため)。
+  internalNote String? @map("internal_note")
+
+  /// 返信として作った個別のお知らせ (`notices.ove_account_id`が本人のもの)。
+  /// 返信の手段を新しく作らず、既にある個別お知らせの仕組みに乗せている。
+  replyNoticeId String?   @map("reply_notice_id")
+  answeredAt    DateTime? @map("answered_at")
+  answeredBy    String?   @map("answered_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account OveAccount @relation(fields: [oveAccountId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([oveAccountId])
+  @@map("support_inquiries")
 }
 
 /// お知らせの既読状態 (アカウント単位)。行が存在すれば既読、存在しなければ未読。

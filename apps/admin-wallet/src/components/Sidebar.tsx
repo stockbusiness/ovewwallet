@@ -38,6 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { href: "/reward-rules", label: "付与ルール管理" },
       { href: "/notices", label: "お知らせ管理" },
+      { href: "/support-inquiries", label: "お問い合わせ" },
     ],
   },
   {
