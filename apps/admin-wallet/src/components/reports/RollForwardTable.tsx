@@ -6,13 +6,14 @@ const COLUMNS = [
   "発行",
   "利用",
   "失効",
+  "退会による放棄",
   "発行の取消",
   "利用の取消",
   "期末残高",
   "差異",
 ];
 
-/** 月次増減表。`期首 + 発行 − 利用 − 失効 − 発行取消 + 利用取消 ± その他 = 期末`。 */
+/** 月次増減表。`期首 + 発行 − 利用 − 失効 − 退会による放棄 − 発行取消 + 利用取消 ± その他 = 期末`。 */
 export function RollForwardTable({ rows }: { rows: RollForwardPeriod[] }) {
   return (
     <div className="overflow-x-auto">
@@ -50,6 +51,7 @@ export function RollForwardTable({ rows }: { rows: RollForwardPeriod[] }) {
                 <td className="p-3">{formatOve(row.movement.issued)}</td>
                 <td className="p-3">{formatOve(row.movement.used)}</td>
                 <td className="p-3">{formatOve(row.movement.expired)}</td>
+                <td className="p-3">{formatOve(row.movement.forfeited)}</td>
                 <td className="p-3">{formatOve(row.movement.reversedIssuance)}</td>
                 <td className="p-3">{formatOve(row.movement.reversedUsage)}</td>
                 <td className="p-3 font-bold">{formatOve(row.closingBalance)}</td>

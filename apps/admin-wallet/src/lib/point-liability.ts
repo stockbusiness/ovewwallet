@@ -4,6 +4,8 @@ export interface LiabilityMovement {
   issued: string;
   used: string;
   expired: string;
+  /** 退会時の残高の放棄。失効とは分けている。 */
+  forfeited: string;
   reversedIssuance: string;
   reversedUsage: string;
   otherIncrease: string;

@@ -45,7 +45,9 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
     await prisma.$disconnect();
   });
 
-  it("残高が残っている場合は400で拒否する", async () => {
+  it("残高が残っていても退会でき、残高は放棄として台帳に記録される", async () => {
+    // 使う導線がまだ無いうえに段階付与で登録直後から残高が入るため、「使い切ってから
+    // 退会」では誰も自分のアカウントを消せない (docs/account-closure.md)。
     const server = app.getHttpServer();
     const idToken = `mock.${generateId()}`;
     const login = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
@@ -58,10 +60,38 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
       .send({ walletId: wallet.id, amount: 1000, reason: "e2e grant" })
       .expect(201);
 
+    const res = await request(server).post("/api/v1/accounts/me/close").set("Cookie", cookie).expect(201);
+    expect(res.body).toEqual({ closed: true, forfeitedAmount: "1000" });
+
+    const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: login.body.ove_account_id } });
+    expect(account.status).toBe("CLOSED");
+
+    // 残高は消えるが、消えた事実は台帳に残る (負債の増減表で追える)。
+    const after = await prisma.wallet.findUniqueOrThrow({ where: { id: wallet.id } });
+    expect(after.availableBalance).toBe(0n);
+    const forfeit = await prisma.oveTransaction.findFirstOrThrow({
+      where: { walletId: wallet.id, transactionType: "ACCOUNT_CLOSURE_FORFEIT" },
+    });
+    expect(forfeit.amount).toBe(1000n);
+    expect(forfeit.direction).toBe("DEBIT");
+    expect(forfeit.status).toBe("COMPLETED");
+  });
+
+  it("処理中の残高が残っている場合は拒否する (確定・解除と辻褄が合わなくなるため)", async () => {
+    const server = app.getHttpServer();
+    const idToken = `mock.${generateId()}`;
+    const login = await request(server).post("/api/v1/auth/line/login").send({ idToken, termsAccepted: true }).expect(201);
+    const cookie = login.headers["set-cookie"] as unknown as string[];
+
+    const wallet = await prisma.wallet.findUniqueOrThrow({ where: { oveAccountId: login.body.ove_account_id } });
+    await prisma.wallet.update({ where: { id: wallet.id }, data: { heldBalance: 500n } });
+
     await request(server).post("/api/v1/accounts/me/close").set("Cookie", cookie).expect(400);
 
     const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: login.body.ove_account_id } });
     expect(account.status).toBe("ACTIVE");
+
+    await prisma.wallet.update({ where: { id: wallet.id }, data: { heldBalance: 0n } });
   });
 
   it("残高0なら退会でき、以後そのCookieでは認証できず、同じLINEユーザーIDで再ログインもできない", async () => {
@@ -74,7 +104,7 @@ describe("退会 (POST /api/v1/accounts/me/close)", () => {
     const cookie = login.headers["set-cookie"] as unknown as string[];
 
     const closeRes = await request(server).post("/api/v1/accounts/me/close").set("Cookie", cookie).expect(201);
-    expect(closeRes.body).toEqual({ closed: true });
+    expect(closeRes.body).toEqual({ closed: true, forfeitedAmount: "0" });
 
     const account = await prisma.oveAccount.findUniqueOrThrow({ where: { id: login.body.ove_account_id } });
     expect(account.status).toBe("CLOSED");

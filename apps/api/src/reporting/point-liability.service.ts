@@ -28,6 +28,7 @@ function netMovement(m: LiabilityMovement): bigint {
     BigInt(m.issued) -
     BigInt(m.used) -
     BigInt(m.expired) -
+    BigInt(m.forfeited) -
     BigInt(m.reversedIssuance) +
     BigInt(m.reversedUsage) +
     BigInt(m.otherIncrease) -
@@ -226,6 +227,7 @@ export class PointLiabilityService {
     let expired = 0n;
     let reversedIssuance = 0n;
     let reversedUsage = 0n;
+    let forfeited = 0n;
     let otherIncrease = 0n;
     let otherDecrease = 0n;
 
@@ -235,6 +237,9 @@ export class PointLiabilityService {
 
       if (row.transactionType === "EXPIRATION") {
         expired += amount;
+      } else if (row.transactionType === "ACCOUNT_CLOSURE_FORFEIT") {
+        // 退会による放棄。利用ではないので`used`へ入れない。
+        forfeited += amount;
       } else if (row.transactionType === "REVERSAL") {
         // CREDITの取消はDEBITとして記録される (負債が減る)。逆も同様。
         if (isCredit) reversedUsage += amount;
@@ -254,6 +259,7 @@ export class PointLiabilityService {
       issued: issued.toString(),
       used: used.toString(),
       expired: expired.toString(),
+      forfeited: forfeited.toString(),
       reversedIssuance: reversedIssuance.toString(),
       reversedUsage: reversedUsage.toString(),
       otherIncrease: otherIncrease.toString(),

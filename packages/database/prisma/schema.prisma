@@ -157,6 +157,9 @@ enum TransactionType {
   BLOCKCHAIN_MIGRATION
   MIGRATION_REVERSAL
   EXPIRATION
+  /// 退会時に残った残高の放棄 (docs/account-closure.md)。有効期限切れの EXPIRATION とは
+  /// 分けている。会計上の意味が違い、負債の増減表でも別の列として並べるため。
+  ACCOUNT_CLOSURE_FORFEIT
 }
 
 enum CreatedByType {
