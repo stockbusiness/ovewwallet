@@ -140,7 +140,7 @@ describe("本人用API (/me) と外部サービス用API (/service/accounts) の
       const balancePath = `/api/v1/service/accounts/${externalUserId}/balance`;
       const res = await request(server)
         .get(balancePath)
-        .set(signedHeaders(serviceA, "GET", balancePath, {}))
+        .set(signedHeaders(serviceA, "GET", balancePath))
         .expect(200);
       expect(res.body.available_balance).toBe("3000");
     });
@@ -169,7 +169,7 @@ describe("本人用API (/me) と外部サービス用API (/service/accounts) の
       const balancePath = `/api/v1/service/accounts/${externalUserId}/balance`;
       await request(server)
         .get(balancePath)
-        .set(signedHeaders(serviceB, "GET", balancePath, {}))
+        .set(signedHeaders(serviceB, "GET", balancePath))
         .expect(404);
     });
 
