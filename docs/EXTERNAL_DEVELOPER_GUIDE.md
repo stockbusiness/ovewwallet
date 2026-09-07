@@ -67,12 +67,39 @@ X-OVE-Nonce: <リクエストごとに変わるランダム文字列>
 X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path>:<raw body>")
 ```
 
-- 署名対象文字列: `` `${timestamp}.${nonce}.${method}:${path}:${JSON.stringify(body)}` ``
-  (`method`は大文字、`path`はクエリ文字列を含むフルパス、`body`はNode.jsの
-  `JSON.stringify`と完全一致させること。キー順序・非ASCII文字のエスケープに注意)
-- **bodyを持たないリクエスト(GET等)の署名対象文字列**: サーバー側実装は
-  `JSON.stringify(req.body ?? {})`を使うため、bodyが無い場合も**必ず`"{}"`**
-  (空文字列`""`でも`"null"`でもない)を使うこと。
+- 署名対象文字列: `` `${timestamp}.${nonce}.${method}:${path}:${rawBody}` ``
+  (`method`は大文字、`path`はクエリ文字列を含むフルパス、`rawBody`は
+  **実際にHTTPで送信するリクエストボディの文字列そのもの**)
+- **`rawBody`はウォレット側で再整形・再直列化しません。** よって、JSONの
+  キー順序・インデント・改行・非ASCII文字のエスケープ方式(`\uXXXX`にするか
+  UTF-8のまま送るか)は**どれでも構いません**。守っていただくのは1点だけです:
+  **ボディ文字列を先に1回だけ組み立て、その文字列に署名し、その同じ文字列を送る**
+  (署名した後に再度シリアライズしないこと)。
+- **bodyを持たないリクエスト(GET等)の`rawBody`**: **空文字列`""`**
+  (`"{}"`でも`"null"`でもない)。署名対象文字列は最後のコロンで終わります。
+
+```js
+// 例 (Node.js)。ポイントは「stringifyの結果を変数に取り、署名にも送信にも同じ値を使う」こと。
+const rawBody = JSON.stringify(body); // GET等でボディが無い場合は "" にする
+const timestamp = String(Date.now());
+const nonce = crypto.randomUUID();
+const signature = crypto
+  .createHmac("sha256", signingSecret)
+  .update(`${timestamp}.${nonce}.${method}:${fullPath}:${rawBody}`)
+  .digest("hex");
+
+await fetch(`${baseUrl}${fullPath}`, {
+  method,
+  headers: {
+    "Content-Type": "application/json",
+    "X-OVE-Api-Key": apiKey,
+    "X-OVE-Timestamp": timestamp,
+    "X-OVE-Nonce": nonce,
+    "X-OVE-Signature": signature,
+  },
+  body: rawBody || undefined, // ここで JSON.stringify(body) を書き直さない
+});
+```
 - タイムスタンプの許容ずれ: **±5分**。これを超えると401。`X-OVE-Timestamp`は
   必ずミリ秒epoch(13桁、`Date.now()`相当)であること。秒epoch(10桁)を送ると
   署名計算自体は成功するが、サーバー側の現在時刻(ミリ秒)との差分が許容ずれを
@@ -82,10 +109,12 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 - `signing_secret` はAPIキー発行時にのみ平文で渡される (11章参照)。以後は
   ウォレット側もハッシュ・暗号化保存のみで、生値を再取得することはできない。
 - **契約テスト用固定fixture**: 上記の仕様を人手での転記に頼らず機械的に検証できるよう、
-  `docs/fixtures/hmac-auth-contract-fixtures.json`に11ケース(通常リクエスト・
+  `docs/fixtures/hmac-auth-contract-fixtures.json`に12ケース(通常リクエスト・
   ミリ秒/秒timestamp・クエリ文字列を含むfullPath・rawBody完全一致・日本語payload・
-  空body・JSONキー順序不一致・nonce再利用・タイムスタンプ範囲外・署名不一致・
-  正常系2xx)の入力値と期待署名/期待結果を収録している。このfixtureは
+  空body・署名文字列と送信文字列の不一致・nonce再利用・タイムスタンプ範囲外・
+  署名不一致・正常系2xx・整形済みbody)の入力値と期待署名/期待結果を収録している。
+  各ケースには**実際に送信するボディ文字列そのものが`rawBody`フィールドとして**
+  入っているので、これをそのまま署名して送れば期待署名が再現できる。このfixtureは
   `packages/auth/src/hmac-contract-fixtures.test.ts`でサーバー側実装(`hmacSign`/
   `hmacVerify`)との整合性を継続的に検証しており、実装と乖離しない。連携先の
   契約テストでもこのfixtureを正として利用すること。

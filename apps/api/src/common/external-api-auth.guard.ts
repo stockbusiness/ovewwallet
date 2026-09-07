@@ -3,6 +3,7 @@ import {
   type ExecutionContext,
   Inject,
   Injectable,
+  type RawBodyRequest,
   UnauthorizedException,
 } from "@nestjs/common";
 import type { Request } from "express";
@@ -33,7 +34,9 @@ export class ExternalApiAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<Request & Partial<RequestWithId>>();
+    const req = context
+      .switchToHttp()
+      .getRequest<RawBodyRequest<Request> & Partial<RequestWithId>>();
     const apiKey = req.header("x-ove-api-key");
     let integration: ServiceIntegration | undefined;
 
@@ -53,7 +56,16 @@ export class ExternalApiAuthGuard implements CanActivate {
       }
 
       const signingSecret = decryptSecret(integration.signingSecretEncrypted, getEncryptionKey());
-      const canonicalPayload = `${req.method}:${req.originalUrl}:${JSON.stringify(req.body ?? {})}`;
+      // **受け取った生ボディに署名する。** 以前はパース後のオブジェクトを
+      // `JSON.stringify` し直した文字列で検証していたが、それだと連携先は
+      // 「送ったバイト列」ではなく「Nodeが再文字列化した結果」を当てる必要があり、
+      // 日本語のエスケープ方式・キー順序・整形の有無で1バイトずれると通らなかった。
+      // 生ボディなら「送るものにそのまま署名する」で済む。共通イベント側
+      // (CommonEventAuthGuard) は元からこの方式で、そちらへ揃えた。
+      //
+      // 本文の無いリクエスト (GET等) は空文字として署名する。`{}` ではない。
+      const rawBody = req.rawBody?.toString("utf8") ?? "";
+      const canonicalPayload = `${req.method}:${req.originalUrl}:${rawBody}`;
       const authenticator = new ExternalApiAuthenticator(this.kv);
 
       await authenticator.verify(

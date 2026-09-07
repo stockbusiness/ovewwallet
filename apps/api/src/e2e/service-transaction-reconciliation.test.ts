@@ -105,7 +105,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const res = await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(200);
 
       expect(res.body.idempotency_key).toBe(idempotencyKey);
@@ -122,7 +122,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceB, "GET", path, {}))
+        .set(signedHeaders(serviceB, "GET", path))
         .expect(404);
     });
 
@@ -131,7 +131,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(404);
     });
 
@@ -146,7 +146,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceNoScope, "GET", path, {}))
+        .set(signedHeaders(serviceNoScope, "GET", path))
         .expect(403);
     });
   });
@@ -161,7 +161,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const res = await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(200);
 
       expect(res.headers["content-type"]).toContain("text/csv");
@@ -202,7 +202,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const res = await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(200);
 
       expect(res.text).toContain(idemA);
@@ -216,7 +216,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(400);
     });
 
@@ -225,7 +225,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(400);
     });
 
@@ -236,7 +236,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(400);
     });
 
@@ -249,7 +249,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(400);
     });
 
@@ -260,7 +260,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceNoScope, "GET", path, {}))
+        .set(signedHeaders(serviceNoScope, "GET", path))
         .expect(403);
     });
 
@@ -269,7 +269,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(400);
     });
 
@@ -302,7 +302,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const res = await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(200);
 
       expect(res.text).not.toContain(`,${formulaLikeExternalUserId},`);
@@ -320,7 +320,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const fullRes = await request(app.getHttpServer())
         .get(basePath)
-        .set(signedHeaders(serviceA, "GET", basePath, {}))
+        .set(signedHeaders(serviceA, "GET", basePath))
         .expect(200);
       expect(fullRes.headers["x-has-more"]).toBe("false");
       expect(fullRes.headers["x-next-cursor"]).toBeUndefined();
@@ -352,7 +352,7 @@ describe("外部サービス向け取引照会 (/api/v1/service/transactions)", 
 
       const res = await request(app.getHttpServer())
         .get(path)
-        .set(signedHeaders(serviceA, "GET", path, {}))
+        .set(signedHeaders(serviceA, "GET", path))
         .expect(200);
 
       expect(res.text).not.toContain(first.idempotencyKey);

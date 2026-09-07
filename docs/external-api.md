@@ -37,8 +37,10 @@ X-OVE-Signature: HMAC-SHA256(signing_secret, "<timestamp>.<nonce>.<method>:<path
 - タイムスタンプの許容ずれ: ±5分。
 - nonce はサービス単位でRedis (`REDIS_URL` 未設定時はインメモリ) に記録し、再利用 (リプレイ)
   を拒否する。
-- 署名対象文字列の組み立ては `Node.js` の `JSON.stringify(req.body)` と完全一致させる必要が
-  ある (キー順序・エスケープに注意。非ASCII文字はエスケープしないこと)。
+- **署名対象の本文は「実際に送信するバイト列そのもの」** (raw body)。送るJSONを組み立てて
+  文字列化したら、その文字列に署名し、同じ文字列をそのまま送信する。キー順序・インデント・
+  非ASCII文字のエスケープ方式は問わない (ウォレット側で再整形・再直列化はしない)。
+- **本文の無いリクエスト (GET等) は空文字 `""` に署名する** (`{}` ではない)。
 - サービス別上限 (`daily_amount_limit`) と1リクエスト上限 (`per_request_amount_limit`) を
   `service_integrations` テーブルの値でチェックする。
 

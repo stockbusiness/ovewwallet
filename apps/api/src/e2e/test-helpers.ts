@@ -54,9 +54,12 @@ export function signedHeaders(
   integration: TestServiceIntegration,
   method: string,
   path: string,
-  body: unknown,
+  /** 送信する本文。**本文の無いリクエスト (GET等) では省略する** (空文字に署名する)。 */
+  body?: unknown,
 ): Record<string, string> {
-  const bodyJson = JSON.stringify(body);
+  // 生ボディに署名する。supertestの`.send(body)`も`JSON.stringify`で直列化するため、
+  // ここで作る文字列と送信されるバイト列が一致する。
+  const bodyJson = body === undefined ? "" : JSON.stringify(body);
   const timestamp = String(Date.now());
   const nonce = generateId();
   const canonicalPayload = `${method}:${path}:${bodyJson}`;

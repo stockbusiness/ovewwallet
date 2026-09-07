@@ -1,7 +1,7 @@
 {
   "secretUsedForFixedCases": "fixture-test-signing-secret-do-not-use-in-prod",
   "algorithm": "HMAC-SHA256, hex digest",
-  "signaturePayloadFormat": "${timestamp}.${nonce}.${method}:${path}:${JSON.stringify(body ?? {})}",
+  "signaturePayloadFormat": "${timestamp}.${nonce}.${method}:${path}:${rawBody}",
   "cases": {
     "case1_normal_grant": {
       "method": "POST",
@@ -19,7 +19,9 @@
       "timestamp": "1755600000000",
       "nonce": "fixture-nonce-case1",
       "signaturePayload": "1755600000000.fixture-nonce-case1.POST:/api/v1/rewards/grant:{\"service_code\":\"SENGOKU_PASSPORT\",\"external_user_id\":\"PASSPORT-USER-0001\",\"event_type\":\"LEARNING_MISSION_COMPLETED\",\"event_id\":\"MISSION-2026-0001\",\"amount\":3000,\"transaction_type\":\"LEARNING_JOURNEY_REWARD\",\"display_name\":\"はじまりの旅 特典\",\"idempotency_key\":\"LEARNING_JOURNEY_REWARD:MISSION-2026-0001:PASSPORT-USER-0001\"}",
-      "expectedSignature": "97d7da28b98b562213796391147bad496edb87d62b30bcc723823b890ca56fee"
+      "expectedSignature": "97d7da28b98b562213796391147bad496edb87d62b30bcc723823b890ca56fee",
+      "rawBody": "{\"service_code\":\"SENGOKU_PASSPORT\",\"external_user_id\":\"PASSPORT-USER-0001\",\"event_type\":\"LEARNING_MISSION_COMPLETED\",\"event_id\":\"MISSION-2026-0001\",\"amount\":3000,\"transaction_type\":\"LEARNING_JOURNEY_REWARD\",\"display_name\":\"はじまりの旅 特典\",\"idempotency_key\":\"LEARNING_JOURNEY_REWARD:MISSION-2026-0001:PASSPORT-USER-0001\"}",
+      "note": "bodyは可読性のために展開して併記しているが、署名対象・送信対象はいずれも rawBody の文字列。"
     },
     "case2_timestamp_must_be_milliseconds": {
       "correct_example": {
@@ -27,25 +29,27 @@
         "nonce": "fixture-nonce-case2-ms",
         "signaturePayload": "1755600000000.fixture-nonce-case2-ms.POST:/api/v1/example:{\"a\":1}",
         "expectedSignature": "6f93b9611ff90c80a4b09b4d5f4bcaaca774a12a924d7b86846e806b08d96c22",
-        "note": "13桁のミリ秒epoch。署名計算自体は成功するが、これが正しい形式。"
+        "note": "13桁のミリ秒epoch。署名計算自体は成功するが、これが正しい形式。",
+        "rawBody": "{\"a\":1}"
       },
       "wrong_example_seconds": {
         "timestamp": "1755600000",
         "nonce": "fixture-nonce-case2-sec",
         "signaturePayload": "1755600000.fixture-nonce-case2-sec.POST:/api/v1/example:{\"a\":1}",
         "expectedSignature": "193fdcbaf191e45a05bcaac754dbd814edfbbb9bd5f1f834885965ab27258c91",
-        "note": "10桁の秒epochを渡すと、サーバー側の現在時刻(ミリ秒)との差が±5分を大きく超えるため401 (timestamp is outside the allowed skew) になる。署名自体は数学的に正しく計算できてしまう点に注意。"
+        "note": "10桁の秒epochを渡すと、サーバー側の現在時刻(ミリ秒)との差が±5分を大きく超えるため401 (timestamp is outside the allowed skew) になる。署名自体は数学的に正しく計算できてしまう点に注意。",
+        "rawBody": "{\"a\":1}"
       }
     },
     "case3_full_path_with_query_string": {
       "method": "GET",
       "path": "/api/v1/service/transactions/export?period_from=2026-08-01T00%3A00%3A00.000Z&period_to=2026-08-31T23%3A59%3A59.000Z&rule_code=SENGOKU_LEARNING_JOURNEY_REWARD",
-      "body": {},
       "timestamp": "1755600000000",
       "nonce": "fixture-nonce-case3",
-      "signaturePayload": "1755600000000.fixture-nonce-case3.GET:/api/v1/service/transactions/export?period_from=2026-08-01T00%3A00%3A00.000Z&period_to=2026-08-31T23%3A59%3A59.000Z&rule_code=SENGOKU_LEARNING_JOURNEY_REWARD:{}",
-      "expectedSignature": "a87085d6486649b907ed8805a0cbd9f17f5e94b2b6a8a06de31f391a075d108e",
-      "note": "pathはクエリ文字列を含むreq.originalUrlそのもの。エンコード済みの生文字列をそのまま使うこと(再エンコードしない)。"
+      "signaturePayload": "1755600000000.fixture-nonce-case3.GET:/api/v1/service/transactions/export?period_from=2026-08-01T00%3A00%3A00.000Z&period_to=2026-08-31T23%3A59%3A59.000Z&rule_code=SENGOKU_LEARNING_JOURNEY_REWARD:",
+      "expectedSignature": "575a2aa39141d547dee0582ca10ccb12faad5d4db286afe934492badba77f7b2",
+      "note": "pathはクエリ文字列を含むreq.originalUrlそのもの。エンコード済みの生文字列をそのまま使うこと(再エンコードしない)。ボディの無いGETなので rawBody は空文字列 — 署名対象文字列は最後のコロンで終わる。",
+      "rawBody": ""
     },
     "case4_raw_body_matches_signed_body": {
       "method": "POST",
@@ -56,10 +60,10 @@
       },
       "timestamp": "1755600000000",
       "nonce": "fixture-nonce-case4",
-      "rawBodySentOverWire": "{\"external_user_id\":\"USER-1\",\"amount\":100}",
       "signaturePayload": "1755600000000.fixture-nonce-case4.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
       "expectedSignature": "7466a24e4adc8cc7a2083039ea03824969ce34dbfb5be882e895681d728afd0c",
-      "note": "署名対象文字列内のJSON.stringify(body)と、実際にHTTPで送信するrawBodyの文字列は「完全一致」でなければならない。事前にstringify結果を保存しておき、それをそのままHTTP bodyとして送ること(送信直前に再stringifyすると、実装によってはキー順序が変わり不一致になりうる)。"
+      "note": "署名対象文字列の末尾に置いた rawBody と、実際にHTTPで送信するボディの文字列は「完全一致」でなければならない。ボディ文字列を先に1回だけ組み立て、その同じ文字列に署名し、その同じ文字列を送ること(送信直前に再度シリアライズすると、実装によってはキー順序や空白が変わり不一致になりうる)。",
+      "rawBody": "{\"external_user_id\":\"USER-1\",\"amount\":100}"
     },
     "case5_japanese_payload": {
       "method": "POST",
@@ -72,15 +76,18 @@
       "nonce": "fixture-nonce-case5",
       "signaturePayload": "1755600000000.fixture-nonce-case5.POST:/api/v1/example:{\"display_name\":\"はじまりの旅 特典\",\"description\":\"2026年7月度ミッション達成分\"}",
       "expectedSignature": "b65805f327170fcf4066fb3454fddb6ad74c2157f33faf63a2e609a5de5c0bc2",
-      "note": "JSON.stringifyは日本語をエスケープせずUTF-8のまま出力する(\\uXXXXエスケープしない)。送信側もJSON.stringifyの既定動作(非ASCIIエスケープなし)に従うこと。"
+      "note": "日本語をUTF-8のまま(\\uXXXXエスケープせずに)送る例。ウォレットは生ボディを検証するため、\\uXXXXエスケープして送っても構わない — その場合はエスケープ後の文字列に署名すること。重要なのは署名した文字列と送信した文字列が同一であることだけ。",
+      "rawBody": "{\"display_name\":\"はじまりの旅 特典\",\"description\":\"2026年7月度ミッション達成分\"}"
     },
     "case6_empty_body": {
       "method": "GET",
       "path": "/api/v1/service/accounts/EXT-USER-1/balance",
-      "canonicalBodyString": "{}",
-      "signaturePayload": "1755600000000.fixture-nonce-case6.GET:/api/v1/service/accounts/EXT-USER-1/balance:{}",
-      "expectedSignature": "2d0f29ca7eaba470b91b473e733d596fad6961dec19827ea947d5e9651ea6ef7",
-      "note": "bodyを持たないGET等でも、署名対象文字列には必ず JSON.stringify({}) === '{}' を使う。空文字列''や'null'ではない。サーバー側実装: `JSON.stringify(req.body ?? {})`。"
+      "signaturePayload": "1755600000000.fixture-nonce-case6.GET:/api/v1/service/accounts/EXT-USER-1/balance:",
+      "expectedSignature": "3eb50bcf2756c81649de7d80c348673638b04ca0d3a0b66005719dd6373cd441",
+      "note": "bodyを持たないGET等の rawBody は空文字列 \"\"。\"{}\" でも \"null\" でもない(サーバー側実装: `req.rawBody?.toString(\"utf8\") ?? \"\"`)。",
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case6",
+      "rawBody": ""
     },
     "case7_json_key_order_mismatch": {
       "method": "POST",
@@ -99,7 +106,8 @@
       },
       "actualSentRawBody": "{\"b\":2,\"a\":1}",
       "result": "401 invalid HMAC signature",
-      "note": "署名計算に使ったオブジェクトのキー順序と、実際に送信したJSON文字列のキー順序が異なると、意味的に同じ内容でも署名不一致で401になる。署名計算と実送信は同一のJSON.stringify結果を使うこと。"
+      "note": "署名に使った文字列と実際に送信した文字列が違えば、意味的に同じJSONでも401になる。ウォレットは受信した生ボディをそのまま検証するので、キー順序を揃える必要はないが、『署名した文字列をそのまま送る』ことは必須。",
+      "signedRawBody": "{\"a\":1,\"b\":2}"
     },
     "case8_nonce_reuse": {
       "firstRequest": {
@@ -113,7 +121,8 @@
         "nonce": "fixture-nonce-case8-reused",
         "signaturePayload": "1755600000000.fixture-nonce-case8-reused.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
         "expectedSignature": "59f2e2ddd445bf7d1785d27576da63814380f102c559d859dcbb797c112d2cd5",
-        "expectedResult": "2xx (初回は成功)"
+        "expectedResult": "2xx (初回は成功)",
+        "rawBody": "{\"external_user_id\":\"USER-1\",\"amount\":100}"
       },
       "secondRequestSameNonce": {
         "method": "POST",
@@ -126,7 +135,8 @@
         "nonce": "fixture-nonce-case8-reused",
         "signaturePayload": "1755600001000.fixture-nonce-case8-reused.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
         "expectedSignature": "df270dc46670a531e164a7469f1a5d8f46c444e9afd6a1be15688998e988c5bc",
-        "expectedResult": "401 nonce has already been used (replay detected)"
+        "expectedResult": "401 nonce has already been used (replay detected)",
+        "rawBody": "{\"external_user_id\":\"USER-1\",\"amount\":100}"
       },
       "note": "nonceはserviceIntegration単位で一度しか使えない(Redis上でincrし2回目以降を拒否)。有効期限は±5分のタイムスタンプ許容幅と同じ(約5分)。同一nonceは、timestampやbodyが異なっていても再利用不可。"
     },
@@ -135,10 +145,10 @@
       "recipe": {
         "method": "POST",
         "path": "/api/v1/example",
-        "body": {},
         "timestamp": "Date.now() - 6*60*1000 (文字列化)",
         "nonce": "実行のたびに新しい値",
-        "expectedResult": "401 request timestamp is outside the allowed skew"
+        "expectedResult": "401 request timestamp is outside the allowed skew",
+        "rawBody": "{}"
       }
     },
     "case10_signature_mismatch": {
@@ -153,7 +163,8 @@
       "signaturePayload": "1755600000000.fixture-nonce-case10.POST:/api/v1/example:{\"external_user_id\":\"USER-1\",\"amount\":100}",
       "sentSignature": "0000000000000000000000000000000000000000000000000000000000000000",
       "expectedResult": "401 invalid HMAC signature",
-      "note": "正しいsignaturePayloadに対し、意図的に不正な(または他の鍵で計算した)signatureを送った場合の例。"
+      "note": "正しいsignaturePayloadに対し、意図的に不正な(または他の鍵で計算した)signatureを送った場合の例。",
+      "rawBody": "{\"external_user_id\":\"USER-1\",\"amount\":100}"
     },
     "case11_valid_signature_returns_2xx": {
       "note": "ケース1と同じ内容だが、契約テストとして実際にstaging/localのAPIへ送信し2xxが返ることまで確認する。timestampは送信直前のDate.now()を使う必要がある(ケース1の固定値1755600000000は過去の時刻なので、そのまま送ると401になる)。",
@@ -174,6 +185,22 @@
         "nonce": "実行のたびに新しい一意な値",
         "expectedResult": "201 (TransactionResponseSchema)"
       }
+    },
+    "case12_pretty_printed_body_is_accepted": {
+      "method": "POST",
+      "path": "/api/v1/example",
+      "body": {
+        "display_name": "はじまりの旅 特典",
+        "amount": 3000
+      },
+      "timestamp": "1755600000000",
+      "nonce": "fixture-nonce-case12",
+      "rawBody": "{\n  \"display_name\": \"はじまりの旅 特典\",\n  \"amount\": 3000\n}",
+      "signaturePayload": "1755600000000.fixture-nonce-case12.POST:/api/v1/example:{\n  \"display_name\": \"はじまりの旅 特典\",\n  \"amount\": 3000\n}",
+      "expectedSignature": "d645d92054c513d37fd75fc5dc6c5520b0a87b871bff40daebb0b52330af107c",
+      "expectedResult": "2xx (署名検証を通過する)",
+      "note": "インデント・改行を含む整形済みJSONでも、その文字列に署名してその文字列を送れば通る。ウォレット側で正規化・再直列化はしない。"
     }
-  }
+  },
+  "rawBodyRule": "rawBody は「実際にHTTPで送信するリクエストボディのバイト列 (UTF-8文字列)」そのもの。ウォレット側は受信した生ボディに対して署名を検証するため、JSONのキー順序・インデント・非ASCII文字のエスケープ方式は問わない。ただし『署名した文字列』と『送信した文字列』は1バイトも違ってはならない (署名してから再直列化しないこと)。ボディの無いリクエスト (GET等) の rawBody は空文字列 \"\" (\"{}\" ではない)。"
 }

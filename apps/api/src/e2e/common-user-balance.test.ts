@@ -439,7 +439,7 @@ describe("POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)", () =
       // (scopeを要求しない既存Guardのみが適用され、旧LedgerExceptionFilter形式で404を返す)。
       const getRes = await request(app.getHttpServer())
         .get(PATH)
-        .set(signedHeaders(scoped, "GET", PATH, {}))
+        .set(signedHeaders(scoped, "GET", PATH))
         .expect(404);
       expect(getRes.body.ok).toBeUndefined(); // ExternalApiExceptionFilter形式ではない(既存のまま)
       expect(typeof getRes.body.message).toBe("string");
@@ -485,7 +485,7 @@ describe("POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)", () =
       const balancePath = `/api/v1/service/accounts/${externalUserId}/balance`;
       const res = await request(app.getHttpServer())
         .get(balancePath)
-        .set(signedHeaders(scoped, "GET", balancePath, {}))
+        .set(signedHeaders(scoped, "GET", balancePath))
         .expect(200);
 
       expect(Object.keys(res.body).sort()).toEqual(
@@ -515,7 +515,7 @@ describe("POST /api/v1/service/accounts/by-common-user-id/balance (PR-W2)", () =
       const unknownPath = `/api/v1/service/accounts/unknown-${generateId()}/balance`;
       const notFoundRes = await request(app.getHttpServer())
         .get(unknownPath)
-        .set(signedHeaders(scoped, "GET", unknownPath, {}))
+        .set(signedHeaders(scoped, "GET", unknownPath))
         .expect(404);
       expect(notFoundRes.body.ok).toBeUndefined();
       expect(typeof notFoundRes.body.message).toBe("string");
