@@ -108,26 +108,28 @@ export default function BulkGrantsPage() {
             <p className="mb-3 text-sm">
               合計付与予定ORI: {Number(summary.totalAmountGranted).toLocaleString("ja-JP")}
             </p>
-            <table className="w-full text-left text-xs">
-              <thead className="text-sengoku-muted">
-                <tr>
-                  <th className="pb-1">行</th>
-                  <th className="pb-1">対象</th>
-                  <th className="pb-1">結果</th>
-                  <th className="pb-1">メッセージ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.results.map((r) => (
-                  <tr key={r.row} className="border-t border-sengoku-border">
-                    <td className="py-1">{r.row}</td>
-                    <td className="py-1">{r.externalUserId}</td>
-                    <td className="py-1">{r.status}</td>
-                    <td className="py-1">{r.message ?? "-"}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs [&_th]:whitespace-nowrap">
+                <thead className="text-sengoku-muted">
+                  <tr>
+                    <th className="pb-1">行</th>
+                    <th className="pb-1">対象</th>
+                    <th className="pb-1">結果</th>
+                    <th className="pb-1">メッセージ</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {summary.results.map((r) => (
+                    <tr key={r.row} className="border-t border-sengoku-border">
+                      <td className="py-1">{r.row}</td>
+                      <td className="py-1">{r.externalUserId}</td>
+                      <td className="py-1">{r.status}</td>
+                      <td className="py-1">{r.message ?? "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
       </>  );

@@ -169,58 +169,60 @@ export default function ServiceIntegrationsPage() {
           </section>
         )}
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">サービスコード</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">1リクエスト上限</th>
-              <th className="p-3">1日あたり上限</th>
-              <th className="p-3">最終アクセス</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((s) => (
-              <tr key={s.id} className="border-t border-sengoku-border">
-                <td className="p-3">{s.serviceCode}</td>
-                <td className="p-3">
-                  <span className={s.status === "ACTIVE" ? "text-sengoku-green" : "font-semibold text-sengoku-red"}>
-                    {s.status}
-                  </span>
-                </td>
-                <td className="p-3">{Number(s.perRequestAmountLimit).toLocaleString("ja-JP")} ORI</td>
-                <td className="p-3">{Number(s.dailyAmountLimit).toLocaleString("ja-JP")} ORI</td>
-                <td className="p-3">{s.lastAccessedAt ? new Date(s.lastAccessedAt).toLocaleString("ja-JP") : "-"}</td>
-                <td className="whitespace-nowrap p-3">
-                  {/* 再発行は停止中でも行える (連携先へ新しい鍵を渡してから再開したい場合があるため)。 */}
-                  <button
-                    onClick={() => rotate(s, "apiKey")}
-                    disabled={rotating === s.id}
-                    className="text-xs text-sengoku-gold underline disabled:opacity-50"
-                  >
-                    APIキー再発行
-                  </button>
-                  <button
-                    onClick={() => rotate(s, "signingSecret")}
-                    disabled={rotating === s.id}
-                    className="ml-3 text-xs text-sengoku-gold underline disabled:opacity-50"
-                  >
-                    署名シークレット再発行
-                  </button>
-                  {s.status === "ACTIVE" ? (
-                    <button onClick={() => suspend(s.id)} className="ml-3 text-xs text-sengoku-red underline">
-                      緊急停止
-                    </button>
-                  ) : (
-                    <button onClick={() => reactivate(s.id)} className="ml-3 text-xs text-sengoku-gold underline">
-                      再開
-                    </button>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">サービスコード</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">1リクエスト上限</th>
+                <th className="p-3">1日あたり上限</th>
+                <th className="p-3">最終アクセス</th>
+                <th className="p-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((s) => (
+                <tr key={s.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{s.serviceCode}</td>
+                  <td className="p-3">
+                    <span className={s.status === "ACTIVE" ? "text-sengoku-green" : "font-semibold text-sengoku-red"}>
+                      {s.status}
+                    </span>
+                  </td>
+                  <td className="p-3">{Number(s.perRequestAmountLimit).toLocaleString("ja-JP")} ORI</td>
+                  <td className="p-3">{Number(s.dailyAmountLimit).toLocaleString("ja-JP")} ORI</td>
+                  <td className="p-3">{s.lastAccessedAt ? new Date(s.lastAccessedAt).toLocaleString("ja-JP") : "-"}</td>
+                  <td className="whitespace-nowrap p-3">
+                    {/* 再発行は停止中でも行える (連携先へ新しい鍵を渡してから再開したい場合があるため)。 */}
+                    <button
+                      onClick={() => rotate(s, "apiKey")}
+                      disabled={rotating === s.id}
+                      className="text-xs text-sengoku-gold underline disabled:opacity-50"
+                    >
+                      APIキー再発行
+                    </button>
+                    <button
+                      onClick={() => rotate(s, "signingSecret")}
+                      disabled={rotating === s.id}
+                      className="ml-3 text-xs text-sengoku-gold underline disabled:opacity-50"
+                    >
+                      署名シークレット再発行
+                    </button>
+                    {s.status === "ACTIVE" ? (
+                      <button onClick={() => suspend(s.id)} className="ml-3 text-xs text-sengoku-red underline">
+                        緊急停止
+                      </button>
+                    ) : (
+                      <button onClick={() => reactivate(s.id)} className="ml-3 text-xs text-sengoku-gold underline">
+                        再開
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

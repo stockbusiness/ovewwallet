@@ -43,35 +43,37 @@ export default function ApiAccessLogsPage() {
             onChange={(e) => setStatusCode(e.target.value)}
           />
         </div>
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">日時</th>
-              <th className="p-3">サービス</th>
-              <th className="p-3">APIキー</th>
-              <th className="p-3">メソッド</th>
-              <th className="p-3">パス</th>
-              <th className="p-3">ステータス</th>
-              <th className="p-3">送信元IP</th>
-              <th className="p-3">エラー</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-t border-sengoku-border">
-                <td className="p-3">{new Date(l.createdAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">{l.serviceCode ?? "-"}</td>
-                <td className="p-3">{l.apiKeyPrefix ? `${l.apiKeyPrefix}...` : "-"}</td>
-                <td className="p-3">{l.method}</td>
-                <td className="p-3">{l.path}</td>
-                <td className="p-3">
-                  <span className={l.statusCode < 400 ? "text-sengoku-green" : "text-sengoku-red"}>{l.statusCode}</span>
-                </td>
-                <td className="p-3">{l.sourceIp ?? "-"}</td>
-                <td className="p-3">{l.errorMessage ?? "-"}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">日時</th>
+                <th className="p-3">サービス</th>
+                <th className="p-3">APIキー</th>
+                <th className="p-3">メソッド</th>
+                <th className="p-3">パス</th>
+                <th className="p-3">ステータス</th>
+                <th className="p-3">送信元IP</th>
+                <th className="p-3">エラー</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {logs.map((l) => (
+                <tr key={l.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{new Date(l.createdAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">{l.serviceCode ?? "-"}</td>
+                  <td className="p-3">{l.apiKeyPrefix ? `${l.apiKeyPrefix}...` : "-"}</td>
+                  <td className="p-3">{l.method}</td>
+                  <td className="p-3">{l.path}</td>
+                  <td className="p-3">
+                    <span className={l.statusCode < 400 ? "text-sengoku-green" : "text-sengoku-red"}>{l.statusCode}</span>
+                  </td>
+                  <td className="p-3">{l.sourceIp ?? "-"}</td>
+                  <td className="p-3">{l.errorMessage ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

@@ -150,7 +150,7 @@ export default function SecuritySettingsPage() {
         {error && <p className="mb-4 rounded-md bg-sengoku-red/10 p-3 text-sm text-sengoku-red">{error}</p>}
 
         <section className="rounded-lg border border-sengoku-border bg-sengoku-navy p-5">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <h2 className="text-sm font-semibold">二要素認証 (MFA)</h2>
             <span
               className={`rounded-full px-3 py-1 text-xs font-bold ${

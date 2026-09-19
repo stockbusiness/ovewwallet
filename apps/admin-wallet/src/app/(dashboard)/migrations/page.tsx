@@ -162,30 +162,32 @@ export default function MigrationsPage() {
           {reviewingAccounts.length === 0 ? (
             <p className="text-xs text-sengoku-muted">検証待ちのアカウントはありません</p>
           ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="text-sengoku-muted">
-                <tr>
-                  <th className="pb-1">アカウントコード</th>
-                  <th className="pb-1">メール</th>
-                  <th className="pb-1">登録日</th>
-                  <th className="pb-1"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviewingAccounts.map((a) => (
-                  <tr key={a.id} className="border-t border-sengoku-gold-soft/30">
-                    <td className="py-1">{toDisplayCode(a.accountCode)}</td>
-                    <td className="py-1">{a.primaryEmail ?? "-"}</td>
-                    <td className="py-1">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
-                    <td className="py-1">
-                      <Link href={`/accounts/${a.id}`} className="text-sengoku-gold underline">
-                        検証する
-                      </Link>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs [&_th]:whitespace-nowrap">
+                <thead className="text-sengoku-muted">
+                  <tr>
+                    <th className="pb-1">アカウントコード</th>
+                    <th className="pb-1">メール</th>
+                    <th className="pb-1">登録日</th>
+                    <th className="pb-1"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {reviewingAccounts.map((a) => (
+                    <tr key={a.id} className="border-t border-sengoku-gold-soft/30">
+                      <td className="py-1">{toDisplayCode(a.accountCode)}</td>
+                      <td className="py-1">{a.primaryEmail ?? "-"}</td>
+                      <td className="py-1">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
+                      <td className="py-1">
+                        <Link href={`/accounts/${a.id}`} className="text-sengoku-gold underline">
+                          検証する
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </>  );

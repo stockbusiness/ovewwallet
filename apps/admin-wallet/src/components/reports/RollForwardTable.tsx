@@ -17,7 +17,7 @@ const COLUMNS = [
 export function RollForwardTable({ rows }: { rows: RollForwardPeriod[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[56rem] rounded-lg border border-sengoku-border bg-sengoku-navy text-right text-sm">
+      <table className="w-full min-w-[56rem] rounded-lg border border-sengoku-border bg-sengoku-navy text-right text-sm [&_th]:whitespace-nowrap">
         <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
           <tr>
             {COLUMNS.map((label, i) => (

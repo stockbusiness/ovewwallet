@@ -22,7 +22,7 @@ export default function CollectibleImageFailures({
     <section className="rounded border border-sengoku-border p-4">
       <h2 className="mb-2 text-sm font-semibold">直近の失敗</h2>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs [&_th]:whitespace-nowrap">
           <thead className="text-sengoku-muted">
             <tr>
               <th className="py-1 pr-3 font-normal">取得元URL</th>

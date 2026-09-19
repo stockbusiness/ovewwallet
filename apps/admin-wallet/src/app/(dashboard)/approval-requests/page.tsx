@@ -125,81 +125,85 @@ export default function ApprovalRequestsPage() {
         )}
 
         <h2 className="mb-2 text-sm font-semibold">承認待ち ({pending.length})</h2>
-        <table className="mb-6 w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">種別</th>
-              <th className="p-3">内容</th>
-              <th className="p-3">理由</th>
-              <th className="p-3">申請者</th>
-              <th className="p-3">申請日時</th>
-              <th className="p-3">経過時間</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {pending.map((r) => {
-              const elapsed = elapsedSinceRequested(r.requestedAt);
-              return (
-                <tr key={r.id} className={`border-t border-sengoku-border ${elapsed.overSla ? "bg-sengoku-red/10" : ""}`}>
-                  <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
-                  <td className="p-3">{formatDetail(r)}</td>
-                  <td className="p-3">{r.payload.reason}</td>
-                  <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
-                  <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
-                  <td className="p-3">
-                    <span className={elapsed.overSla ? "font-bold text-sengoku-red" : "text-sengoku-muted"}>
-                      {elapsed.label}
-                      {elapsed.overSla && " (放置)"}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <div className="flex gap-2">
-                      <button onClick={() => approve(r.id, r.requestType)} className="text-xs text-sengoku-gold underline">
-                        承認
-                      </button>
-                      <button onClick={() => reject(r.id)} className="text-xs text-sengoku-red underline">
-                        却下
-                      </button>
-                    </div>
+        <div className="overflow-x-auto">
+          <table className="mb-6 w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">種別</th>
+                <th className="p-3">内容</th>
+                <th className="p-3">理由</th>
+                <th className="p-3">申請者</th>
+                <th className="p-3">申請日時</th>
+                <th className="p-3">経過時間</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map((r) => {
+                const elapsed = elapsedSinceRequested(r.requestedAt);
+                return (
+                  <tr key={r.id} className={`border-t border-sengoku-border ${elapsed.overSla ? "bg-sengoku-red/10" : ""}`}>
+                    <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
+                    <td className="p-3">{formatDetail(r)}</td>
+                    <td className="p-3">{r.payload.reason}</td>
+                    <td className="p-3 font-mono text-xs">{r.requestedBy}</td>
+                    <td className="p-3">{new Date(r.requestedAt).toLocaleString("ja-JP")}</td>
+                    <td className="p-3">
+                      <span className={elapsed.overSla ? "font-bold text-sengoku-red" : "text-sengoku-muted"}>
+                        {elapsed.label}
+                        {elapsed.overSla && " (放置)"}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => approve(r.id, r.requestType)} className="text-xs text-sengoku-gold underline">
+                          承認
+                        </button>
+                        <button onClick={() => reject(r.id)} className="text-xs text-sengoku-red underline">
+                          却下
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {pending.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-3 text-xs text-sengoku-faint">
+                    承認待ちの申請はありません
                   </td>
                 </tr>
-              );
-            })}
-            {pending.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-3 text-xs text-sengoku-faint">
-                  承認待ちの申請はありません
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <h2 className="mb-2 text-sm font-semibold">履歴</h2>
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">種別</th>
-              <th className="p-3">内容</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">承認/却下者</th>
-              <th className="p-3">日時</th>
-            </tr>
-          </thead>
-          <tbody>
-            {decided.map((r) => (
-              <tr key={r.id} className="border-t border-sengoku-border">
-                <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
-                <td className="p-3">{formatDetail(r)}</td>
-                <td className="p-3">
-                  <span className={r.status === "APPROVED" ? "text-sengoku-green" : "text-sengoku-red"}>{r.status}</span>
-                </td>
-                <td className="p-3 font-mono text-xs">{r.approvedBy ?? "-"}</td>
-                <td className="p-3">{r.decidedAt ? new Date(r.decidedAt).toLocaleString("ja-JP") : "-"}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">種別</th>
+                <th className="p-3">内容</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">承認/却下者</th>
+                <th className="p-3">日時</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {decided.map((r) => (
+                <tr key={r.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{KIND_LABEL[r.payload.kind] ?? r.requestType}</td>
+                  <td className="p-3">{formatDetail(r)}</td>
+                  <td className="p-3">
+                    <span className={r.status === "APPROVED" ? "text-sengoku-green" : "text-sengoku-red"}>{r.status}</span>
+                  </td>
+                  <td className="p-3 font-mono text-xs">{r.approvedBy ?? "-"}</td>
+                  <td className="p-3">{r.decidedAt ? new Date(r.decidedAt).toLocaleString("ja-JP") : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

@@ -193,40 +193,42 @@ export default function CommonEventSigningKeysPage() {
           </button>
         </div>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">key_id</th>
-              <th className="p-3">source_system_key</th>
-              <th className="p-3">許可event_type</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">発行日時</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((k) => (
-              <tr key={k.id} className="border-t border-sengoku-border">
-                <td className="p-3 font-mono">{k.keyId}</td>
-                <td className="p-3">{k.sourceSystemKey}</td>
-                <td className="p-3 text-xs text-sengoku-muted">{k.allowedEventTypes.join(", ")}</td>
-                <td className="p-3">
-                  <span className={k.status === "ACTIVE" ? "text-sengoku-green" : "font-semibold text-sengoku-red"}>
-                    {k.status}
-                  </span>
-                </td>
-                <td className="p-3">{new Date(k.createdAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">
-                  {k.status === "ACTIVE" && (
-                    <button onClick={() => revoke(k)} className="text-xs text-sengoku-red underline">
-                      失効
-                    </button>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">key_id</th>
+                <th className="p-3">source_system_key</th>
+                <th className="p-3">許可event_type</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">発行日時</th>
+                <th className="p-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((k) => (
+                <tr key={k.id} className="border-t border-sengoku-border">
+                  <td className="p-3 font-mono">{k.keyId}</td>
+                  <td className="p-3">{k.sourceSystemKey}</td>
+                  <td className="p-3 text-xs text-sengoku-muted">{k.allowedEventTypes.join(", ")}</td>
+                  <td className="p-3">
+                    <span className={k.status === "ACTIVE" ? "text-sengoku-green" : "font-semibold text-sengoku-red"}>
+                      {k.status}
+                    </span>
+                  </td>
+                  <td className="p-3">{new Date(k.createdAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">
+                    {k.status === "ACTIVE" && (
+                      <button onClick={() => revoke(k)} className="text-xs text-sengoku-red underline">
+                        失効
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
     </>
   );
 }

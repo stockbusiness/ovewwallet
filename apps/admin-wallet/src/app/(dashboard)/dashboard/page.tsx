@@ -124,7 +124,7 @@ export default function DashboardPage() {
           </section>
 
           <section className="rounded-xl border border-sengoku-border bg-sengoku-navy p-5">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
               <h2 className="text-sm font-bold text-sengoku-text">残高整合性チェック (指示書17章)</h2>
               <StatusBadge
                 label={reconciliation && reconciliation.mismatchedWalletCount > 0 ? "要確認" : "正常"}
@@ -140,26 +140,28 @@ export default function DashboardPage() {
                   </span>
                 </p>
                 {reconciliation.mismatched.length > 0 && (
-                  <table className="mt-2 w-full text-left text-xs">
-                    <thead className="text-sengoku-faint">
-                      <tr>
-                        <th className="pb-1">ウォレット</th>
-                        <th className="pb-1">台帳計算残高</th>
-                        <th className="pb-1">キャッシュ残高</th>
-                        <th className="pb-1">差額</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reconciliation.mismatched.map((m) => (
-                        <tr key={m.walletId} className="border-t border-sengoku-border">
-                          <td className="py-1.5 text-sengoku-text">{toDisplayCode(m.walletCode)}</td>
-                          <td className="py-1.5 text-sengoku-muted">{m.computedBalance}</td>
-                          <td className="py-1.5 text-sengoku-muted">{m.cachedBalance}</td>
-                          <td className="py-1.5 font-semibold text-sengoku-red">{m.difference}</td>
+                  <div className="overflow-x-auto">
+                    <table className="mt-2 w-full text-left text-xs [&_th]:whitespace-nowrap">
+                      <thead className="text-sengoku-faint">
+                        <tr>
+                          <th className="pb-1">ウォレット</th>
+                          <th className="pb-1">台帳計算残高</th>
+                          <th className="pb-1">キャッシュ残高</th>
+                          <th className="pb-1">差額</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {reconciliation.mismatched.map((m) => (
+                          <tr key={m.walletId} className="border-t border-sengoku-border">
+                            <td className="py-1.5 text-sengoku-text">{toDisplayCode(m.walletCode)}</td>
+                            <td className="py-1.5 text-sengoku-muted">{m.computedBalance}</td>
+                            <td className="py-1.5 text-sengoku-muted">{m.cachedBalance}</td>
+                            <td className="py-1.5 font-semibold text-sengoku-red">{m.difference}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </>
             )}

@@ -167,54 +167,56 @@ export default function OutboxPage() {
           {message && <span className="text-sengoku-muted">{message}</span>}
         </div>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">発生日時</th>
-              <th className="p-3">イベント種別</th>
-              <th className="p-3">連携先</th>
-              <th className="p-3">対象</th>
-              <th className="p-3">ステータス</th>
-              <th className="p-3">試行回数</th>
-              <th className="p-3">次回再送予定</th>
-              <th className="p-3">最終エラー</th>
-              <th className="p-3">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id} className="border-t border-sengoku-border align-top">
-                <td className="p-3">{new Date(e.createdAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">{e.eventType}</td>
-                <td className="p-3">{e.destinationService}</td>
-                <td className="p-3">
-                  {e.aggregateType}:{e.aggregateId}
-                </td>
-                <td className="p-3">
-                  <span className={STATUS_CLASS[e.status]}>{STATUS_LABEL[e.status]}</span>
-                </td>
-                <td className="p-3">{e.attemptCount}</td>
-                <td className="p-3">{new Date(e.availableAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3 max-w-xs whitespace-pre-wrap text-sengoku-red">
-                  {e.lastErrorMessage ?? "-"}
-                </td>
-                <td className="p-3">
-                  {e.status === "FAILED" && (
-                    <button onClick={() => retry(e.id)} className="text-sengoku-gold underline">
-                      手動再送
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {events.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
               <tr>
-                <td colSpan={9} className="p-4 text-center text-sengoku-faint">
-                  キューにイベントはありません
-                </td>
+                <th className="p-3">発生日時</th>
+                <th className="p-3">イベント種別</th>
+                <th className="p-3">連携先</th>
+                <th className="p-3">対象</th>
+                <th className="p-3">ステータス</th>
+                <th className="p-3">試行回数</th>
+                <th className="p-3">次回再送予定</th>
+                <th className="p-3">最終エラー</th>
+                <th className="p-3">操作</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {events.map((e) => (
+                <tr key={e.id} className="border-t border-sengoku-border align-top">
+                  <td className="p-3">{new Date(e.createdAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">{e.eventType}</td>
+                  <td className="p-3">{e.destinationService}</td>
+                  <td className="p-3">
+                    {e.aggregateType}:{e.aggregateId}
+                  </td>
+                  <td className="p-3">
+                    <span className={STATUS_CLASS[e.status]}>{STATUS_LABEL[e.status]}</span>
+                  </td>
+                  <td className="p-3">{e.attemptCount}</td>
+                  <td className="p-3">{new Date(e.availableAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3 max-w-xs whitespace-pre-wrap text-sengoku-red">
+                    {e.lastErrorMessage ?? "-"}
+                  </td>
+                  <td className="p-3">
+                    {e.status === "FAILED" && (
+                      <button onClick={() => retry(e.id)} className="text-sengoku-gold underline">
+                        手動再送
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {events.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="p-4 text-center text-sengoku-faint">
+                    キューにイベントはありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

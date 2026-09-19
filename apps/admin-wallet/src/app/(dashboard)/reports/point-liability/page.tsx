@@ -52,7 +52,7 @@ export default function PointLiabilityPage() {
 
   return (
     <>
-      <div className="mb-1 flex items-center justify-between">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h1 className="text-xl font-bold">ポイント負債レポート</h1>
         <a
           href={`${API_BASE_URL}/api/v1/admin/reports/point-liability/roll-forward/export?months=${months}`}
@@ -70,7 +70,7 @@ export default function PointLiabilityPage() {
 
       {current && <LiabilitySummary liability={current} />}
 
-      <div className="mb-3 mt-8 flex items-center justify-between">
+      <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="font-heading text-lg font-bold">月次増減表</h2>
         <label className="flex items-center gap-2 text-sm text-sengoku-muted">
           表示期間:
