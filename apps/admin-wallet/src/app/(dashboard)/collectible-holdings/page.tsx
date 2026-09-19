@@ -124,42 +124,44 @@ export default function CollectibleHoldingsPage() {
           {error && <p className="mt-2 text-sm text-sengoku-red">{error}</p>}
         </section>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">カード名</th>
-              <th className="p-3">保有アカウント</th>
-              <th className="p-3">entitlement_id</th>
-              <th className="p-3">取得日</th>
-              <th className="p-3">状態</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((h) => (
-              <tr key={h.id} className="border-t border-sengoku-border">
-                <td className="p-3">{h.asset.name}</td>
-                <td className="p-3 font-mono text-xs">{toDisplayCode(h.account?.accountCode) ?? h.oveAccountId}</td>
-                <td className="p-3 font-mono text-xs">{h.entitlementId}</td>
-                <td className="p-3">{new Date(h.acquiredAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">
-                  <span className={h.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{h.status}</span>
-                </td>
-                <td className="p-3">
-                  <Link href={`/collectible-holdings/${h.id}`} className="text-xs text-sengoku-gold underline">
-                    詳細
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {searched && items.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
               <tr>
-                <td className="p-3 text-xs text-sengoku-faint" colSpan={6}>
-                  該当する保有が見つかりません
-                </td>
+                <th className="p-3">カード名</th>
+                <th className="p-3">保有アカウント</th>
+                <th className="p-3">entitlement_id</th>
+                <th className="p-3">取得日</th>
+                <th className="p-3">状態</th>
+                <th className="p-3"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map((h) => (
+                <tr key={h.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{h.asset.name}</td>
+                  <td className="p-3 font-mono text-xs">{toDisplayCode(h.account?.accountCode) ?? h.oveAccountId}</td>
+                  <td className="p-3 font-mono text-xs">{h.entitlementId}</td>
+                  <td className="p-3">{new Date(h.acquiredAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">
+                    <span className={h.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{h.status}</span>
+                  </td>
+                  <td className="p-3">
+                    <Link href={`/collectible-holdings/${h.id}`} className="text-xs text-sengoku-gold underline">
+                      詳細
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+              {searched && items.length === 0 && (
+                <tr>
+                  <td className="p-3 text-xs text-sengoku-faint" colSpan={6}>
+                    該当する保有が見つかりません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

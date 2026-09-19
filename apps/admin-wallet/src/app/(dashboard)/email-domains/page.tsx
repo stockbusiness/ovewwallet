@@ -162,49 +162,51 @@ export default function EmailDomainsPage() {
         </div>
       </section>
 
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-sengoku-border text-xs text-sengoku-muted">
-          <tr>
-            <th className="py-2">ドメイン</th>
-            <th className="py-2">扱い</th>
-            <th className="py-2">理由</th>
-            <th className="py-2">登録日</th>
-            <th className="py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {data?.rules.length === 0 && (
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm [&_th]:whitespace-nowrap">
+          <thead className="border-b border-sengoku-border text-xs text-sengoku-muted">
             <tr>
-              <td colSpan={5} className="py-4 text-xs text-sengoku-muted">
-                個別の指定はありません (既定のリストのみが有効です)。
-              </td>
+              <th className="py-2">ドメイン</th>
+              <th className="py-2">扱い</th>
+              <th className="py-2">理由</th>
+              <th className="py-2">登録日</th>
+              <th className="py-2" />
             </tr>
-          )}
-          {data?.rules.map((rule) => (
-            <tr key={rule.domain} className="border-b border-sengoku-border/50">
-              <td className="py-2 font-mono text-xs">{rule.domain}</td>
-              <td className="py-2">
-                <span className={rule.action === "ALLOW" ? "text-green-400" : "text-red-400"}>
-                  {rule.action === "ALLOW" ? "許可" : "拒否"}
-                </span>
-              </td>
-              <td className="py-2 text-xs text-sengoku-muted">{rule.reason ?? "-"}</td>
-              <td className="py-2 text-xs text-sengoku-muted">
-                {new Date(rule.createdAt).toLocaleDateString("ja-JP")}
-              </td>
-              <td className="py-2 text-right">
-                <button
-                  type="button"
-                  onClick={() => remove(rule.domain)}
-                  className="text-xs text-sengoku-muted underline"
-                >
-                  削除
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data?.rules.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-4 text-xs text-sengoku-muted">
+                  個別の指定はありません (既定のリストのみが有効です)。
+                </td>
+              </tr>
+            )}
+            {data?.rules.map((rule) => (
+              <tr key={rule.domain} className="border-b border-sengoku-border/50">
+                <td className="py-2 font-mono text-xs">{rule.domain}</td>
+                <td className="py-2">
+                  <span className={rule.action === "ALLOW" ? "text-green-400" : "text-red-400"}>
+                    {rule.action === "ALLOW" ? "許可" : "拒否"}
+                  </span>
+                </td>
+                <td className="py-2 text-xs text-sengoku-muted">{rule.reason ?? "-"}</td>
+                <td className="py-2 text-xs text-sengoku-muted">
+                  {new Date(rule.createdAt).toLocaleDateString("ja-JP")}
+                </td>
+                <td className="py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => remove(rule.domain)}
+                    className="text-xs text-sengoku-muted underline"
+                  >
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

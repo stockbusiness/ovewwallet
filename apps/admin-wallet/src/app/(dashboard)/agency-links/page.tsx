@@ -125,90 +125,92 @@ export default function AgencyLinksPage() {
           </select>
         </div>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">external_id</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">紐付けORIアカウント</th>
-              <th className="p-3">代理店名</th>
-              <th className="p-3">連絡先メール</th>
-              <th className="p-3">同期/認証日時</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <Fragment key={item.id}>
-                <tr className="border-t border-sengoku-border align-top">
-                  <td className="p-3">{item.externalUserId}</td>
-                  <td className="p-3">
-                    <span className={STATUS_CLASS[item.status]}>{STATUS_LABEL[item.status]}</span>
-                  </td>
-                  <td className="p-3">
-                    {item.account ? `${toDisplayCode(item.account.accountCode)} (${item.account.displayName ?? "-"})` : "-"}
-                  </td>
-                  <td className="p-3">{metaString(item.metadata, "name")}</td>
-                  <td className="p-3">{metaString(item.metadata, "contactEmail")}</td>
-                  <td className="p-3">
-                    {new Date(item.verifiedAt ?? item.linkedAt).toLocaleString("ja-JP")}
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
-                      className="text-xs text-sengoku-gold underline"
-                    >
-                      {expandedId === item.id ? "閉じる" : "詳細"}
-                    </button>
-                  </td>
-                </tr>
-                {expandedId === item.id && (
-                  <tr className="border-t border-sengoku-border bg-sengoku-navy-deep">
-                    <td colSpan={7} className="p-3">
-                      <dl className="grid grid-cols-2 gap-2 text-xs text-sengoku-muted sm:grid-cols-3">
-                        <div>
-                          <dt className="text-sengoku-faint">親代理店ID (parent_external_id)</dt>
-                          <dd>{metaString(item.metadata, "parentExternalId")}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-sengoku-faint">共通ID (common_user_id)</dt>
-                          <dd>{metaString(item.metadata, "commonUserId")}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-sengoku-faint">紹介トークン (referral_token)</dt>
-                          <dd>{metaString(item.metadata, "referralToken")}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-sengoku-faint">ロール</dt>
-                          <dd>{metaString(item.metadata, "roleLabel")}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-sengoku-faint">同期ステータス (status)</dt>
-                          <dd>{metaString(item.metadata, "syncStatus")}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-sengoku-faint">連携方法 (linkMethod)</dt>
-                          <dd>{item.linkMethod}</dd>
-                        </div>
-                      </dl>
-                      {canEdit && (
-                        <div className="mt-3 border-t border-sengoku-border pt-3">
-                          <AgencyLinkActions item={item} onDone={load} />
-                        </div>
-                      )}
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">external_id</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">紐付けORIアカウント</th>
+                <th className="p-3">代理店名</th>
+                <th className="p-3">連絡先メール</th>
+                <th className="p-3">同期/認証日時</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <Fragment key={item.id}>
+                  <tr className="border-t border-sengoku-border align-top">
+                    <td className="p-3">{item.externalUserId}</td>
+                    <td className="p-3">
+                      <span className={STATUS_CLASS[item.status]}>{STATUS_LABEL[item.status]}</span>
+                    </td>
+                    <td className="p-3">
+                      {item.account ? `${toDisplayCode(item.account.accountCode)} (${item.account.displayName ?? "-"})` : "-"}
+                    </td>
+                    <td className="p-3">{metaString(item.metadata, "name")}</td>
+                    <td className="p-3">{metaString(item.metadata, "contactEmail")}</td>
+                    <td className="p-3">
+                      {new Date(item.verifiedAt ?? item.linkedAt).toLocaleString("ja-JP")}
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                        className="text-xs text-sengoku-gold underline"
+                      >
+                        {expandedId === item.id ? "閉じる" : "詳細"}
+                      </button>
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
-            {items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-4 text-center text-sengoku-faint">
-                  該当する連携はありません
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  {expandedId === item.id && (
+                    <tr className="border-t border-sengoku-border bg-sengoku-navy-deep">
+                      <td colSpan={7} className="p-3">
+                        <dl className="grid grid-cols-2 gap-2 text-xs text-sengoku-muted sm:grid-cols-3">
+                          <div>
+                            <dt className="text-sengoku-faint">親代理店ID (parent_external_id)</dt>
+                            <dd>{metaString(item.metadata, "parentExternalId")}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sengoku-faint">共通ID (common_user_id)</dt>
+                            <dd>{metaString(item.metadata, "commonUserId")}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sengoku-faint">紹介トークン (referral_token)</dt>
+                            <dd>{metaString(item.metadata, "referralToken")}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sengoku-faint">ロール</dt>
+                            <dd>{metaString(item.metadata, "roleLabel")}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sengoku-faint">同期ステータス (status)</dt>
+                            <dd>{metaString(item.metadata, "syncStatus")}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-sengoku-faint">連携方法 (linkMethod)</dt>
+                            <dd>{item.linkMethod}</dd>
+                          </div>
+                        </dl>
+                        {canEdit && (
+                          <div className="mt-3 border-t border-sengoku-border pt-3">
+                            <AgencyLinkActions item={item} onDone={load} />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-4 text-center text-sengoku-faint">
+                    該当する連携はありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

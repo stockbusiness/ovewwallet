@@ -47,7 +47,7 @@ export default function AuditLogsPage() {
 
   return (
     <>
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <h1 className="text-xl font-bold">管理者操作ログ</h1>
           <button
             onClick={downloadCsv}
@@ -59,33 +59,35 @@ export default function AuditLogsPage() {
         </div>
         <p className="mb-4 text-xs text-sengoku-muted">監査ログは削除できません (指示書16章)。</p>
         {error && <p className="mb-4 text-sm text-sengoku-red">{error}</p>}
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">日時</th>
-              <th className="p-3">実行者種別</th>
-              <th className="p-3">操作</th>
-              <th className="p-3">対象</th>
-              <th className="p-3">結果</th>
-              <th className="p-3">理由</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-t border-sengoku-border">
-                <td className="p-3">{new Date(l.createdAt).toLocaleString("ja-JP")}</td>
-                <td className="p-3">{l.actorType}</td>
-                <td className="p-3">{l.actionType}</td>
-                <td className="p-3">
-                  {l.targetType}:{l.targetId}
-                </td>
-                <td className="p-3">
-                  <span className={l.result === "SUCCESS" ? "text-sengoku-green" : "text-sengoku-red"}>{l.result}</span>
-                </td>
-                <td className="p-3">{l.reason ?? "-"}</td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">日時</th>
+                <th className="p-3">実行者種別</th>
+                <th className="p-3">操作</th>
+                <th className="p-3">対象</th>
+                <th className="p-3">結果</th>
+                <th className="p-3">理由</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {logs.map((l) => (
+                <tr key={l.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{new Date(l.createdAt).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">{l.actorType}</td>
+                  <td className="p-3">{l.actionType}</td>
+                  <td className="p-3">
+                    {l.targetType}:{l.targetId}
+                  </td>
+                  <td className="p-3">
+                    <span className={l.result === "SUCCESS" ? "text-sengoku-green" : "text-sengoku-red"}>{l.result}</span>
+                  </td>
+                  <td className="p-3">{l.reason ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

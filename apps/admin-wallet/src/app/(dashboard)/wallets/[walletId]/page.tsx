@@ -170,31 +170,33 @@ export default function WalletDetailPage() {
 
         <section className="rounded-lg border border-sengoku-border bg-sengoku-navy p-4">
           <h2 className="mb-3 text-sm font-semibold">最近の取引</h2>
-          <table className="w-full text-left text-xs">
-            <thead className="text-sengoku-muted">
-              <tr>
-                <th className="pb-1">取引コード</th>
-                <th className="pb-1">種別</th>
-                <th className="pb-1">金額</th>
-                <th className="pb-1">状態</th>
-                <th className="pb-1">日時</th>
-              </tr>
-            </thead>
-            <tbody>
-              {wallet.recentTransactions.map((t) => (
-                <tr key={t.id} className="border-t border-sengoku-border">
-                  <td className="py-1">{t.transaction_code}</td>
-                  <td className="py-1">{t.display_name}</td>
-                  <td className="py-1">
-                    {t.direction === "CREDIT" ? "+" : "-"}
-                    {Number(t.amount).toLocaleString("ja-JP")}
-                  </td>
-                  <td className="py-1">{t.status}</td>
-                  <td className="py-1">{new Date(t.occurred_at).toLocaleString("ja-JP")}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs [&_th]:whitespace-nowrap">
+              <thead className="text-sengoku-muted">
+                <tr>
+                  <th className="pb-1">取引コード</th>
+                  <th className="pb-1">種別</th>
+                  <th className="pb-1">金額</th>
+                  <th className="pb-1">状態</th>
+                  <th className="pb-1">日時</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {wallet.recentTransactions.map((t) => (
+                  <tr key={t.id} className="border-t border-sengoku-border">
+                    <td className="py-1">{t.transaction_code}</td>
+                    <td className="py-1">{t.display_name}</td>
+                    <td className="py-1">
+                      {t.direction === "CREDIT" ? "+" : "-"}
+                      {Number(t.amount).toLocaleString("ja-JP")}
+                    </td>
+                    <td className="py-1">{t.status}</td>
+                    <td className="py-1">{new Date(t.occurred_at).toLocaleString("ja-JP")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       </>  );
 }

@@ -89,7 +89,7 @@ export default function AccountsPage() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <h1 className="text-xl font-bold">アカウント一覧</h1>
           <div className="flex items-center gap-3">
             <button
@@ -137,51 +137,53 @@ export default function AccountsPage() {
           </div>
         </div>
         {error && <p className="mb-4 text-sm text-sengoku-red">{error}</p>}
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">アカウントコード</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">メール</th>
-              <th className="p-3">ウォレット残高</th>
-              <th className="p-3">登録日</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.length === 0 && (
-              <tr className="border-t border-sengoku-border">
-                <td colSpan={5} className="p-6 text-center text-sm text-sengoku-muted">
-                  {loading
-                    ? "読み込み中..."
-                    : appliedSearch
-                      ? `「${appliedSearch}」に一致するアカウントは見つかりませんでした`
-                      : "表示できるアカウントがありません"}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">アカウントコード</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">メール</th>
+                <th className="p-3">ウォレット残高</th>
+                <th className="p-3">登録日</th>
               </tr>
-            )}
-            {accounts.map((a) => (
-              <tr key={a.id} className="border-t border-sengoku-border">
-                <td className="p-3">
-                  <Link href={`/accounts/${a.id}`} className="text-sengoku-gold underline">
-                    {toDisplayCode(a.accountCode)}
-                  </Link>
-                </td>
-                <td className="p-3">{a.status}</td>
-                <td className="p-3">{a.primaryEmail ?? "-"}</td>
-                <td className="p-3">
-                  {a.wallet ? (
-                    <Link href={`/wallets/${a.wallet.id}`} className="text-sengoku-gold underline">
-                      {Number(a.wallet.availableBalance).toLocaleString("ja-JP")} ORI
+            </thead>
+            <tbody>
+              {accounts.length === 0 && (
+                <tr className="border-t border-sengoku-border">
+                  <td colSpan={5} className="p-6 text-center text-sm text-sengoku-muted">
+                    {loading
+                      ? "読み込み中..."
+                      : appliedSearch
+                        ? `「${appliedSearch}」に一致するアカウントは見つかりませんでした`
+                        : "表示できるアカウントがありません"}
+                  </td>
+                </tr>
+              )}
+              {accounts.map((a) => (
+                <tr key={a.id} className="border-t border-sengoku-border">
+                  <td className="p-3">
+                    <Link href={`/accounts/${a.id}`} className="text-sengoku-gold underline">
+                      {toDisplayCode(a.accountCode)}
                     </Link>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td className="p-3">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="p-3">{a.status}</td>
+                  <td className="p-3">{a.primaryEmail ?? "-"}</td>
+                  <td className="p-3">
+                    {a.wallet ? (
+                      <Link href={`/wallets/${a.wallet.id}`} className="text-sengoku-gold underline">
+                        {Number(a.wallet.availableBalance).toLocaleString("ja-JP")} ORI
+                      </Link>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="p-3">{new Date(a.createdAt).toLocaleDateString("ja-JP")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
     </>
   );
 }

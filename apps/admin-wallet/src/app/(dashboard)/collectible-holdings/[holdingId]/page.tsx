@@ -109,47 +109,49 @@ export default function CollectibleHoldingDetailPage() {
         </div>
       </section>
 
-      <table className="mb-6 w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-        <tbody>
-          <Row label="保有ID" value={holding.id} mono />
-          <Row
-            label="保有アカウント"
-            value={toDisplayCode(holding.account?.accountCode) ?? holding.oveAccountId}
-            mono
-          />
-          <Row
-            label="common_user_id"
-            value={holding.account?.commonUserId ?? "-"}
-            mono
-          />
-          <Row label="entitlement_id" value={holding.entitlementId} mono />
-          <Row label="order_id" value={holding.orderId ?? "-"} mono />
-          <Row label="order_item_id" value={holding.orderItemId ?? "-"} mono />
-          <Row label="送信元" value={holding.sourceSystemKey} />
-          <Row
-            label="取得日"
-            value={new Date(holding.acquiredAt).toLocaleString("ja-JP")}
-          />
-          <Row label="状態" value={holding.status} />
-          <RevokeTrackingRows
-            holding={holding}
-            revokeReasonDisplay={revokeReasonDisplay}
-          />
-          {holding.network && (
-            <Row label="ネットワーク" value={holding.network} />
-          )}
-          {holding.tokenId && (
-            <Row label="token_id" value={holding.tokenId} mono />
-          )}
-          {holding.contractAddress && (
+      <div className="overflow-x-auto">
+        <table className="mb-6 w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+          <tbody>
+            <Row label="保有ID" value={holding.id} mono />
             <Row
-              label="コントラクトアドレス"
-              value={holding.contractAddress}
+              label="保有アカウント"
+              value={toDisplayCode(holding.account?.accountCode) ?? holding.oveAccountId}
               mono
             />
-          )}
-        </tbody>
-      </table>
+            <Row
+              label="common_user_id"
+              value={holding.account?.commonUserId ?? "-"}
+              mono
+            />
+            <Row label="entitlement_id" value={holding.entitlementId} mono />
+            <Row label="order_id" value={holding.orderId ?? "-"} mono />
+            <Row label="order_item_id" value={holding.orderItemId ?? "-"} mono />
+            <Row label="送信元" value={holding.sourceSystemKey} />
+            <Row
+              label="取得日"
+              value={new Date(holding.acquiredAt).toLocaleString("ja-JP")}
+            />
+            <Row label="状態" value={holding.status} />
+            <RevokeTrackingRows
+              holding={holding}
+              revokeReasonDisplay={revokeReasonDisplay}
+            />
+            {holding.network && (
+              <Row label="ネットワーク" value={holding.network} />
+            )}
+            {holding.tokenId && (
+              <Row label="token_id" value={holding.tokenId} mono />
+            )}
+            {holding.contractAddress && (
+              <Row
+                label="コントラクトアドレス"
+                value={holding.contractAddress}
+                mono
+              />
+            )}
+          </tbody>
+        </table>
+      </div>
 
       {message && <p className="mb-4 text-sm text-sengoku-green">{message}</p>}
 

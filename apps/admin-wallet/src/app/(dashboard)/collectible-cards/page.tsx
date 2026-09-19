@@ -137,41 +137,43 @@ export default function CollectibleCardsPage() {
           {error && <p className="mt-2 text-sm text-sengoku-red">{error}</p>}
         </section>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">画像</th>
-              <th className="p-3">asset_code</th>
-              <th className="p-3">カード名</th>
-              <th className="p-3">product_code</th>
-              <th className="p-3">レアリティ</th>
-              <th className="p-3">状態</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map((asset) => (
-              <tr key={asset.id} className="border-t border-sengoku-border">
-                <td className="p-3">
-                  <div className="relative h-12 w-12 overflow-hidden rounded-md bg-sengoku-bg">
-                    <Image src={asset.imageUrl} alt={asset.name} fill sizes="48px" className="object-cover" />
-                  </div>
-                </td>
-                <td className="p-3 font-mono text-xs">{asset.assetCode}</td>
-                <td className="p-3">{asset.name}</td>
-                <td className="p-3">{asset.productCode ?? "-"}</td>
-                <td className="p-3">{asset.rarity ?? "-"}</td>
-                <td className="p-3">
-                  <span className={asset.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{asset.status}</span>
-                </td>
-                <td className="p-3">
-                  <button onClick={() => toggleStatus(asset)} className="text-xs text-sengoku-gold underline">
-                    {asset.status === "ACTIVE" ? "アーカイブ" : "有効化"}
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">画像</th>
+                <th className="p-3">asset_code</th>
+                <th className="p-3">カード名</th>
+                <th className="p-3">product_code</th>
+                <th className="p-3">レアリティ</th>
+                <th className="p-3">状態</th>
+                <th className="p-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {assets.map((asset) => (
+                <tr key={asset.id} className="border-t border-sengoku-border">
+                  <td className="p-3">
+                    <div className="relative h-12 w-12 overflow-hidden rounded-md bg-sengoku-bg">
+                      <Image src={asset.imageUrl} alt={asset.name} fill sizes="48px" className="object-cover" />
+                    </div>
+                  </td>
+                  <td className="p-3 font-mono text-xs">{asset.assetCode}</td>
+                  <td className="p-3">{asset.name}</td>
+                  <td className="p-3">{asset.productCode ?? "-"}</td>
+                  <td className="p-3">{asset.rarity ?? "-"}</td>
+                  <td className="p-3">
+                    <span className={asset.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{asset.status}</span>
+                  </td>
+                  <td className="p-3">
+                    <button onClick={() => toggleStatus(asset)} className="text-xs text-sengoku-gold underline">
+                      {asset.status === "ACTIVE" ? "アーカイブ" : "有効化"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

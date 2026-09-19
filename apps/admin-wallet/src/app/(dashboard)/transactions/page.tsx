@@ -149,47 +149,49 @@ export default function TransactionsPage() {
         {message && <p className="mb-3 text-sm text-sengoku-green">{message}</p>}
         {error && <p className="mb-3 text-sm text-sengoku-red">{error}</p>}
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">取引コード</th>
-              <th className="p-3">アカウント</th>
-              <th className="p-3">種別</th>
-              <th className="p-3">金額</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">日時</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((t) => (
-              <tr key={t.id} className="border-t border-sengoku-border">
-                <td className="p-3">{t.transaction_code}</td>
-                <td className="p-3">{t.account_code}</td>
-                <td className="p-3">{t.display_name}</td>
-                <td className="p-3">
-                  {t.direction === "CREDIT" ? "+" : "-"}
-                  {Number(t.amount).toLocaleString("ja-JP")}
-                </td>
-                <td className="p-3">{t.status}</td>
-                <td className="p-3">{new Date(t.occurred_at).toLocaleString("ja-JP")}</td>
-                <td className="p-3">
-                  {t.status === "COMPLETED" && (
-                    <button onClick={() => reverse(t.id)} className="text-xs text-sengoku-red underline">
-                      取消
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {transactions.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
               <tr>
-                <td colSpan={7} className="p-3 text-xs text-sengoku-faint">
-                  該当する取引はありません
-                </td>
+                <th className="p-3">取引コード</th>
+                <th className="p-3">アカウント</th>
+                <th className="p-3">種別</th>
+                <th className="p-3">金額</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">日時</th>
+                <th className="p-3"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {transactions.map((t) => (
+                <tr key={t.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{t.transaction_code}</td>
+                  <td className="p-3">{t.account_code}</td>
+                  <td className="p-3">{t.display_name}</td>
+                  <td className="p-3">
+                    {t.direction === "CREDIT" ? "+" : "-"}
+                    {Number(t.amount).toLocaleString("ja-JP")}
+                  </td>
+                  <td className="p-3">{t.status}</td>
+                  <td className="p-3">{new Date(t.occurred_at).toLocaleString("ja-JP")}</td>
+                  <td className="p-3">
+                    {t.status === "COMPLETED" && (
+                      <button onClick={() => reverse(t.id)} className="text-xs text-sengoku-red underline">
+                        取消
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {transactions.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-3 text-xs text-sengoku-faint">
+                    該当する取引はありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

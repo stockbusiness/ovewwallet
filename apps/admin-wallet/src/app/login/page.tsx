@@ -70,8 +70,8 @@ export default function AdminLoginPage() {
 
   if (mfaToken) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-sengoku-bg">
-        <form onSubmit={submitMfa} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-8 shadow">
+      <main className="flex min-h-screen items-center justify-center bg-sengoku-bg px-4 py-8">
+        <form onSubmit={submitMfa} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-6 shadow sm:p-8">
           <h1 className="mb-1 font-heading text-lg font-bold text-sengoku-gold">二要素認証</h1>
           <p className="mb-6 text-sm text-sengoku-muted">認証アプリに表示されている6桁のコードを入力してください。</p>
           <label className="mb-4 block text-sm font-medium text-sengoku-text">
@@ -113,8 +113,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-sengoku-bg">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-8 shadow">
+    <main className="flex min-h-screen items-center justify-center bg-sengoku-bg px-4 py-8">
+      <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-sengoku-border bg-sengoku-navy p-6 shadow sm:p-8">
         <h1 className="mb-1 font-heading text-lg font-bold text-sengoku-gold">千ノ国ウォレット管理画面</h1>
         <p className="mb-6 text-sm text-sengoku-muted">管理者アカウントでログインしてください。</p>
         <label className="mb-3 block text-sm font-medium text-sengoku-text">

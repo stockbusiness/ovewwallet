@@ -30,31 +30,33 @@ export default function WalletsPage() {
     <>
         <h1 className="mb-4 text-xl font-bold">ウォレット一覧</h1>
         {error && <p className="mb-4 text-sm text-sengoku-red">{error}</p>}
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">ウォレットコード</th>
-              <th className="p-3">状態</th>
-              <th className="p-3">利用可能残高</th>
-              <th className="p-3">保留残高</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {wallets.map((w) => (
-              <tr key={w.id} className="border-t border-sengoku-border">
-                <td className="p-3">{toDisplayCode(w.walletCode)}</td>
-                <td className="p-3">{w.status}</td>
-                <td className="p-3">{Number(w.availableBalance).toLocaleString("ja-JP")} ORI</td>
-                <td className="p-3">{Number(w.heldBalance).toLocaleString("ja-JP")} ORI</td>
-                <td className="p-3">
-                  <Link href={`/wallets/${w.id}`} className="text-sengoku-gold underline">
-                    詳細
-                  </Link>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">ウォレットコード</th>
+                <th className="p-3">状態</th>
+                <th className="p-3">利用可能残高</th>
+                <th className="p-3">保留残高</th>
+                <th className="p-3"></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {wallets.map((w) => (
+                <tr key={w.id} className="border-t border-sengoku-border">
+                  <td className="p-3">{toDisplayCode(w.walletCode)}</td>
+                  <td className="p-3">{w.status}</td>
+                  <td className="p-3">{Number(w.availableBalance).toLocaleString("ja-JP")} ORI</td>
+                  <td className="p-3">{Number(w.heldBalance).toLocaleString("ja-JP")} ORI</td>
+                  <td className="p-3">
+                    <Link href={`/wallets/${w.id}`} className="text-sengoku-gold underline">
+                      詳細
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

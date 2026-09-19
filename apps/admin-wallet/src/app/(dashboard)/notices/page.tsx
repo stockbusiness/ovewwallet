@@ -126,59 +126,61 @@ export default function NoticesPage() {
           {error && <p className="mt-2 text-sm text-sengoku-red">{error}</p>}
         </section>
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">公開日時</th>
-              <th className="p-3">タイトル</th>
-              <th className="p-3">本文</th>
-              <th className="p-3">重要度</th>
-              <th className="p-3">状態</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {notices.map((n) => (
-              <tr key={n.id} className="border-t border-sengoku-border align-top">
-                <td className="p-3">
-                  {new Date(n.publishedAt).toLocaleString("ja-JP")}
-                  {new Date(n.publishedAt) > new Date() && (
-                    <span className="ml-2 rounded-full bg-sengoku-gold-soft/10 px-2 py-0.5 text-xs font-semibold text-sengoku-gold-soft">
-                      公開予定
-                    </span>
-                  )}
-                </td>
-                <td className="p-3">{n.title}</td>
-                <td className="max-w-sm p-3 text-sengoku-muted">{n.message}</td>
-                <td className="p-3">
-                  {n.importance === "IMPORTANT" ? (
-                    <span className="font-semibold text-sengoku-red">重要</span>
-                  ) : (
-                    <span className="text-sengoku-faint">通常</span>
-                  )}
-                </td>
-                <td className="p-3">
-                  <span className={n.status === "PUBLISHED" ? "text-sengoku-green" : "text-sengoku-faint"}>
-                    {n.status}
-                  </span>
-                </td>
-                <td className="p-3">
-                  {n.status === "PUBLISHED" && (
-                    <button onClick={() => archiveNotice(n.id)} className="text-xs text-sengoku-gold underline">
-                      非表示にする
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {notices.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
               <tr>
-                <td colSpan={6} className="p-4 text-center text-sengoku-faint">
-                  お知らせはまだありません
-                </td>
+                <th className="p-3">公開日時</th>
+                <th className="p-3">タイトル</th>
+                <th className="p-3">本文</th>
+                <th className="p-3">重要度</th>
+                <th className="p-3">状態</th>
+                <th className="p-3"></th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {notices.map((n) => (
+                <tr key={n.id} className="border-t border-sengoku-border align-top">
+                  <td className="p-3">
+                    {new Date(n.publishedAt).toLocaleString("ja-JP")}
+                    {new Date(n.publishedAt) > new Date() && (
+                      <span className="ml-2 rounded-full bg-sengoku-gold-soft/10 px-2 py-0.5 text-xs font-semibold text-sengoku-gold-soft">
+                        公開予定
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3">{n.title}</td>
+                  <td className="max-w-sm p-3 text-sengoku-muted">{n.message}</td>
+                  <td className="p-3">
+                    {n.importance === "IMPORTANT" ? (
+                      <span className="font-semibold text-sengoku-red">重要</span>
+                    ) : (
+                      <span className="text-sengoku-faint">通常</span>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    <span className={n.status === "PUBLISHED" ? "text-sengoku-green" : "text-sengoku-faint"}>
+                      {n.status}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    {n.status === "PUBLISHED" && (
+                      <button onClick={() => archiveNotice(n.id)} className="text-xs text-sengoku-gold underline">
+                        非表示にする
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {notices.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-4 text-center text-sengoku-faint">
+                    お知らせはまだありません
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </>  );
 }

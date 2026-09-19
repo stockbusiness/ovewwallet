@@ -515,73 +515,75 @@ export default function RewardRulesPage() {
           </section>
         )}
 
-        <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm">
-          <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
-            <tr>
-              <th className="p-3">ルールコード</th>
-              <th className="p-3">サービス</th>
-              <th className="p-3">付与額</th>
-              <th className="p-3">上限 (ユーザー/イベント)</th>
-              <th className="p-3">有効期限</th>
-              <th className="p-3">案内先URL</th>
-              <th className="p-3">累計発行 (額/件数)</th>
-              <th className="p-3">状態</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rules.map((r) => {
-              const summary = issuanceSummary.get(r.ruleCode);
-              return (
-                <tr key={r.id} className="border-t border-sengoku-border">
-                  <td className="p-3">
-                    {r.ruleCode}
-                    <p className="text-xs text-sengoku-faint">{r.displayName}</p>
-                  </td>
-                  <td className="p-3">{r.sourceService}</td>
-                  <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} ORI</td>
-                  <td className="p-3">
-                    {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
-                  </td>
-                  <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
-                  <td className="max-w-[14rem] p-3">
-                    {r.landingUrl ? (
-                      <span className="block truncate text-xs text-sengoku-text" title={r.landingUrl}>
-                        {r.landingUrl}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-sengoku-faint">未設定 (導線を出さない)</span>
-                    )}
-                    <button onClick={() => editLandingUrl(r)} className="mt-1 text-xs text-sengoku-gold underline">
-                      {r.landingUrl ? "変更" : "設定"}
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    {summary && summary.totalAmount !== null ? (
-                      <>
-                        {Number(summary.totalAmount).toLocaleString("ja-JP")} ORI
-                        <p className="text-xs text-sengoku-faint">{summary.count}件</p>
-                      </>
-                    ) : (
-                      <span className="text-xs text-sengoku-faint">集計不可</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <span className={r.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{r.status}</span>
-                  </td>
-                  <td className="whitespace-nowrap p-3">
-                    <button onClick={() => startEdit(r)} className="text-xs text-sengoku-gold underline">
-                      編集
-                    </button>
-                    <button onClick={() => toggleStatus(r)} className="ml-3 text-xs text-sengoku-gold underline">
-                      {r.status === "ACTIVE" ? "無効化" : "有効化"}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full rounded-lg border border-sengoku-border bg-sengoku-navy text-left text-sm [&_th]:whitespace-nowrap">
+            <thead className="bg-sengoku-navy-deep text-xs text-sengoku-muted">
+              <tr>
+                <th className="p-3">ルールコード</th>
+                <th className="p-3">サービス</th>
+                <th className="p-3">付与額</th>
+                <th className="p-3">上限 (ユーザー/イベント)</th>
+                <th className="p-3">有効期限</th>
+                <th className="p-3">案内先URL</th>
+                <th className="p-3">累計発行 (額/件数)</th>
+                <th className="p-3">状態</th>
+                <th className="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rules.map((r) => {
+                const summary = issuanceSummary.get(r.ruleCode);
+                return (
+                  <tr key={r.id} className="border-t border-sengoku-border">
+                    <td className="p-3">
+                      {r.ruleCode}
+                      <p className="text-xs text-sengoku-faint">{r.displayName}</p>
+                    </td>
+                    <td className="p-3">{r.sourceService}</td>
+                    <td className="p-3">{Number(r.rewardAmount).toLocaleString("ja-JP")} ORI</td>
+                    <td className="p-3">
+                      {r.perUserLimit ?? "-"} / {r.perEventLimit ?? "-"}
+                    </td>
+                    <td className="p-3">{r.expiryDays ? `${r.expiryDays}日` : "失効しない"}</td>
+                    <td className="max-w-[14rem] p-3">
+                      {r.landingUrl ? (
+                        <span className="block truncate text-xs text-sengoku-text" title={r.landingUrl}>
+                          {r.landingUrl}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-sengoku-faint">未設定 (導線を出さない)</span>
+                      )}
+                      <button onClick={() => editLandingUrl(r)} className="mt-1 text-xs text-sengoku-gold underline">
+                        {r.landingUrl ? "変更" : "設定"}
+                      </button>
+                    </td>
+                    <td className="p-3">
+                      {summary && summary.totalAmount !== null ? (
+                        <>
+                          {Number(summary.totalAmount).toLocaleString("ja-JP")} ORI
+                          <p className="text-xs text-sengoku-faint">{summary.count}件</p>
+                        </>
+                      ) : (
+                        <span className="text-xs text-sengoku-faint">集計不可</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <span className={r.status === "ACTIVE" ? "text-sengoku-green" : "text-sengoku-faint"}>{r.status}</span>
+                    </td>
+                    <td className="whitespace-nowrap p-3">
+                      <button onClick={() => startEdit(r)} className="text-xs text-sengoku-gold underline">
+                        編集
+                      </button>
+                      <button onClick={() => toggleStatus(r)} className="ml-3 text-xs text-sengoku-gold underline">
+                        {r.status === "ACTIVE" ? "無効化" : "有効化"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
         <section className="mt-6 rounded-lg border border-sengoku-border bg-sengoku-navy p-4">
           <h2 className="mb-1 text-sm font-semibold">ORI失効バッチ</h2>
