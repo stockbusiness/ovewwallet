@@ -9,6 +9,7 @@ import { LedgerExceptionFilter } from "../common/ledger-exception.filter";
 import {
   createTestCommonEventSigningKey,
   commonEventSignedHeaders,
+  ensureCommonEventRewardRule,
   type TestCommonEventSigningKey,
 } from "./test-helpers";
 
@@ -27,6 +28,12 @@ describe("POST /api/integrations/events (次期改修指示書P0-1/P0-3/P0-4/P0-
     app.use(cookieParser());
     app.useGlobalFilters(new LedgerExceptionFilter());
     await app.init();
+
+    // `reward.granted` は付与ルールの登録を必須にしている (requireRule、
+    // docs/point-exchange.md)。product_codeを指定しないイベントは
+    // `COMMON_EVENT_REWARD:default` を引くため、ここで登録しておく。
+    // 個別の上限を検証するテストは、それぞれの中で専用のルールを作り直す。
+    await ensureCommonEventRewardRule();
   });
 
   afterAll(async () => {
