@@ -457,6 +457,23 @@ jobs:
             "COLLECTIBLE_IMAGE_STORAGE_ACCESS_KEY_ID=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_ACCESS_KEY_ID }}"
             "COLLECTIBLE_IMAGE_STORAGE_SECRET_ACCESS_KEY=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_SECRET_ACCESS_KEY }}"
             "COLLECTIBLE_IMAGE_STORAGE_ENDPOINT=${{ secrets.COLLECTIBLE_IMAGE_STORAGE_ENDPOINT }}"
+            # カード画像の取得元ホスト許可リスト (千ノ国マーケット、先方回答 2026-09-22)。
+            #
+            # **この値はVercel側にも同じものが必要。** apps/user-wallet と
+            # apps/admin-wallet の next.config.mjs がビルド時にこれを読み、Next.js Image
+            # Optimizer の remotePatterns を組み立てる。未設定だと remotePatterns が
+            # 空配列になり、**リモート画像を1枚も表示できない**。
+            #
+            # 取り込み済みの画像は `/api/v1/collectible-images/{sha}.{ext}` という相対パス
+            # で返るため許可リストを必要としない。効いてくるのは**取り込めていない間**で、
+            # そのとき collectibles-query.service.ts は「画像が出ないより外部URLでも出た方が
+            # よい」として取得元URLをそのまま返す。この意図をフロント側で殺さないために
+            # 設定する。取り込みは granted ハンドラ内で失敗しても握り潰して先へ進むため、
+            # 保有権だけ先にでき画像が後から届く状態は普通に起こりうる。
+            #
+            # **空にしないこと。** API側 (common/image-url-validator.ts) では未設定=検査
+            # しない (opt-in) だが、フロント側は未設定=全拒否で、意味が逆になる。
+            "COLLECTIBLE_IMAGE_ALLOWED_HOSTS=www.sengoku-rr.com"
             # NFTコレクション。画面・API・ハンドラは実装済みで、フラグだけが閉じていた。
             #
             # 開けても、鍵を渡していない相手からは何も入らない。受信は署名鍵での認証を
