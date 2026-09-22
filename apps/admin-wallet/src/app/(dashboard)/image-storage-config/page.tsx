@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import HelpPanel from "@/components/HelpPanel";
 import ImageStorageStatus from "@/components/ImageStorageStatus";
+import R2SetupGuide, { R2TroubleshootingGuide, S3SetupNote } from "@/components/R2SetupGuide";
 import { apiFetch, ApiError, type ImageStorageConfig, type ImageStorageTestResult } from "@/lib/api";
 
 /**
@@ -139,6 +140,33 @@ export default function ImageStorageConfigPage() {
             <strong>保存済みの設定で試すので、先に保存してください。</strong>
           </p>
         </div>
+      </HelpPanel>
+
+      <HelpPanel storageKey="image-storage-r2-setup" title="キーの取得手順 (Cloudflare R2)">
+        <p>
+          下の4つの欄に入れる値を、どこから持ってくるかの手順です。画面の文言は
+          Cloudflare 側の変更で変わることがあるため、操作の内容で書いています。
+        </p>
+        <R2SetupGuide />
+
+        {/* 参照するのは詰まったときだけなので、既定では畳んで手順を読む妨げにしない。 */}
+        <details className="rounded border border-sengoku-border p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-sengoku-text">
+            接続テストが失敗するとき
+          </summary>
+          <div className="mt-3 space-y-2">
+            <R2TroubleshootingGuide />
+          </div>
+        </details>
+
+        <details className="rounded border border-sengoku-border p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-sengoku-text">
+            Amazon S3 を使う場合
+          </summary>
+          <div className="mt-3">
+            <S3SetupNote />
+          </div>
+        </details>
       </HelpPanel>
 
       {error && <p className="mb-3 rounded bg-red-950 p-2 text-sm text-red-300">{error}</p>}
