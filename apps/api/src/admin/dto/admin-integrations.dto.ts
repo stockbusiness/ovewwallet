@@ -58,3 +58,12 @@ export const ProfileConfigUpdateSchema = z.object({
   promptEnabled: z.boolean().optional(),
   reason: z.string().min(1),
 });
+
+/**
+ * カード受取の接続テスト。`token` は任意で、省略すると実在しないダミーを使う。
+ * 実トークンを指定できるのは「この1件だけ受け取れない」という調査のため
+ * (状態照会のみで確定はしないので、受取は進まない)。
+ */
+export const ClaimConnectionTestSchema = z.object({
+  token: z.string().max(255).optional(),
+});

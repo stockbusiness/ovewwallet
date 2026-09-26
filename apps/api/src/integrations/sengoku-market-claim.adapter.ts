@@ -40,7 +40,7 @@ export type ConfirmClaimResult =
   | { outcome: "network_error" }
   | { outcome: "invalid_response" };
 
-interface MarketClaimConfig {
+export interface MarketClaimConfig {
   baseUrl: string;
   keyId: string;
   hmacSecret: string;
@@ -54,6 +54,18 @@ interface MarketClaimConfig {
  */
 function resolveMarketClaimConfig(): MarketClaimConfig | null {
   if (!isFeatureEnabled("ENABLE_COLLECTIBLE_CLAIM_FLOW")) return null;
+  return resolveMarketClaimConfigIgnoringFlag();
+}
+
+/**
+ * Feature Flagを見ずに接続先だけを解決する。**管理画面の接続テスト専用。**
+ *
+ * Flagを開ける**前**に「URLと鍵が正しいか」を確かめられることが接続テストの目的
+ * なので、ここだけは意図的にFlagを無視する (代理店の
+ * `resolveAgencySystemConfigIgnoringFlag` と同じ考え方)。
+ * 実際のClaim経路では使わないこと (Flagで止められなくなる)。
+ */
+export function resolveMarketClaimConfigIgnoringFlag(): MarketClaimConfig | null {
   const baseUrl = process.env["SENGOKU_MARKET_CLAIM_BASE_URL"];
   const keyId = process.env["SENGOKU_MARKET_CLAIM_KEY_ID"];
   const hmacSecret = process.env["SENGOKU_MARKET_CLAIM_HMAC_SECRET"];
@@ -95,7 +107,7 @@ export function signSenNoKuniRequest(secret: string, canonical: string): string 
  * 完全に同じ文字列を渡すこと (呼び出し元が`IntegrationHttpClient`へも同じ`rawBody`を
  * 渡す)。GETの署名対象bodyは指示書通り空文字とする。
  */
-function buildSignedHeaders(params: {
+export function buildSignedHeaders(params: {
   keyId: string;
   secret: string;
   method: "GET" | "POST";

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nest
 import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { z } from "zod";
+import { AdminClaimConnectionTestService } from "./admin-claim-connection-test.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { AdminMailConfigService } from "./admin-mail-config.service";
@@ -12,6 +13,7 @@ import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test
 import {
   AgencyLinkManualLinkSchema,
   AgencyLinkUnlinkSchema,
+  ClaimConnectionTestSchema,
   ServiceIntegrationActionSchema,
   CommonUserHubConfigUpdateSchema,
   MailConfigUpdateSchema,
@@ -31,6 +33,7 @@ export class AdminIntegrationsController {
     private readonly agencyLinks: AdminAgencyLinksService,
     private readonly agencySetup: AdminAgencySetupService,
     private readonly agencyConnectionTest: AdminAgencyConnectionTestService,
+    private readonly claimConnectionTest: AdminClaimConnectionTestService,
     private readonly mailConfig: AdminMailConfigService,
     private readonly profileConfig: AdminProfileConfigService,
   ) {}
@@ -58,6 +61,25 @@ export class AdminIntegrationsController {
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
   async testAgencyConnection(@Req() req: AuthenticatedAdminRequest) {
     return this.agencyConnectionTest.run(req.admin.id);
+  }
+
+  /**
+   * 千ノ国マーケットのClaim状態照会APIを実際に叩き、**生のステータスと応答本文**を
+   * そのまま返す。受取ページは設定不足・通信エラー・先方401・応答形式不正を
+   * すべて503にまとめるため、運用者が原因を追えないことへの対処
+   * (admin-claim-connection-test.service.ts 参照)。
+   *
+   * Feature Flagは見ない (開ける前に確かめられることが目的)。状態照会のみで
+   * 確定は叩かないため副作用は無い。本番の鍵で外部へ発信するのでAUDITORには開けない。
+   */
+  @Post("collectible-claims/test-connection")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async testClaimConnection(
+    @Body(new ZodValidationPipe(ClaimConnectionTestSchema)) body: z.infer<typeof ClaimConnectionTestSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.claimConnectionTest.run(req.admin.id, body.token);
   }
 
   @Get("service-integrations")
