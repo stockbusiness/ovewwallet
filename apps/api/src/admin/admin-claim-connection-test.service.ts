@@ -13,6 +13,9 @@ import {
 /** 連携先が何を返しても診断できるよう、形は問わずに受ける。 */
 const AnyJsonSchema = z.unknown();
 
+/** 画面に出す応答本文の上限。HTMLの404ページでも発信元が分かる程度は残す。 */
+const PARTNER_RESPONSE_MAX_CHARS = 500;
+
 export type ClaimConnectionTestOutcome =
   | "ok"
   | "token_not_found"
@@ -29,7 +32,7 @@ export interface ClaimConnectionTestResult {
   /** 実際に叩いた先 (鍵は含めない)。 */
   requestUrl: string | null;
   httpStatus: number | null;
-  /** 連携先が返した本文の抜粋 (先頭300文字)。原因の切り分け用。 */
+  /** 連携先が返した本文の抜粋 (先頭500文字)。原因の切り分け用。 */
   partnerResponse: string | null;
 }
 
@@ -108,14 +111,25 @@ export class AdminClaimConnectionTestService {
     });
   }
 
-  /** 連携先の応答本文を切り分け材料として少しだけ残す。長い本文やHTMLは切り詰める。 */
+  /**
+   * 連携先の応答本文を切り分け材料として少しだけ残す。
+   *
+   * `error.body`は**JSONとしてパースできた時だけ**入るので、これだけを見ると
+   * HTMLの404ページが「本文なし」に化けてしまい、`endpoint_not_found`の判定根拠を
+   * 画面から確認できない。生本文(`error.bodyText`)まで見るのはそのため。
+   * HTMLは改行・空白が多く画面で読みにくいので、空白を1つに畳んでから切り詰める。
+   */
   private summarizePartnerResponse(
     result: Awaited<ReturnType<IntegrationHttpClient["request"]>>,
   ): string | null {
     if (result.ok) return null;
-    const body = result.error.body;
-    if (body === undefined || body === null) return null;
-    return JSON.stringify(body).slice(0, 300);
+    const { body, bodyText } = result.error;
+    if (body !== undefined && body !== null) {
+      return JSON.stringify(body).slice(0, PARTNER_RESPONSE_MAX_CHARS);
+    }
+    const collapsed = bodyText?.replace(/\s+/gu, " ").trim();
+    if (!collapsed) return null;
+    return collapsed.slice(0, PARTNER_RESPONSE_MAX_CHARS);
   }
 
   private classify(

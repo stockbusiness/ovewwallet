@@ -38,8 +38,11 @@ function build(response: unknown) {
   return { service: new AdminClaimConnectionTestService(db, http), audits, requests };
 }
 
-function httpError(status: number, body?: unknown) {
-  return { ok: false, error: { kind: "http_4xx", retryable: false, status, message: "failed", body } };
+function httpError(status: number, body?: unknown, bodyText?: string) {
+  return {
+    ok: false,
+    error: { kind: "http_4xx", retryable: false, status, message: "failed", body, bodyText },
+  };
 }
 
 describe("AdminClaimConnectionTestService", () => {
@@ -122,5 +125,49 @@ describe("AdminClaimConnectionTestService", () => {
     const serialized = JSON.stringify(audits[0]);
     expect(serialized).not.toContain("secret-1");
     expect(audits[0]!["actionType"]).toBe("COLLECTIBLE_CLAIM_CONNECTION_TEST");
+  });
+  /**
+   * 2026-09-26 の本番実行で `endpoint_not_found` と出た際、応答が「(本文なし)」と
+   * 表示された。`IntegrationHttpClient` はJSONとしてパースできた本文しか `body` に
+   * 入れないため、**HTMLの404ページが本文なしに化けていた**のが原因。
+   * 判定根拠を画面から確かめられないと、この画面を作った意味が無い。
+   */
+  it("JSONで無い本文 (HTMLの404ページ) でも中身を画面に出す", async () => {
+    const html = "<!DOCTYPE html>\n<html>\n  <head><title>404 Not Found</title></head>\n  <body>nginx</body>\n</html>";
+    const { service } = build(httpError(404, undefined, html));
+    const result = await service.run("admin-1");
+
+    expect(result.outcome).toBe("endpoint_not_found");
+    expect(result.partnerResponse).toContain("404 Not Found");
+    expect(result.partnerResponse).toContain("nginx");
+    // 改行だらけのHTMLをそのまま出すと画面で読めないので空白は畳む。
+    expect(result.partnerResponse).not.toContain("\n");
+  });
+
+  it("本文が本当に空なら null のままにする", async () => {
+    const { service } = build(httpError(404, undefined, "   \n  "));
+    const result = await service.run("admin-1");
+
+    expect(result.outcome).toBe("endpoint_not_found");
+    expect(result.partnerResponse).toBeNull();
+  });
+
+  /** 生本文へのフォールバックを足したせいで、JSONの判定が鈍らないことを固定する。 */
+  it("JSON本文があればそちらを優先して token_not_found と判定する", async () => {
+    const { service } = build(
+      httpError(404, { code: "CLAIM_TOKEN_INVALID" }, "<html>404</html>"),
+    );
+    const result = await service.run("admin-1");
+
+    expect(result.outcome).toBe("token_not_found");
+    expect(result.partnerResponse).toContain("CLAIM_TOKEN_INVALID");
+    expect(result.partnerResponse).not.toContain("<html>");
+  });
+
+  it("長すぎる本文は切り詰める", async () => {
+    const { service } = build(httpError(404, undefined, "x".repeat(5000)));
+    const result = await service.run("admin-1");
+
+    expect(result.partnerResponse).toHaveLength(500);
   });
 });

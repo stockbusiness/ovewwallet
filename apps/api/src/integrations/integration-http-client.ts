@@ -15,6 +15,12 @@ export interface IntegrationErrorResult {
    * 呼び出し元向け (例: 409でも revoked / common_user_mismatch / processing を区別する)。
    */
   readonly body?: unknown;
+  /**
+   * 4xx/5xxレスポンスの生本文 (先頭2,000文字)。`body`は**JSONとしてパースできた時だけ**
+   * 設定されるため、HTMLの404ページのようにパースできない本文は`body`からは見えない。
+   * 「経路が無いのか、アプリまで届いた上でのエラーなのか」の切り分けにはこちらを使う。
+   */
+  readonly bodyText?: string;
 }
 
 export type IntegrationResult<T> = { ok: true; data: T } | { ok: false; error: IntegrationErrorResult };
@@ -46,6 +52,8 @@ export interface IntegrationRequestParams<T = void> {
 
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_API_KEY_HEADER = "x-api-key";
+/** 生本文を保持する上限。調査に足りる長さで、巨大な応答をメモリ・ログに載せない。 */
+const MAX_ERROR_BODY_TEXT_CHARS = 2000;
 
 function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) return "****";
@@ -129,6 +137,7 @@ export class IntegrationHttpClient {
             status: res.status,
             message: `HTTP ${res.status}`,
             body: parsedBody,
+            bodyText: bodyText ? bodyText.slice(0, MAX_ERROR_BODY_TEXT_CHARS) : undefined,
           },
         };
       }
