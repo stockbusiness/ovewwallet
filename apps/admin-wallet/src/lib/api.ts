@@ -378,6 +378,23 @@ export interface AgencyConnectionTestResult {
   partnerResponse: string | null;
 }
 
+/** カード受取の接続テスト結果 (`POST /api/v1/admin/collectible-claims/test-connection`)。 */
+export interface ClaimConnectionTestResult {
+  outcome:
+    | "ok"
+    | "token_not_found"
+    | "endpoint_not_found"
+    | "unauthorized"
+    | "unreachable"
+    | "server_error"
+    | "not_configured";
+  message: string;
+  requestUrl: string | null;
+  httpStatus: number | null;
+  /** 連携先が返した本文の抜粋。原因の切り分け用。 */
+  partnerResponse: string | null;
+}
+
 export type AgencySetupFlagKey =
   | "ENABLE_PLATFORM_USER_ID"
   | "ENABLE_WALLET_REFERRAL_TOKEN"

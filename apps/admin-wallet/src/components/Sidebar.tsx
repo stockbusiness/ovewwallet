@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: "/collectible-holdings", label: "カード保有一覧" },
       { href: "/image-storage-config", label: "カード画像の保管先" },
       { href: "/collectible-image-ingest", label: "カード画像の取り込み状況" },
+      { href: "/collectible-claim-test", label: "カード受取の接続テスト" },
     ],
   },
   {

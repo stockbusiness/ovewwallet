@@ -18,6 +18,7 @@ import { AdminAuthController } from "./admin-auth.controller";
 import { AdminAuthService } from "./admin-auth.service";
 import { AdminLoginThrottleService } from "./admin-login-throttle.service";
 import { AdminBulkGrantService } from "./admin-bulk-grant.service";
+import { AdminClaimConnectionTestService } from "./admin-claim-connection-test.service";
 import { AdminCollectibleImagesController } from "./admin-collectible-images.controller";
 import { AdminCollectibleImagesService } from "./admin-collectible-images.service";
 import { AdminCollectiblesController } from "./admin-collectibles.controller";
@@ -94,6 +95,7 @@ import { AdminService } from "./admin.service";
     AdminAgencyLinksService,
     AdminAgencySetupService,
     AdminAgencyConnectionTestService,
+    AdminClaimConnectionTestService,
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
