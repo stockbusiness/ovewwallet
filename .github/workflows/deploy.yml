@@ -496,13 +496,25 @@ jobs:
             "ENABLE_COMMON_EVENT_INBOX=true"
             "ENABLE_COLLECTIBLE_ENTITLEMENT_INBOX=true"
             "ENABLE_DIGITAL_COLLECTION=true"
-            # ENABLE_COLLECTIBLE_CLAIM_FLOW はまだ開けない。Claim確認はマーケット側の
-            # APIを叩く実装で、SENGOKU_MARKET_CLAIM_BASE_URL / _KEY_ID / _HMAC_SECRET の
-            # 3つが揃わないとアダプタがnullを返し、/claim/{token} が503になる
-            # (integrations/sengoku-market-claim.adapter.ts)。開けても動かない画面を
-            # 出すことになるため、接続先を受け取ってから開ける。
+            # カード受取 (Claim) の接続先。千ノ国マーケットから受取確認APIの鍵を
+            # 受け取ったため開ける (2026-09-26)。
             #
-            # ENABLE_ONCHAIN_MIGRATION もまだ開けない。このフラグは現在コードのどこも
+            # Claim確認はマーケット側のAPIを叩く実装で、下記3つが揃わないとアダプタが
+            # nullを返し、/claim/{token} が503になる
+            # (integrations/sengoku-market-claim.adapter.ts)。**フラグだけ開けても
+            # 動かない**ので、3つと同時に設定する。
+            #
+            # base URLは秘密情報ではないのでここに直接書く。key_id / secret は
+            # GitHub Environment の Secrets から渡す (本番は Production、検証は
+            # RAILWAY。Environmentを分けているので同名のまま値だけが変わる)。
+            #
+            # **Secretが未登録だと空文字が入り、アダプタはnullを返す。** 起動は
+            # 止まらず、受取ページだけが503になる形で失敗する点に注意。
+            "SENGOKU_MARKET_CLAIM_BASE_URL=https://www.sengoku-rr.com"
+            "SENGOKU_MARKET_CLAIM_KEY_ID=${{ secrets.SENGOKU_MARKET_CLAIM_KEY_ID }}"
+            "SENGOKU_MARKET_CLAIM_HMAC_SECRET=${{ secrets.SENGOKU_MARKET_CLAIM_HMAC_SECRET }}"
+            "ENABLE_COLLECTIBLE_CLAIM_FLOW=true"
+            # ENABLE_ONCHAIN_MIGRATION はまだ開けない。このフラグは現在コードのどこも
             # ゲートしておらず (将来のオンチェーン移行用の予約)、trueにしても挙動は
             # 変わらない。管理画面のフラグ一覧に「有効」と出るだけで、実態と食い違う。
             "ENABLE_SENGOKU_PASSPORT_LOGIN=false"
