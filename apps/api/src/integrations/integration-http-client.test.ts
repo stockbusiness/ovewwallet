@@ -183,4 +183,58 @@ describe("IntegrationHttpClient", () => {
       expect(result.error.body).toEqual({ code: "processing" });
     }
   });
+  /**
+   * 2026-09-27、千ノ国マーケットのClaim接続調査でワイヤーを実測したところ
+   * `x-correlation-id: corr-1, corr-1` と**連結**されていた。`extraHeaders`が
+   * 同名を持つのに、あとから同じヘッダーを重ねていたのが原因 (RFC 9110 5.2)。
+   * 署名関連ヘッダーを厳密に検証する連携先はこれを不正値として弾きうる。
+   */
+  it("does not duplicate a header the caller already set via extraHeaders", async () => {
+    let receivedHeaders: Record<string, string | string[] | undefined> = {};
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      res.statusCode = 200;
+      res.end();
+    });
+
+    await client.request({
+      baseUrl,
+      path: "/x",
+      extraHeaders: { "X-Correlation-Id": "corr-1", "X-Request-Id": "req-1" },
+      correlationId: "corr-generated",
+    });
+
+    expect(receivedHeaders["x-correlation-id"]).toBe("corr-1");
+    expect(receivedHeaders["x-request-id"]).toBe("req-1");
+  });
+
+  it("still sets correlation and request ids when the caller passes none", async () => {
+    let receivedHeaders: Record<string, string | string[] | undefined> = {};
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      res.statusCode = 200;
+      res.end();
+    });
+
+    await client.request({ baseUrl, path: "/x", correlationId: "corr-2" });
+
+    expect(receivedHeaders["x-correlation-id"]).toBe("corr-2");
+    expect(receivedHeaders["x-request-id"]).toEqual(expect.any(String));
+  });
+
+  /** JSONとしてパースできない本文は`body`に入らないので、生本文も別に保持する。 */
+  it("keeps the raw body of a non-ok response even when it is not JSON", async () => {
+    const baseUrl = await startServer((_req, res) => {
+      res.statusCode = 404;
+      res.setHeader("content-type", "text/html");
+      res.end("<html><title>404 Not Found</title></html>");
+    });
+
+    const result = await client.request({ baseUrl, path: "/x" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.body).toBeUndefined();
+      expect(result.error.bodyText).toContain("404 Not Found");
+    }
+  });
 });

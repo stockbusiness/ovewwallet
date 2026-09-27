@@ -102,6 +102,12 @@ export class IntegrationHttpClient {
       apiKey: params.apiKey ? maskApiKey(params.apiKey) : undefined,
     };
 
+    // `extraHeaders`が同名(大文字小文字違いを含む)を持つ場合、あとから同じヘッダーを
+    // 重ねるとfetchが値を**連結**する (RFC 9110 5.2、例: `corr-1, corr-1`)。
+    // 署名関連ヘッダーを厳密に検証する連携先はこれを不正な値として弾きうるため、
+    // 呼び出し元が明示した値をそのまま尊重する。
+    const extraHeaderNames = new Set(Object.keys(params.extraHeaders ?? {}).map((n) => n.toLowerCase()));
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -112,8 +118,8 @@ export class IntegrationHttpClient {
           "content-type": "application/json",
           ...(params.apiKey ? { [apiKeyHeader]: params.apiKey } : {}),
           ...params.extraHeaders,
-          "x-request-id": requestId,
-          "x-correlation-id": correlationId,
+          ...(extraHeaderNames.has("x-request-id") ? {} : { "x-request-id": requestId }),
+          ...(extraHeaderNames.has("x-correlation-id") ? {} : { "x-correlation-id": correlationId }),
         },
         body: resolveRequestBody(params),
         signal: controller.signal,
