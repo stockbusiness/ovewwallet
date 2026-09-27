@@ -4,6 +4,7 @@ import { generateId, type PrismaClient } from "@ove/database";
 import { z } from "zod";
 import { PRISMA } from "../common/prisma.module";
 import { IntegrationHttpClient } from "../integrations/integration-http-client";
+import { MarketClaimErrorBodySchema } from "../integrations/integration-response-schemas";
 import {
   buildSignedHeaders,
   resolveMarketClaimConfigIgnoringFlag,
@@ -160,7 +161,7 @@ export class AdminClaimConnectionTestService {
         partnerResponse,
       };
     }
-    if (status === 404) return this.classifyNotFound(requestUrl, partnerResponse, usedRealToken);
+    if (status === 404) return this.classifyNotFound(result, requestUrl, partnerResponse, usedRealToken);
     if (status === 410) {
       return {
         outcome: "token_not_found",
@@ -189,22 +190,56 @@ export class AdminClaimConnectionTestService {
     };
   }
 
+
+  /**
+   * 本文が契約のError Envelope (`{"error":{"code":"..."}}`) として読めるか。
+   *
+   * 本番の受取フロー (`SengokuMarketClaimAdapter.parseMarketErrorCode`) はこの形しか
+   * 受け付けない。文字列一致だけで判定すると、平坦な `{"code":"..."}` のような
+   * **契約外の形でもこの画面だけが「正常」に見えてしまう**ので、同じSchemaで確かめる。
+   */
+  private parseContractErrorCode(
+    result: Awaited<ReturnType<IntegrationHttpClient["request"]>>,
+  ): string | undefined {
+    if (result.ok) return undefined;
+    const parsed = MarketClaimErrorBodySchema.safeParse(result.error.body);
+    return parsed.success ? parsed.data.error?.code : undefined;
+  }
+
   /**
    * 404は原因が2つあり、**受取ページからは区別できない**のでここで分ける。
    * 本文に契約の`CLAIM_TOKEN_INVALID`があればトークン側の話、無ければ経路自体が
    * 無い疑い (先方が状態照会APIを未実装、URLの綴り違い等)。
+   *
+   * さらに「コードは在るが契約の形ではない」場合を第3のケースとして分ける。状態照会は
+   * 404をどのみち`not_found`に落とすので実害が出ないが、**確定API (POST .../confirm) は
+   * 本文のコードで取消済み・本人不一致・二重実行を区別する**ため、形が違うと
+   * それらをすべてHTTPステータスだけの判定に落としてしまう。
    */
   private classifyNotFound(
+    result: Awaited<ReturnType<IntegrationHttpClient["request"]>>,
     requestUrl: string,
     partnerResponse: string | null,
     usedRealToken: boolean,
   ): ClaimConnectionTestResult {
-    if (partnerResponse?.includes("CLAIM_TOKEN_INVALID")) {
+    const contractCode = this.parseContractErrorCode(result);
+    if (contractCode === "CLAIM_TOKEN_INVALID") {
       return {
         outcome: "token_not_found",
         message: usedRealToken
           ? "先方が「このトークンは無効」と回答しました。接続と署名は通っているので設定の問題ではありません。トークンが使用済みでないか、発行元の環境が本番かを先方にご確認ください。"
           : "接続と署名は問題ありません。実在しないトークンを送ったので、無効と返るのが正しい結果です。",
+        requestUrl,
+        httpStatus: 404,
+        partnerResponse,
+      };
+    }
+
+    if (partnerResponse?.includes("CLAIM_TOKEN_INVALID")) {
+      return {
+        outcome: "token_not_found",
+        message:
+          '経路と署名は通っており、CLAIM_TOKEN_INVALID も返っています。ただし**本文が契約のError Envelope形式ではありません**。確定API (POST .../confirm) は本文のコードで「取消済み」「本人不一致」「二重実行」を区別するため、この形のままだとそれらを取り違えます。{"error":{"code":"CLAIM_TOKEN_INVALID","message":"..."}} のように error の下に入れる形へ修正を依頼してください。',
         requestUrl,
         httpStatus: 404,
         partnerResponse,

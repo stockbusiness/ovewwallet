@@ -170,4 +170,37 @@ describe("AdminClaimConnectionTestService", () => {
 
     expect(result.partnerResponse).toHaveLength(500);
   });
+  /**
+   * 先方が「CLAIM_TOKEN_INVALID に合わせた」と回答しても、**形が契約と違えば**
+   * 確定API側で取消済み・本人不一致を取り違える。文字列一致だけで通していると
+   * この画面が「正常」と誤って太鼓判を押してしまうので、契約のSchemaで確かめる。
+   */
+  it("契約の形 (error配下) なら素直に token_not_found と判定する", async () => {
+    const { service } = build(
+      httpError(404, { error: { code: "CLAIM_TOKEN_INVALID", message: "not found" } }),
+    );
+    const result = await service.run("admin-1");
+
+    expect(result.outcome).toBe("token_not_found");
+    expect(result.message).not.toContain("Error Envelope");
+  });
+
+  it("コードは在っても平坦な形なら、確定APIで取り違える旨を警告する", async () => {
+    const { service } = build(httpError(404, { code: "CLAIM_TOKEN_INVALID" }));
+    const result = await service.run("admin-1");
+
+    // 経路と署名は通っているので token_not_found のままで正しい。
+    expect(result.outcome).toBe("token_not_found");
+    // ただし形の違いを黙って見逃さない。
+    expect(result.message).toContain("Error Envelope");
+    expect(result.message).toContain('{"error":{"code":"CLAIM_TOKEN_INVALID"');
+  });
+
+  it("契約外のコードは契約の形でも警告する", async () => {
+    const { service } = build(httpError(404, { error: { code: "TOKEN_NOT_FOUND" } }));
+    const result = await service.run("admin-1");
+
+    // 契約の6コード以外はSchemaが弾くので、経路が無い扱いにはせず本文をそのまま見せる。
+    expect(result.partnerResponse).toContain("TOKEN_NOT_FOUND");
+  });
 });
