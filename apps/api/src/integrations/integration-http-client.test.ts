@@ -278,4 +278,60 @@ describe("IntegrationHttpClient", () => {
       expect(result.error.finalUrl).toContain("/x");
     }
   });
+  /**
+   * 2026-10-03、Claimの署名不一致調査。鍵の指紋もcanonical stringも連携先と一致し、
+   * リダイレクトも無いのに401が続いた。残る容疑が「空の本文の解釈」。
+   *
+   * GETに `content-type: application/json` が付いていると、連携先のbodyパーサが
+   * 空の本文を `{}` と解釈しうる。署名の `raw_body` を `JSON.stringify(req.body)` で
+   * 組み立てる実装では、こちらが空文字で署名しているのに相手は `{}` で検証することに
+   * なり、**双方の照合は一致するのに実リクエストだけ落ちる**。本文が無いなら
+   * content-type も付けないのが正しい。
+   */
+  it("omits content-type when the request has no body", async () => {
+    let receivedHeaders: Record<string, string | string[] | undefined> = {};
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      res.statusCode = 200;
+      res.end();
+    });
+
+    await client.request({ baseUrl, path: "/x", method: "GET" });
+
+    expect(receivedHeaders["content-type"]).toBeUndefined();
+  });
+
+  it("still sends content-type when there is a body", async () => {
+    let receivedHeaders: Record<string, string | string[] | undefined> = {};
+    let receivedBody = "";
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        receivedBody = Buffer.concat(chunks).toString("utf8");
+        res.statusCode = 200;
+        res.end();
+      });
+    });
+
+    await client.request({ baseUrl, path: "/x", method: "POST", body: { a: 1 } });
+
+    expect(receivedHeaders["content-type"]).toBe("application/json");
+    expect(receivedBody).toBe('{"a":1}');
+  });
+
+  /** `rawBody` に空文字を明示した場合は本文ありとして扱う (署名対象と送信を一致させるため)。 */
+  it("sends content-type when the caller explicitly passes an empty rawBody", async () => {
+    let receivedHeaders: Record<string, string | string[] | undefined> = {};
+    const baseUrl = await startServer((req, res) => {
+      receivedHeaders = req.headers;
+      res.statusCode = 200;
+      res.end();
+    });
+
+    await client.request({ baseUrl, path: "/x", method: "POST", rawBody: "" });
+
+    expect(receivedHeaders["content-type"]).toBe("application/json");
+  });
 });
