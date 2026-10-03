@@ -510,6 +510,9 @@ jobs:
             #
             # **Secretが未登録だと空文字が入り、アダプタはnullを返す。** 起動は
             # 止まらず、受取ページだけが503になる形で失敗する点に注意。
+            # この3点は管理画面「カード受取の接続設定」(market_claim_config) が
+            # **優先される**。ここの値は初期設定と緊急時の逃げ道として残す。
+            # 画面に3点すべてを登録するとそちらが使われる。
             "SENGOKU_MARKET_CLAIM_BASE_URL=https://www.sengoku-rr.com"
             "SENGOKU_MARKET_CLAIM_KEY_ID=${{ secrets.SENGOKU_MARKET_CLAIM_KEY_ID }}"
             "SENGOKU_MARKET_CLAIM_HMAC_SECRET=${{ secrets.SENGOKU_MARKET_CLAIM_HMAC_SECRET }}"

@@ -378,6 +378,21 @@ export interface AgencyConnectionTestResult {
   partnerResponse: string | null;
 }
 
+/** カード受取の接続設定 (`GET /api/v1/admin/collectible-claims/config`)。鍵の生値は含まない。 */
+export interface MarketClaimConfig {
+  baseUrl: string | null;
+  keyId: string | null;
+  hmacSecretSet: boolean;
+  /** 末尾4文字だけのマスク表示 (例: "****abcd")。 */
+  hmacSecretPreview: string | null;
+  /** 画面が未設定でも環境変数で動いている状態かどうか。 */
+  fallbackFromEnv: boolean;
+  /** 送信に使える状態か (画面か環境変数のどちらかが揃っている)。 */
+  configured: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 /** カード受取の接続テスト結果 (`POST /api/v1/admin/collectible-claims/test-connection`)。 */
 export interface ClaimConnectionTestResult {
   outcome:
