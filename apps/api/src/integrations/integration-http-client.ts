@@ -117,6 +117,9 @@ export class IntegrationHttpClient {
     // 呼び出し元が明示した値をそのまま尊重する。
     const extraHeaderNames = new Set(Object.keys(params.extraHeaders ?? {}).map((n) => n.toLowerCase()));
 
+    // 本文の有無で `content-type` を付けるかを決めるため、ここで先に確定させる。
+    const requestBody = resolveRequestBody(params);
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -124,13 +127,18 @@ export class IntegrationHttpClient {
       const res = await fetch(url, {
         method,
         headers: {
-          "content-type": "application/json",
+          // **本文が無いリクエストには付けない。** GETに `application/json` が付いていると、
+          // 連携先のbodyパーサが空の本文を `{}` と解釈しうる (Expressの `express.json()` など)。
+          // 署名の `raw_body` を `JSON.stringify(req.body)` で組み立てる実装では、こちらが
+          // 空文字で署名しているのに相手は `{}` で検証することになり、鍵もcanonicalの
+          // 作り方も正しいのに署名不一致になる。本文が無いなら content-type も要らない。
+          ...(requestBody === undefined ? {} : { "content-type": "application/json" }),
           ...(params.apiKey ? { [apiKeyHeader]: params.apiKey } : {}),
           ...params.extraHeaders,
           ...(extraHeaderNames.has("x-request-id") ? {} : { "x-request-id": requestId }),
           ...(extraHeaderNames.has("x-correlation-id") ? {} : { "x-correlation-id": correlationId }),
         },
-        body: resolveRequestBody(params),
+        body: requestBody,
         signal: controller.signal,
       });
 
