@@ -9,7 +9,10 @@ import {
   MarketClaimConfigService,
   type ResolvedMarketClaimConfig,
 } from "../integrations/market-claim-config.service";
-import { buildSignedHeaders } from "../integrations/sengoku-market-claim.adapter";
+import {
+  buildSignedRequest,
+  claimKeyFingerprint,
+} from "../integrations/sengoku-market-claim.adapter";
 
 /** 連携先が何を返しても診断できるよう、形は問わずに受ける。 */
 const AnyJsonSchema = z.unknown();
@@ -35,7 +38,26 @@ export interface ClaimConnectionTestResult {
   httpStatus: number | null;
   /** 連携先が返した本文の抜粋 (先頭500文字)。原因の切り分け用。 */
   partnerResponse: string | null;
+  /**
+   * 署名対象にした canonical string。改行は `\n` として見せる。
+   * 署名不一致のとき、連携先と**どの文字列に署名したか**を突き合わせるため。
+   * **鍵は含まれない**ので、そのまま連携先へ渡してよい。
+   */
+  canonicalString: string | null;
+  /** 送信に使った key_id。先方の登録値と一致しているかの確認用。 */
+  keyId: string | null;
+  /**
+   * 鍵の指紋 (Key Check Value)。固定文字列をHMACした先頭16桁。
+   * 連携先が同じ計算をして**一致しなければ鍵の値そのものが違う**と断定できる。
+   */
+  keyFingerprint: string | null;
 }
+
+/**
+ * 応答の分類結果。診断用の3点 (canonical string / key_id / 鍵の指紋) は分類に
+ * 依存しないので、`run()` がまとめて足す。
+ */
+type ClassifiedResult = Omit<ClaimConnectionTestResult, "canonicalString" | "keyId" | "keyFingerprint">;
 
 /**
  * 管理画面の「カード受取の接続テスト」。保存済みの接続先と鍵で千ノ国マーケットの
@@ -76,15 +98,24 @@ export class AdminClaimConnectionTestService {
         requestUrl: null,
         httpStatus: null,
         partnerResponse: null,
+        canonicalString: null,
+        keyId: null,
+        keyFingerprint: null,
       };
     }
 
     const rawToken = token?.trim() || `connection-test-${randomUUID()}`;
     const path = `/api/collectible-claims/${encodeURIComponent(rawToken)}`;
     const requestUrl = `${config.baseUrl}${path}`;
-    const result = await this.probe(config, path);
+    const { result, canonical } = await this.probe(config, path);
 
-    const classified = this.classify(result, requestUrl, Boolean(token?.trim()));
+    const classified = {
+      ...this.classify(result, requestUrl, Boolean(token?.trim())),
+      // 署名不一致の切り分けに要る材料。canonical stringにも指紋にも鍵は含まれない。
+      canonicalString: canonical,
+      keyId: config.keyId,
+      keyFingerprint: claimKeyFingerprint(config.hmacSecret),
+    };
     await this.writeAudit(adminId, config, classified);
     return classified;
   }
@@ -93,25 +124,27 @@ export class AdminClaimConnectionTestService {
   private async probe(
     config: ResolvedMarketClaimConfig,
     path: string,
-  ): Promise<Awaited<ReturnType<IntegrationHttpClient["request"]>>> {
+  ): Promise<{ result: Awaited<ReturnType<IntegrationHttpClient["request"]>>; canonical: string }> {
     const correlationId = randomUUID();
-    return this.http.request({
+    const signed = buildSignedRequest({
+      keyId: config.keyId,
+      secret: config.hmacSecret,
+      method: "GET",
+      path,
+      rawBody: "",
+      correlationId,
+    });
+    const result = await this.http.request({
       baseUrl: config.baseUrl,
       path,
       method: "GET",
-      extraHeaders: buildSignedHeaders({
-        keyId: config.keyId,
-        secret: config.hmacSecret,
-        method: "GET",
-        path,
-        rawBody: "",
-        correlationId,
-      }),
+      extraHeaders: signed.headers,
       correlationId,
       timeoutMs: 5000,
       responseSchema: AnyJsonSchema,
       logger: this.logger,
     });
+    return { result, canonical: signed.canonical };
   }
 
   /**
@@ -139,7 +172,7 @@ export class AdminClaimConnectionTestService {
     result: Awaited<ReturnType<IntegrationHttpClient["request"]>>,
     requestUrl: string,
     usedRealToken: boolean,
-  ): ClaimConnectionTestResult {
+  ): ClassifiedResult {
     const partnerResponse = this.summarizePartnerResponse(result);
     if (result.ok) {
       return {
@@ -223,7 +256,7 @@ export class AdminClaimConnectionTestService {
     requestUrl: string,
     partnerResponse: string | null,
     usedRealToken: boolean,
-  ): ClaimConnectionTestResult {
+  ): ClassifiedResult {
     const contractCode = this.parseContractErrorCode(result);
     if (contractCode === "CLAIM_TOKEN_INVALID") {
       return {

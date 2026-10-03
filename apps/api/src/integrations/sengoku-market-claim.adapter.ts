@@ -81,7 +81,14 @@ export function signSenNoKuniRequest(secret: string, canonical: string): string 
  * 完全に同じ文字列を渡すこと (呼び出し元が`IntegrationHttpClient`へも同じ`rawBody`を
  * 渡す)。GETの署名対象bodyは指示書通り空文字とする。
  */
-export function buildSignedHeaders(params: {
+/**
+ * 署名に使った **canonical string** も一緒に返す。
+ *
+ * 署名不一致の調査では「どの文字列に署名したか」が決定打になるが、ヘッダーからは
+ * 読み取れない。管理画面の接続テストがこれをそのまま画面へ出し、連携先と
+ * 突き合わせられるようにする (canonical stringに**鍵は含まれない**)。
+ */
+export function buildSignedRequest(params: {
   keyId: string;
   secret: string;
   method: "GET" | "POST";
@@ -89,7 +96,7 @@ export function buildSignedHeaders(params: {
   rawBody: string;
   correlationId: string;
   idempotencyKey?: string;
-}): Record<string, string> {
+}): { headers: Record<string, string>; canonical: string } {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const nonce = randomUUID();
   const canonical = buildSenNoKuniCanonicalString({
@@ -102,13 +109,39 @@ export function buildSignedHeaders(params: {
   });
   const signature = signSenNoKuniRequest(params.secret, canonical);
   return {
-    "X-SenNoKuni-Key-Id": params.keyId,
-    "X-SenNoKuni-Timestamp": timestamp,
-    "X-SenNoKuni-Nonce": nonce,
-    "X-SenNoKuni-Signature": signature,
-    "X-Correlation-Id": params.correlationId,
-    ...(params.idempotencyKey ? { "Idempotency-Key": params.idempotencyKey } : {}),
+    canonical,
+    headers: {
+      "X-SenNoKuni-Key-Id": params.keyId,
+      "X-SenNoKuni-Timestamp": timestamp,
+      "X-SenNoKuni-Nonce": nonce,
+      "X-SenNoKuni-Signature": signature,
+      "X-Correlation-Id": params.correlationId,
+      ...(params.idempotencyKey ? { "Idempotency-Key": params.idempotencyKey } : {}),
+    },
   };
+}
+
+/**
+ * 鍵そのものを明かさずに「双方の鍵が同じか」を比べるための指紋 (Key Check Value)。
+ * 固定文字列をHMACした先頭16桁で、連携先が同じ計算をして一致すれば鍵は同じ。
+ * 一致しなければ**鍵の値そのものが食い違っている**と断定できる。
+ */
+export const CLAIM_KEY_CHECK_PAYLOAD = "sennokuni-claim-key-check";
+
+export function claimKeyFingerprint(secret: string): string {
+  return hmacSign(secret, CLAIM_KEY_CHECK_PAYLOAD).slice(0, 16);
+}
+
+export function buildSignedHeaders(params: {
+  keyId: string;
+  secret: string;
+  method: "GET" | "POST";
+  path: string;
+  rawBody: string;
+  correlationId: string;
+  idempotencyKey?: string;
+}): Record<string, string> {
+  return buildSignedRequest(params).headers;
 }
 
 /**
