@@ -8,6 +8,10 @@
  * 他の管理画面 (旧brandテーマ) はこれらのCSS変数を参照しないため影響を受けない。
  */
 :root {
+  /* @fontsource で自己ホストしたフォント。tailwind.config.ts がこの変数を参照する。
+     next/font が生成していたクラスの代わりで、フォールバックはTailwind側で付く。 */
+  --font-noto-sans-jp: "Noto Sans JP";
+  --font-noto-serif-jp: "Noto Serif JP";
   --sengoku-bg: 10 30 63;
   --sengoku-surface: 16 38 77;
   --sengoku-navy: 22 51 96;
