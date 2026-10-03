@@ -40,6 +40,8 @@ export default function CollectibleClaimTestPage() {
         canonicalString: null,
         keyId: null,
         keyFingerprint: null,
+        finalUrl: null,
+        redirected: false,
       });
     } finally {
       setTesting(false);
@@ -156,6 +158,14 @@ export default function CollectibleClaimTestPage() {
                 </dd>
               </div>
             )}
+            {result.redirected && (
+              <div>
+                <dt className="text-sengoku-muted">転送後の最終URL</dt>
+                <dd className="break-all">
+                  <code>{result.finalUrl}</code>
+                </dd>
+              </div>
+            )}
             {result.canonicalString && (
               <div>
                 <dt className="text-sengoku-muted">署名対象の文字列 (canonical string)</dt>
@@ -169,6 +179,13 @@ export default function CollectibleClaimTestPage() {
           {result.outcome === "unauthorized" && (
             <div className="mt-4 rounded border border-sengoku-border p-3 text-xs">
               <p className="font-semibold">署名不一致の切り分け方</p>
+              {result.redirected && (
+                <p className="mt-1 rounded border border-sengoku-red/50 p-2">
+                  <strong>このリクエストは転送されています。</strong>署名は転送前のパスに対して計算するため、
+                  連携先アプリが見るパスがずれ、鍵も文字列も正しいのに署名不一致になります。
+                  まずこの転送を無くしてください (多くは末尾スラッシュの有無や www の有無が原因です)。
+                </p>
+              )}
               <p className="mt-1">
                 上の<strong>鍵の指紋</strong>を連携先に伝え、同じ値になるか確認してください。指紋は固定文字列{" "}
                 <code>sennokuni-claim-key-check</code> を鍵でHMAC-SHA256した先頭16桁です。
