@@ -21,6 +21,15 @@ export interface IntegrationErrorResult {
    * 「経路が無いのか、アプリまで届いた上でのエラーなのか」の切り分けにはこちらを使う。
    */
   readonly bodyText?: string;
+  /**
+   * リダイレクトを追ってたどり着いた最終URL。要求したURLと違えば、途中で
+   * 301/302が挟まっている。**HMAC署名は要求時のパスに対して計算している**ため、
+   * 転送先で連携先アプリが見るパスがずれ、署名不一致になりうる。
+   * 署名付き連携でいちばん見つけにくい失敗なので、個別に持つ。
+   */
+  readonly finalUrl?: string;
+  /** リダイレクトを経由したか。 */
+  readonly redirected?: boolean;
 }
 
 export type IntegrationResult<T> = { ok: true; data: T } | { ok: false; error: IntegrationErrorResult };
@@ -144,6 +153,8 @@ export class IntegrationHttpClient {
             message: `HTTP ${res.status}`,
             body: parsedBody,
             bodyText: bodyText ? bodyText.slice(0, MAX_ERROR_BODY_TEXT_CHARS) : undefined,
+            finalUrl: res.url,
+            redirected: res.redirected,
           },
         };
       }

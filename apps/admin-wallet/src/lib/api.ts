@@ -417,6 +417,13 @@ export interface ClaimConnectionTestResult {
   keyId: string | null;
   /** 鍵の指紋 (Key Check Value)。連携先と一致しなければ鍵の値が違う。 */
   keyFingerprint: string | null;
+  /**
+   * リダイレクトを追った最終URL。`requestUrl` と違えば、署名したパスと
+   * 連携先アプリが見るパスがずれている。
+   */
+  finalUrl: string | null;
+  /** リダイレクトを経由したか。 */
+  redirected: boolean;
 }
 
 export type AgencySetupFlagKey =

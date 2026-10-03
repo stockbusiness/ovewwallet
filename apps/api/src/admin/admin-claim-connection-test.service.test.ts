@@ -45,10 +45,23 @@ function build(response: unknown) {
   return { service: new AdminClaimConnectionTestService(db, http, config), audits, requests };
 }
 
-function httpError(status: number, body?: unknown, bodyText?: string) {
+function httpError(
+  status: number,
+  body?: unknown,
+  bodyText?: string,
+  extra?: { finalUrl?: string; redirected?: boolean },
+) {
   return {
     ok: false,
-    error: { kind: "http_4xx", retryable: false, status, message: "failed", body, bodyText },
+    error: {
+      kind: "http_4xx",
+      retryable: false,
+      status,
+      message: "failed",
+      body,
+      bodyText,
+      ...extra,
+    },
   };
 }
 
@@ -261,5 +274,25 @@ describe("AdminClaimConnectionTestService", () => {
       expect(result.canonicalString).toBeNull();
       expect(result.keyFingerprint).toBeNull();
     });
+  });
+  /** 転送はどちらからも見えないので、画面に出して気づけるようにする。 */
+  it("転送された場合は最終URLと転送フラグを返す", async () => {
+    const { service } = build(
+      httpError(401, { error: { code: "INVALID_SIGNATURE" } }, undefined, {
+        finalUrl: "https://www.sengoku-rr.com/api/collectible-claims/tok-1/",
+        redirected: true,
+      }),
+    );
+    const result = await service.run("admin-1", "tok-1");
+
+    expect(result.redirected).toBe(true);
+    expect(result.finalUrl).toBe("https://www.sengoku-rr.com/api/collectible-claims/tok-1/");
+  });
+
+  it("転送されていなければ転送フラグは立てない", async () => {
+    const { service } = build(httpError(401));
+    const result = await service.run("admin-1");
+
+    expect(result.redirected).toBe(false);
   });
 });

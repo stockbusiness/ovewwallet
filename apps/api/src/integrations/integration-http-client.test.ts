@@ -237,4 +237,45 @@ describe("IntegrationHttpClient", () => {
       expect(result.error.bodyText).toContain("404 Not Found");
     }
   });
+  /**
+   * 2026-10-03、Claimの署名不一致調査。鍵も canonical string も双方一致したのに
+   * 401が続いた。署名は**要求時のパス**に対して計算するため、途中で301/302が
+   * 挟まると連携先アプリが見るパスとずれる。どちらからも見えない失敗なので、
+   * 最終URLを結果に残して検知できるようにする。
+   */
+  it("reports the final URL and redirect flag so a path-changing redirect is visible", async () => {
+    const baseUrl = await startServer((req, res) => {
+      if (req.url === "/x") {
+        res.statusCode = 301;
+        res.setHeader("location", "/moved");
+        res.end();
+        return;
+      }
+      res.statusCode = 401;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ error: { code: "INVALID_SIGNATURE" } }));
+    });
+
+    const result = await client.request({ baseUrl, path: "/x" });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.redirected).toBe(true);
+      expect(result.error.finalUrl).toContain("/moved");
+    }
+  });
+
+  it("marks a direct response as not redirected", async () => {
+    const baseUrl = await startServer((_req, res) => {
+      res.statusCode = 401;
+      res.end();
+    });
+
+    const result = await client.request({ baseUrl, path: "/x" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.redirected).toBe(false);
+      expect(result.error.finalUrl).toContain("/x");
+    }
+  });
 });

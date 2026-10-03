@@ -51,13 +51,24 @@ export interface ClaimConnectionTestResult {
    * 連携先が同じ計算をして**一致しなければ鍵の値そのものが違う**と断定できる。
    */
   keyFingerprint: string | null;
+  /**
+   * リダイレクトを追った最終URL。`requestUrl` と違えば、**署名したパスと
+   * 連携先アプリが見るパスがずれている**ので、鍵も文字列も正しいのに
+   * 署名不一致になる。
+   */
+  finalUrl: string | null;
+  /** リダイレクトを経由したか。 */
+  redirected: boolean;
 }
 
 /**
  * 応答の分類結果。診断用の3点 (canonical string / key_id / 鍵の指紋) は分類に
  * 依存しないので、`run()` がまとめて足す。
  */
-type ClassifiedResult = Omit<ClaimConnectionTestResult, "canonicalString" | "keyId" | "keyFingerprint">;
+type ClassifiedResult = Omit<
+  ClaimConnectionTestResult,
+  "canonicalString" | "keyId" | "keyFingerprint" | "finalUrl" | "redirected"
+>;
 
 /**
  * 管理画面の「カード受取の接続テスト」。保存済みの接続先と鍵で千ノ国マーケットの
@@ -101,6 +112,8 @@ export class AdminClaimConnectionTestService {
         canonicalString: null,
         keyId: null,
         keyFingerprint: null,
+        finalUrl: null,
+        redirected: false,
       };
     }
 
@@ -115,6 +128,8 @@ export class AdminClaimConnectionTestService {
       canonicalString: canonical,
       keyId: config.keyId,
       keyFingerprint: claimKeyFingerprint(config.hmacSecret),
+      finalUrl: result.ok ? null : (result.error.finalUrl ?? null),
+      redirected: result.ok ? false : (result.error.redirected ?? false),
     };
     await this.writeAudit(adminId, config, classified);
     return classified;
