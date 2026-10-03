@@ -37,6 +37,9 @@ export default function CollectibleClaimTestPage() {
         requestUrl: null,
         httpStatus: null,
         partnerResponse: null,
+        canonicalString: null,
+        keyId: null,
+        keyFingerprint: null,
       });
     } finally {
       setTesting(false);
@@ -137,7 +140,52 @@ export default function CollectibleClaimTestPage() {
                 )}
               </dd>
             </div>
+            {result.keyId && (
+              <div>
+                <dt className="text-sengoku-muted">送信に使った key_id</dt>
+                <dd className="break-all">
+                  <code>{result.keyId}</code>
+                </dd>
+              </div>
+            )}
+            {result.keyFingerprint && (
+              <div>
+                <dt className="text-sengoku-muted">鍵の指紋 (Key Check Value)</dt>
+                <dd className="break-all">
+                  <code>{result.keyFingerprint}</code>
+                </dd>
+              </div>
+            )}
+            {result.canonicalString && (
+              <div>
+                <dt className="text-sengoku-muted">署名対象の文字列 (canonical string)</dt>
+                <dd className="break-all">
+                  <code>{JSON.stringify(result.canonicalString)}</code>
+                </dd>
+              </div>
+            )}
           </dl>
+
+          {result.outcome === "unauthorized" && (
+            <div className="mt-4 rounded border border-sengoku-border p-3 text-xs">
+              <p className="font-semibold">署名不一致の切り分け方</p>
+              <p className="mt-1">
+                上の<strong>鍵の指紋</strong>を連携先に伝え、同じ値になるか確認してください。指紋は固定文字列{" "}
+                <code>sennokuni-claim-key-check</code> を鍵でHMAC-SHA256した先頭16桁です。
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-4">
+                <li>
+                  <strong>指紋が違う</strong> → 鍵の値そのものが食い違っています。再発行して受け渡し直してください。
+                </li>
+                <li>
+                  <strong>指紋が同じ</strong> → 鍵は正しく、<strong>署名対象の文字列の作り方</strong>が違います。上の
+                  canonical string をそのまま渡して突き合わせてください (GETは <code>raw_body</code>{" "}
+                  が空でも<strong>末尾が改行で終わります</strong>)。
+                </li>
+              </ul>
+              <p className="mt-2">どちらにも鍵そのものは含まれないので、そのまま連携先へ渡して構いません。</p>
+            </div>
+          )}
         </section>
       )}
     </>

@@ -408,6 +408,15 @@ export interface ClaimConnectionTestResult {
   httpStatus: number | null;
   /** 連携先が返した本文の抜粋。原因の切り分け用。 */
   partnerResponse: string | null;
+  /**
+   * 署名対象にした canonical string。署名不一致のとき、連携先と
+   * **どの文字列に署名したか**を突き合わせるため。鍵は含まれない。
+   */
+  canonicalString: string | null;
+  /** 送信に使った key_id。 */
+  keyId: string | null;
+  /** 鍵の指紋 (Key Check Value)。連携先と一致しなければ鍵の値が違う。 */
+  keyFingerprint: string | null;
 }
 
 export type AgencySetupFlagKey =

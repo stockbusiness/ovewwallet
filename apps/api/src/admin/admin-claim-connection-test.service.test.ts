@@ -210,4 +210,56 @@ describe("AdminClaimConnectionTestService", () => {
     // 契約の6コード以外はSchemaが弾くので、経路が無い扱いにはせず本文をそのまま見せる。
     expect(result.partnerResponse).toContain("TOKEN_NOT_FOUND");
   });
+  /**
+   * 署名不一致 (INVALID_SIGNATURE) が続いたとき、原因が「鍵の値違い」なのか
+   * 「canonical stringの作り方違い」なのかを画面だけで切り分けられるようにする。
+   * どちらの材料にも**鍵そのものを含めない**ことが絶対条件。
+   */
+  describe("署名不一致の切り分け材料", () => {
+    it("署名対象の文字列をそのまま返し、鍵は含めない", async () => {
+      const { service } = build(httpError(401, { error: { code: "INVALID_SIGNATURE" } }));
+      const result = await service.run("admin-1", "tok-1");
+
+      expect(result.outcome).toBe("unauthorized");
+      expect(result.canonicalString).toContain("GET");
+      expect(result.canonicalString).toContain("/api/collectible-claims/tok-1");
+      // 契約どおり6要素をLFで連結するので、GETは末尾が改行で終わる。
+      expect(result.canonicalString?.endsWith("\n")).toBe(true);
+      expect(result.canonicalString).not.toContain("secret-1");
+    });
+
+    it("鍵の指紋を返し、鍵そのものは返さない", async () => {
+      const { service } = build(httpError(401));
+      const result = await service.run("admin-1");
+
+      expect(result.keyId).toBe("key-1");
+      expect(result.keyFingerprint).toMatch(/^[0-9a-f]{16}$/u);
+      expect(result.keyFingerprint).not.toContain("secret-1");
+      expect(JSON.stringify(result)).not.toContain("secret-1");
+    });
+
+    it("同じ鍵なら同じ指紋、違う鍵なら違う指紋になる", async () => {
+      const { service: a } = build(httpError(401));
+      const first = await a.run("admin-1");
+
+      const { service: b } = build(httpError(401));
+      const second = await b.run("admin-1");
+      expect(second.keyFingerprint).toBe(first.keyFingerprint);
+
+      process.env["SENGOKU_MARKET_CLAIM_HMAC_SECRET"] = "secret-2";
+      const { service: c } = build(httpError(401));
+      const third = await c.run("admin-1");
+      expect(third.keyFingerprint).not.toBe(first.keyFingerprint);
+    });
+
+    it("接続先が未設定なら切り分け材料も出さない", async () => {
+      delete process.env["SENGOKU_MARKET_CLAIM_HMAC_SECRET"];
+      const { service } = build(httpError(401));
+      const result = await service.run("admin-1");
+
+      expect(result.outcome).toBe("not_configured");
+      expect(result.canonicalString).toBeNull();
+      expect(result.keyFingerprint).toBeNull();
+    });
+  });
 });
