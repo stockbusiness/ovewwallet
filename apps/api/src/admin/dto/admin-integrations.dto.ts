@@ -67,3 +67,14 @@ export const ProfileConfigUpdateSchema = z.object({
 export const ClaimConnectionTestSchema = z.object({
   token: z.string().max(255).optional(),
 });
+
+/**
+ * カード受取の接続設定。`hmacSecret` を空欄で保存すると現在の鍵を維持する
+ * (メール送信設定・共通顧客HUB設定と同じ挙動)。
+ */
+export const MarketClaimConfigUpdateSchema = z.object({
+  baseUrl: z.string().url().max(2048).optional(),
+  keyId: z.string().min(1).max(255).optional(),
+  hmacSecret: z.string().min(1).max(512).optional(),
+  reason: z.string().min(1),
+});

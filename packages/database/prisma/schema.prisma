@@ -382,6 +382,34 @@ model CommonUserHubConfig {
   @@map("common_user_hub_config")
 }
 
+
+/// 千ノ国マーケットの受取確認API (Claim) への接続設定。`MailConfig`と同じく
+/// シングルトン行 (`id = "default"`) で、管理画面 (/market-claim-config) から編集する。
+///
+/// 環境変数 `SENGOKU_MARKET_CLAIM_*` でも設定できるが、**この行が優先**される。
+/// 鍵の入れ替えにデプロイを待たせないため。
+model MarketClaimConfig {
+  id String @id
+
+  /// 受取確認APIのベースURL (例: https://www.sengoku-rr.com)。末尾スラッシュは付けない。
+  baseUrl String? @map("base_url")
+
+  /// 先方が発行したHMACのkey_id。署名ヘッダー X-SenNoKuni-Key-Id に入る。
+  keyId String? @map("key_id")
+
+  /// 先方が発行したHMAC Secret。ENCRYPTION_KEYによる可逆暗号化
+  /// (AES-256-GCM、MailConfig.apiKeyEncryptedと同方式)。署名の計算に生値が要るため
+  /// ハッシュではなく暗号化で保存する (AGENTS.md)。
+  hmacSecretEncrypted String? @map("hmac_secret_encrypted")
+  /// 管理画面表示用のマスク済みプレビュー (例: "****abcd")。生値は含まない。
+  hmacSecretPreview   String? @map("hmac_secret_preview")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("market_claim_config")
+}
+
 /// メール送信 (ワンタイムコードの配信) の設定。単一行 (`id = "default"`、
 /// CommonUserHubConfigと同じ方式) で、管理画面 (/mail-config) から編集する。
 ///

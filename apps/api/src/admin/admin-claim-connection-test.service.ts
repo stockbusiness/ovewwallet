@@ -6,10 +6,10 @@ import { PRISMA } from "../common/prisma.module";
 import { IntegrationHttpClient } from "../integrations/integration-http-client";
 import { MarketClaimErrorBodySchema } from "../integrations/integration-response-schemas";
 import {
-  buildSignedHeaders,
-  resolveMarketClaimConfigIgnoringFlag,
-  type MarketClaimConfig,
-} from "../integrations/sengoku-market-claim.adapter";
+  MarketClaimConfigService,
+  type ResolvedMarketClaimConfig,
+} from "../integrations/market-claim-config.service";
+import { buildSignedHeaders } from "../integrations/sengoku-market-claim.adapter";
 
 /** 連携先が何を返しても診断できるよう、形は問わずに受ける。 */
 const AnyJsonSchema = z.unknown();
@@ -57,6 +57,7 @@ export class AdminClaimConnectionTestService {
   constructor(
     @Inject(PRISMA) private readonly db: PrismaClient,
     private readonly http: IntegrationHttpClient,
+    private readonly marketClaimConfig: MarketClaimConfigService,
   ) {}
 
   /**
@@ -65,12 +66,13 @@ export class AdminClaimConnectionTestService {
    * 確定はしないので、指定しても受取は進まない。
    */
   async run(adminId: string, token?: string): Promise<ClaimConnectionTestResult> {
-    const config = resolveMarketClaimConfigIgnoringFlag();
+    // Feature Flagは見ない。開ける**前**に設定の正しさを確認できることが目的。
+    const config = await this.marketClaimConfig.resolve();
     if (!config) {
       return {
         outcome: "not_configured",
         message:
-          "接続先が未設定です。SENGOKU_MARKET_CLAIM_BASE_URL / _KEY_ID / _HMAC_SECRET の3つが揃って初めて有効になります。1つでも空だとこのテストは送信自体を行いません。",
+          "接続先が未設定です。URL / Key ID / HMAC Secret の3つが揃って初めて有効になります。「カード受取の接続設定」画面で登録してください (環境変数 SENGOKU_MARKET_CLAIM_* でも設定できますが、画面の設定が優先されます)。",
         requestUrl: null,
         httpStatus: null,
         partnerResponse: null,
@@ -89,7 +91,7 @@ export class AdminClaimConnectionTestService {
 
   /** 状態照会 (GET) だけを行う。確定 (POST .../confirm) は叩かないので副作用は無い。 */
   private async probe(
-    config: MarketClaimConfig,
+    config: ResolvedMarketClaimConfig,
     path: string,
   ): Promise<Awaited<ReturnType<IntegrationHttpClient["request"]>>> {
     const correlationId = randomUUID();
@@ -258,7 +260,7 @@ export class AdminClaimConnectionTestService {
   /** 本番の鍵を使う外部への発信なので、誰がいつ実行したかを残す。鍵は記録しない。 */
   private async writeAudit(
     adminId: string,
-    config: MarketClaimConfig,
+    config: ResolvedMarketClaimConfig,
     result: ClaimConnectionTestResult,
   ): Promise<void> {
     await this.db.auditLog.create({

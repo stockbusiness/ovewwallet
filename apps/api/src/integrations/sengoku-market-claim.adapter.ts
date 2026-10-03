@@ -3,6 +3,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { hmacSign } from "@ove/auth";
 import { isFeatureEnabled } from "../common/feature-flags";
 import { IntegrationHttpClient, type IntegrationErrorResult } from "./integration-http-client";
+import { MarketClaimConfigService } from "./market-claim-config.service";
 import {
   MarketClaimConfirmResponseSchema,
   MarketClaimErrorBodySchema,
@@ -44,33 +45,6 @@ export interface MarketClaimConfig {
   baseUrl: string;
   keyId: string;
   hmacSecret: string;
-}
-
-/**
- * NFTカードClaim導線実装指示書7章。Feature Flag OFF、またはbaseUrl/keyId/secretの
- * いずれかが未設定なら`null` (呼び出し元は503 disabled/config missingとして扱う)。
- * 代理店システム連携の`IntegrationConfigProvider`と異なり、この設定はDBではなく
- * 環境変数から読む (指示書7章が明示するプレーンな環境変数のみの構成)。
- */
-function resolveMarketClaimConfig(): MarketClaimConfig | null {
-  if (!isFeatureEnabled("ENABLE_COLLECTIBLE_CLAIM_FLOW")) return null;
-  return resolveMarketClaimConfigIgnoringFlag();
-}
-
-/**
- * Feature Flagを見ずに接続先だけを解決する。**管理画面の接続テスト専用。**
- *
- * Flagを開ける**前**に「URLと鍵が正しいか」を確かめられることが接続テストの目的
- * なので、ここだけは意図的にFlagを無視する (代理店の
- * `resolveAgencySystemConfigIgnoringFlag` と同じ考え方)。
- * 実際のClaim経路では使わないこと (Flagで止められなくなる)。
- */
-export function resolveMarketClaimConfigIgnoringFlag(): MarketClaimConfig | null {
-  const baseUrl = process.env["SENGOKU_MARKET_CLAIM_BASE_URL"];
-  const keyId = process.env["SENGOKU_MARKET_CLAIM_KEY_ID"];
-  const hmacSecret = process.env["SENGOKU_MARKET_CLAIM_HMAC_SECRET"];
-  if (!baseUrl || !keyId || !hmacSecret) return null;
-  return { baseUrl, keyId, hmacSecret };
 }
 
 /**
@@ -147,10 +121,24 @@ export function buildSignedHeaders(params: {
 export class SengokuMarketClaimAdapter {
   private readonly logger = new Logger(SengokuMarketClaimAdapter.name);
 
-  constructor(private readonly http: IntegrationHttpClient) {}
+  constructor(
+    private readonly http: IntegrationHttpClient,
+    private readonly config: MarketClaimConfigService,
+  ) {}
+
+  /**
+   * NFTカードClaim導線実装指示書7章。Feature Flag OFF、または接続先3点のいずれかが
+   * 未設定なら`null` (呼び出し元は503 disabled/config missingとして扱う)。
+   *
+   * 設定の実体は`MarketClaimConfigService` (管理画面のDB行が環境変数より優先)。
+   */
+  private async resolveConfig(): Promise<MarketClaimConfig | null> {
+    if (!isFeatureEnabled("ENABLE_COLLECTIBLE_CLAIM_FLOW")) return null;
+    return this.config.resolve();
+  }
 
   async getClaimStatus(rawToken: string, correlationId: string = randomUUID()): Promise<GetClaimStatusResult> {
-    const config = resolveMarketClaimConfig();
+    const config = await this.resolveConfig();
     if (!config) return { outcome: "disabled" };
 
     const path = `/api/collectible-claims/${encodeURIComponent(rawToken)}`;
@@ -191,7 +179,7 @@ export class SengokuMarketClaimAdapter {
     idempotencyKey: string;
     correlationId?: string;
   }): Promise<ConfirmClaimResult> {
-    const config = resolveMarketClaimConfig();
+    const config = await this.resolveConfig();
     if (!config) return { outcome: "disabled" };
 
     const correlationId = params.correlationId ?? randomUUID();

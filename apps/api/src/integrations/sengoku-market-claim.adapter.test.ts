@@ -2,11 +2,23 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { hmacSign } from "@ove/auth";
 import { IntegrationHttpClient } from "./integration-http-client";
+import { MarketClaimConfigService } from "./market-claim-config.service";
 import {
   SengokuMarketClaimAdapter,
   buildSenNoKuniCanonicalString,
   signSenNoKuniRequest,
 } from "./sengoku-market-claim.adapter";
+
+/**
+ * DB行が無い状態の設定サービス。既存のテストは環境変数で接続先を与えているので、
+ * **環境変数フォールバックが生きていること**もあわせて固定することになる。
+ */
+function envOnlyConfigService(): MarketClaimConfigService {
+  const db = {
+    marketClaimConfig: { findUnique: async () => null },
+  } as unknown as ConstructorParameters<typeof MarketClaimConfigService>[0];
+  return new MarketClaimConfigService(db);
+}
 
 /**
  * 千ノ国NFTマーケット契約v2指示書 PR-WN01 (6〜9章) の回帰テスト。
@@ -138,7 +150,7 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
       process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
       process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
 
-      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient(), envOnlyConfigService());
       const result = await adapter.confirmClaim({
         rawToken: "tok123",
         commonUserId: "cu_1",
@@ -178,7 +190,7 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
       process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
       process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
 
-      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient(), envOnlyConfigService());
       const result = await adapter.confirmClaim({
         rawToken: "tok123",
         commonUserId: "cu_1",
@@ -204,7 +216,7 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
         process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
         process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
 
-        const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+        const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient(), envOnlyConfigService());
         const result = await adapter.confirmClaim({
           rawToken: "tok123",
           commonUserId: "cu_1",
@@ -222,7 +234,7 @@ describe("sengoku-market-claim.adapter (千ノ国NFTマーケット契約v2 PR-W
       process.env.SENGOKU_MARKET_CLAIM_KEY_ID = "test-claim-key";
       process.env.SENGOKU_MARKET_CLAIM_HMAC_SECRET = "test-claim-secret";
 
-      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient());
+      const adapter = new SengokuMarketClaimAdapter(new IntegrationHttpClient(), envOnlyConfigService());
       const result = await adapter.getClaimStatus("tok123");
 
       expect(result.outcome).toBe("ok");

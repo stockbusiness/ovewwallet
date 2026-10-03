@@ -3,6 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { z } from "zod";
 import { AdminClaimConnectionTestService } from "./admin-claim-connection-test.service";
+import { MarketClaimConfigService } from "../integrations/market-claim-config.service";
 import { AdminServiceIntegrationsService } from "./admin-service-integrations.service";
 import { AdminCommonUserHubService } from "./admin-common-user-hub.service";
 import { AdminMailConfigService } from "./admin-mail-config.service";
@@ -14,6 +15,7 @@ import {
   AgencyLinkManualLinkSchema,
   AgencyLinkUnlinkSchema,
   ClaimConnectionTestSchema,
+  MarketClaimConfigUpdateSchema,
   ServiceIntegrationActionSchema,
   CommonUserHubConfigUpdateSchema,
   MailConfigUpdateSchema,
@@ -36,6 +38,7 @@ export class AdminIntegrationsController {
     private readonly claimConnectionTest: AdminClaimConnectionTestService,
     private readonly mailConfig: AdminMailConfigService,
     private readonly profileConfig: AdminProfileConfigService,
+    private readonly marketClaimConfig: MarketClaimConfigService,
   ) {}
 
   /**
@@ -72,6 +75,31 @@ export class AdminIntegrationsController {
    * Feature Flagは見ない (開ける前に確かめられることが目的)。状態照会のみで
    * 確定は叩かないため副作用は無い。本番の鍵で外部へ発信するのでAUDITORには開けない。
    */
+  /** カード受取の接続設定を読む。鍵の生値は返さない (末尾4文字のマスクのみ)。 */
+  @Get("collectible-claims/config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN", "AUDITOR")
+  async getMarketClaimConfig() {
+    return this.marketClaimConfig.describe();
+  }
+
+  /** HMAC Secretを空欄で保存すると現在の鍵を維持する。 */
+  @Post("collectible-claims/config")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")
+  async updateMarketClaimConfig(
+    @Body(new ZodValidationPipe(MarketClaimConfigUpdateSchema))
+    body: z.infer<typeof MarketClaimConfigUpdateSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    await this.marketClaimConfig.save(
+      { baseUrl: body.baseUrl, keyId: body.keyId, hmacSecret: body.hmacSecret },
+      req.admin.id,
+      body.reason,
+    );
+    return this.marketClaimConfig.describe();
+  }
+
   @Post("collectible-claims/test-connection")
   @UseGuards(AdminAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "INTEGRATION_ADMIN")

@@ -1,4 +1,5 @@
 import type { IntegrationHttpClient } from "../integrations/integration-http-client";
+import { MarketClaimConfigService } from "../integrations/market-claim-config.service";
 import { AdminClaimConnectionTestService } from "./admin-claim-connection-test.service";
 
 /**
@@ -35,7 +36,13 @@ function build(response: unknown) {
     },
   } as unknown as IntegrationHttpClient;
 
-  return { service: new AdminClaimConnectionTestService(db, http), audits, requests };
+  // DB行は持たせない。既存のテストは環境変数で接続先を与えているため、
+  // 環境変数フォールバックが生きていることもここで固定される。
+  const configDb = {
+    marketClaimConfig: { findUnique: async () => null },
+  } as unknown as ConstructorParameters<typeof MarketClaimConfigService>[0];
+  const config = new MarketClaimConfigService(configDb);
+  return { service: new AdminClaimConnectionTestService(db, http, config), audits, requests };
 }
 
 function httpError(status: number, body?: unknown, bodyText?: string) {
