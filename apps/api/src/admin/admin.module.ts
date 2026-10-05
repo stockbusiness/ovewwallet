@@ -30,6 +30,7 @@ import { AdminLegalService } from "./admin-legal.service";
 import { AdminMailConfigService } from "./admin-mail-config.service";
 import { AdminProfileConfigService } from "./admin-profile-config.service";
 import { AdminCollectiblesService } from "./admin-collectibles.service";
+import { AdminCommonUserResolveService } from "./admin-common-user-resolve.service";
 import { AdminEmailDomainsController } from "./admin-email-domains.controller";
 import { AdminEmailDomainsService } from "./admin-email-domains.service";
 import { AdminImageStorageController } from "./admin-image-storage.controller";
@@ -99,6 +100,7 @@ import { AdminService } from "./admin.service";
     AdminWalletReferralsService,
     AdminNoticesService,
     AdminCommonUserHubService,
+    AdminCommonUserResolveService,
     AdminLegalService,
     AdminMailConfigService,
     AdminProfileConfigService,

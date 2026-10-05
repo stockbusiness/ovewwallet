@@ -25,6 +25,7 @@ import { TermsConsentService } from "./terms-consent.service";
     TermsConsentService,
     AccountProfileService,
   ],
-  exports: [AccountsService, AccountAnonymizationService, AccountProfileService],
+  // 管理画面の「共通IDを再解決」(AdminCommonUserResolveService) から使う。
+  exports: [AccountsService, AccountAnonymizationService, AccountProfileService, CommonUserLinkingService],
 })
 export class AccountsModule {}
