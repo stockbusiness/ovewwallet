@@ -20,6 +20,10 @@ export class CommonUserHubClient {
     return this.adapter.resolve(params);
   }
 
+  async isConfigured(): Promise<boolean> {
+    return this.adapter.isConfigured();
+  }
+
   async linkSystemAccount(params: LinkSystemAccountParams): Promise<boolean> {
     return this.adapter.linkSystemAccount(params);
   }

@@ -178,6 +178,8 @@ export interface AccountDetailItem {
   id: string;
   accountCode: string;
   status: string;
+  /** 共通顧客HUBで解決した共通ID。未解決なら null (デジタル会員証付与・カード受取が通らない)。 */
+  commonUserId: string | null;
   displayName: string | null;
   primaryEmail: string | null;
   primaryPhone: string | null;

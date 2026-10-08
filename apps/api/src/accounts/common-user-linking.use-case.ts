@@ -14,7 +14,12 @@ export interface LinkCommonUserResult {
 export interface LinkCommonUserParams {
   accountId: string;
   commonUserId: string;
-  actorType: "SYSTEM" | "EXTERNAL_SERVICE";
+  /**
+   * 監査ログ上の実行主体。登録時の自動解決は`SYSTEM`、共通イベント経由は
+   * `EXTERNAL_SERVICE`、管理画面からの手動再解決は`ADMIN`。
+   * 誰が紐付けたかを後から追えるようにするため、呼び出し元ごとに分ける。
+   */
+  actorType: "SYSTEM" | "EXTERNAL_SERVICE" | "ADMIN";
   actorId?: string;
   /** AuditLogのreasonに残す追加コンテキスト (例: `event_id=...`)。 */
   reasonContext?: string;

@@ -5,6 +5,25 @@ import { ReferralsService } from "../referrals/referrals.service";
 import { CommonUserLinkingUseCase } from "./common-user-linking.use-case";
 
 /**
+ * 共通ID解決の結果。登録時はベストエフォートで握り潰すが、管理画面から
+ * 手動で再解決するときは**何が起きたかを呼び出し元へ返す**必要がある
+ * (「静かに失敗」したままでは、運用者が設定の誤りに気づけない)。
+ */
+export type ResolveCommonUserOutcome =
+  /** HUBが返したIDを新たに紐付けた。 */
+  | { outcome: "linked"; commonUserId: string }
+  /** 既に同じIDが紐付いていた (再実行しても安全)。 */
+  | { outcome: "already_linked"; commonUserId: string }
+  /** 別アカウントに同じIDが紐付いている等。自動では解決しない。 */
+  | { outcome: "conflict"; commonUserId: string }
+  /** Feature Flag OFF、または送信先・APIキー未設定でHUBを呼んでいない。 */
+  | { outcome: "not_configured" }
+  /** HUBは呼んだが応答が得られなかった (通信エラー・認証エラー等)。 */
+  | { outcome: "hub_unavailable" }
+  /** 例外。`message`は画面に出す。 */
+  | { outcome: "failed"; message: string };
+
+/**
  * リファクタリング指示書 Phase 2: `AccountsService`から分離した
  * Common User Hub連携責務 (common_user_id解決・保存、紐付け後の紹介confirm)。
  */
@@ -29,6 +48,33 @@ export class CommonUserLinkingService {
    * (`common_user.resolved`イベント経由の`CommonUserResolvedHandler`と共通) に委ねる。
    */
   async tryLinkCommonUser(account: OveAccount): Promise<void> {
+    const result = await this.resolveAndLink(account, "SYSTEM");
+    if (result.outcome === "conflict") {
+      this.logger.warn(
+        `common_user_id ${result.commonUserId} could not be linked to account ${account.id} (conflict)`,
+      );
+    }
+    if (result.outcome === "failed") {
+      this.logger.warn(`failed to link common_user_id for account ${account.id}: ${result.message}`);
+    }
+  }
+
+  /**
+   * 共通IDを解決して紐付け、**結果を返す**。
+   *
+   * `tryLinkCommonUser`は登録時にしか呼ばれず、失敗しても登録は成功する
+   * 設計のため、HUBの設定が誤っていると「静かに失敗」したアカウントが
+   * 残り続ける (あとから解決し直す手段が無い)。管理画面から手動で再解決
+   * できるよう、同じ処理を結果付きで公開する。
+   *
+   * `actorType`は監査ログ上の実行主体。登録時の自動実行は`SYSTEM`、
+   * 管理画面からの手動実行は`ADMIN`を渡す。
+   */
+  async resolveAndLink(
+    account: OveAccount,
+    actorType: "SYSTEM" | "ADMIN",
+    actorId?: string,
+  ): Promise<ResolveCommonUserOutcome> {
     try {
       const result = await this.commonUserHub.resolve({
         externalUserId: account.id,
@@ -36,27 +82,36 @@ export class CommonUserLinkingService {
         phone: account.primaryPhone,
         displayName: account.displayName,
       });
-      if (!result) return;
+      // Flag OFF・設定未投入・HUB側エラーのいずれでも`null`が返る
+      // (`CommonUserHubAdapter.resolve`)。設定の有無で区別して返す。
+      if (!result) {
+        return (await this.commonUserHub.isConfigured())
+          ? { outcome: "hub_unavailable" }
+          : { outcome: "not_configured" };
+      }
 
       const linkResult = await this.linking.link({
         accountId: account.id,
         commonUserId: result.commonUserId,
-        actorType: "SYSTEM",
+        actorType,
+        actorId,
       });
       if (linkResult.action === "conflict_requires_review") {
-        this.logger.warn(
-          `common_user_id ${result.commonUserId} could not be linked to account ${account.id} (conflict)`,
-        );
-        return;
+        return { outcome: "conflict", commonUserId: result.commonUserId };
       }
 
       // 紹介Phase 2 (共通実装契約5章): 「本人ログイン・common user resolve後にconfirmする」。
       // ベストエフォート (失敗しても登録・ログイン自体はブロックしない)。
       await this.referrals.confirmAfterCommonUserResolve(account.id, result.commonUserId);
+
+      return linkResult.action === "already_linked"
+        ? { outcome: "already_linked", commonUserId: result.commonUserId }
+        : { outcome: "linked", commonUserId: result.commonUserId };
     } catch (error) {
-      this.logger.warn(
-        `failed to link common_user_id for account ${account.id}: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return {
+        outcome: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 }

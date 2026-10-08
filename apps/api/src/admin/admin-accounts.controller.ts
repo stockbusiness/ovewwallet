@@ -5,10 +5,11 @@ import { z } from "zod";
 import { AdminService } from "./admin.service";
 import { AdminAccountMergeService } from "./admin-account-merge.service";
 import { AccountAnonymizationService } from "../accounts/account-anonymization.service";
-import { AccountMergeSchema } from "./dto/admin-accounts.dto";
+import { AccountMergeSchema, ResolveCommonUserSchema } from "./dto/admin-accounts.dto";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
+import { AdminCommonUserResolveService } from "./admin-common-user-resolve.service";
 
 @ApiTags("admin-accounts")
 @Controller("api/v1/admin")
@@ -17,6 +18,7 @@ export class AdminAccountsController {
     private readonly admin: AdminService,
     private readonly accountMerge: AdminAccountMergeService,
     private readonly anonymization: AccountAnonymizationService,
+    private readonly commonUserResolve: AdminCommonUserResolveService,
   ) {}
 
   /**
@@ -86,6 +88,30 @@ export class AdminAccountsController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.admin.revokeAllSessions(accountId, req.admin.id);
+  }
+
+  /**
+   * 共通IDの再解決 (バックフィル)。
+   *
+   * `common_user_id`は**アカウント新規登録時の自動解決**か共通イベント受信でしか
+   * 入らず、登録時の解決はベストエフォート (共通顧客HUBが未設定・誤設定でも登録は
+   * 成功する) なため、その期間に作られたアカウントは空のまま固定されてしまう。
+   * 共通IDが無いと`entitlement.granted`が404になり、カード受取も確定手前で止まる。
+   * 実運用で詰まったため、あとから解決し直せる入口を用意する。
+   *
+   * 冪等 (既に同じIDが紐付いていれば`already_linked`を返すだけ)。別アカウントに
+   * 紐付いている場合は自動解決せず`conflict`を返す (統合は二段階承認が必要な
+   * `accounts/merge`の責務)。
+   */
+  @Post("accounts/:accountId/resolve-common-user")
+  @UseGuards(AdminAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "OVE_OPERATOR")
+  async resolveCommonUser(
+    @Param("accountId") accountId: string,
+    @Body(new ZodValidationPipe(ResolveCommonUserSchema)) body: z.infer<typeof ResolveCommonUserSchema>,
+    @Req() req: AuthenticatedAdminRequest,
+  ) {
+    return this.commonUserResolve.run(accountId, req.admin.id, body.reason);
   }
 
   /**

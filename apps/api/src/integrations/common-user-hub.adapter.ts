@@ -45,6 +45,15 @@ export class CommonUserHubAdapter {
     private readonly configProvider: IntegrationConfigProvider,
   ) {}
 
+  /**
+   * 送信先・APIキー・Feature Flagが揃っているか。`resolve()`は未設定でも
+   * HUB側エラーでも等しく`null`を返すため、呼び出し元がその2つを区別するために使う
+   * (「設定していない」のか「設定したが通じない」のかで、運用者の次の手が変わる)。
+   */
+  async isConfigured(): Promise<boolean> {
+    return (await this.configProvider.resolveAgencySystemConfig("ENABLE_PLATFORM_USER_ID")) !== null;
+  }
+
   async resolve(params: ResolveCommonUserParams): Promise<ResolveCommonUserResult | null> {
     const config = await this.configProvider.resolveAgencySystemConfig("ENABLE_PLATFORM_USER_ID");
     if (!config) return null;
