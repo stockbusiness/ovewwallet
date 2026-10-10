@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { API_BASE_URL } from "@/lib/api-base-url";
 
 /**
  * 代理店紹介URL (実装指示書 v1.0、Cookie発行方式の技術判断書)。

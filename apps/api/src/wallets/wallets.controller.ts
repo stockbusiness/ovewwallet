@@ -39,6 +39,7 @@ import {
 } from "../common/session-auth.guard";
 import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { ReferralsService } from "../referrals/referrals.service";
+import { WalletUserReferralsService } from "../wallet-user-referrals/wallet-user-referrals.service";
 import { WALLET_SERVICE_SCOPES } from "./wallet-service-scopes";
 import { WalletsService } from "./wallets.service";
 
@@ -54,6 +55,7 @@ export class MeController {
     private readonly wallets: WalletsService,
     private readonly referrals: ReferralsService,
     private readonly collectibles: CollectiblesQueryService,
+    private readonly walletUserReferrals: WalletUserReferralsService,
   ) {}
 
   @Get("wallet")
@@ -138,6 +140,21 @@ export class MeController {
     return this.referrals.getMyReferralStatus(req.account.id);
   }
 
+  /**
+   * 本人の紹介コード・共有URLと、ウォレット経由で紹介した相手の一覧
+   * (`docs/wallet-user-referral.md`)。
+   *
+   * 代理店紹介の`referral-status`が「自分が紹介された結果どうなったか」を返すのに対し、
+   * こちらは「自分が誰を紹介したか」を返す。紹介コードは**この呼び出しで初めて
+   * 発行される** (使わない人のほうが多い想定で、全員に前もって振らない)。
+   * Feature Flag OFFのときは発行せず `enabled: false` を返す。
+   */
+  @Get("wallet-user-referrals")
+  @UseGuards(SessionAuthGuard)
+  async myWalletUserReferrals(@Req() req: AuthenticatedUserRequest) {
+    return this.walletUserReferrals.getMySummary(req.account.id);
+  }
+
   @Get("wallet/expiring-credits")
   @UseGuards(SessionAuthGuard)
   async expiringCredits(@Req() req: AuthenticatedUserRequest) {
@@ -151,6 +168,7 @@ export class MeController {
     return {
       digital_collection_enabled: isFeatureEnabled("ENABLE_DIGITAL_COLLECTION"),
       linked_services_enabled: isFeatureEnabled("ENABLE_LINKED_SERVICES"),
+      wallet_user_referral_enabled: isFeatureEnabled("ENABLE_WALLET_USER_REFERRAL"),
     };
   }
 

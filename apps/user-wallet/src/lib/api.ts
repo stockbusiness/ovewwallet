@@ -178,6 +178,8 @@ export interface LoginMethodAvailability {
 export interface MeFeatureFlags {
   digital_collection_enabled: boolean;
   linked_services_enabled: boolean;
+  /** ウォレット利用者同士の紹介 (`/wallet/referral`) の導線を出すか。 */
+  wallet_user_referral_enabled: boolean;
 }
 
 export type CollectibleHoldingStatus =
@@ -350,3 +352,39 @@ export const SUPPORT_STATUS_LABEL: Record<SupportInquiryStatus, string> = {
   ANSWERED: "お返事済み",
   CLOSED: "対応済み",
 };
+
+/** 自分がウォレット経由で紹介した相手 (`docs/wallet-user-referral.md`)。 */
+export interface WalletUserReferralItem {
+  account_code: string;
+  display_name: string | null;
+  registered_at: string | null;
+  /** 代理店システムへ継承を通知済みか。 */
+  inherited: boolean;
+}
+
+export interface WalletUserReferralSummary {
+  /** Feature Flagが無効のときはfalse。この場合、紹介コードは発行されない。 */
+  enabled: boolean;
+  code: string | null;
+  url: string | null;
+  referred_count: number;
+  referrals: WalletUserReferralItem[];
+}
+
+/** 自分がウォレット経由で紹介した相手 (`docs/wallet-user-referral.md`)。 */
+export interface WalletUserReferralItem {
+  account_code: string;
+  display_name: string | null;
+  registered_at: string | null;
+  /** 代理店システムへ継承を通知済みか。 */
+  inherited: boolean;
+}
+
+export interface WalletUserReferralSummary {
+  /** Feature Flagが無効のときはfalse。この場合、紹介コードは発行されない。 */
+  enabled: boolean;
+  code: string | null;
+  url: string | null;
+  referred_count: number;
+  referrals: WalletUserReferralItem[];
+}

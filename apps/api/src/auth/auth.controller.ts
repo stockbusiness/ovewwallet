@@ -13,6 +13,7 @@ import { SkipTermsConsent } from "../accounts/terms-consent";
 import { availableLoginMethods, isLoginMethodEnabled, type LoginMethod } from "./login-methods";
 import { referralCookieOptions } from "../referrals/referral-cookie";
 import { REFERRAL_SESSION_COOKIE_NAME } from "../referrals/referrals.controller";
+import { WALLET_USER_REFERRAL_COOKIE_NAME } from "../wallet-user-referrals/wallet-user-referrals.controller";
 
 /** ログインデバイス一覧向けに、リクエストから接続元情報を取り出す。 */
 function sessionMetaFromRequest(req: Request): SessionMeta {
@@ -97,6 +98,7 @@ export class AuthController {
     assertLoginMethodEnabled("email");
     // 紹介Cookieの扱いはLINEログインと揃える。メール登録でも紹介を成立させるため。
     const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
+    const walletUserReferralCookieToken = req.cookies?.[WALLET_USER_REFERRAL_COOKIE_NAME] as string | undefined;
     try {
       const session = await this.auth.verifyEmailOtpAndLogin(
         body.email,
@@ -104,6 +106,7 @@ export class AuthController {
         body.termsAccepted,
         sessionMetaFromRequest(req),
         referralCookieToken,
+        walletUserReferralCookieToken,
       );
       setSessionCookie(res, session.token, session.expiresAt);
       return { ove_account_id: session.oveAccountId };
@@ -111,6 +114,9 @@ export class AuthController {
       // LINEログインと同じく、成功・失敗にかかわらず使い切りとして削除する。
       // 発行時とまったく同じ属性 (domainを含む) を渡す。食い違うとブラウザが削除を無視する。
       if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, referralCookieOptions(req.hostname));
+      if (walletUserReferralCookieToken) {
+        res.clearCookie(WALLET_USER_REFERRAL_COOKIE_NAME, referralCookieOptions(req.hostname));
+      }
     }
   }
 
@@ -122,12 +128,14 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const referralCookieToken = req.cookies?.[REFERRAL_SESSION_COOKIE_NAME] as string | undefined;
+    const walletUserReferralCookieToken = req.cookies?.[WALLET_USER_REFERRAL_COOKIE_NAME] as string | undefined;
     try {
       const session = await this.auth.loginWithLineMock(
         body.idToken,
         body.termsAccepted,
         referralCookieToken,
         sessionMetaFromRequest(req),
+        walletUserReferralCookieToken,
       );
       setSessionCookie(res, session.token, session.expiresAt);
       return { ove_account_id: session.oveAccountId };
@@ -139,6 +147,9 @@ export class AuthController {
       // (httpOnly/secure/sameSite) を指定しないとブラウザが削除を無視しうるため揃える。
       // 発行時とまったく同じ属性 (domainを含む) を渡す。食い違うとブラウザが削除を無視する。
       if (referralCookieToken) res.clearCookie(REFERRAL_SESSION_COOKIE_NAME, referralCookieOptions(req.hostname));
+      if (walletUserReferralCookieToken) {
+        res.clearCookie(WALLET_USER_REFERRAL_COOKIE_NAME, referralCookieOptions(req.hostname));
+      }
     }
   }
 
