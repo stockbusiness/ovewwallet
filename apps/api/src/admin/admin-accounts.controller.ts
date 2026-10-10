@@ -10,6 +10,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe";
 import { AdminAuthGuard, type AuthenticatedAdminRequest } from "../common/admin-auth.guard";
 import { Roles, RolesGuard } from "../common/roles.guard";
 import { AdminCommonUserResolveService } from "./admin-common-user-resolve.service";
+import { AdminWalletUserReferralsService } from "./admin-wallet-user-referrals.service";
 
 @ApiTags("admin-accounts")
 @Controller("api/v1/admin")
@@ -19,6 +20,7 @@ export class AdminAccountsController {
     private readonly accountMerge: AdminAccountMergeService,
     private readonly anonymization: AccountAnonymizationService,
     private readonly commonUserResolve: AdminCommonUserResolveService,
+    private readonly walletUserReferrals: AdminWalletUserReferralsService,
   ) {}
 
   /**
@@ -88,6 +90,22 @@ export class AdminAccountsController {
     @Req() req: AuthenticatedAdminRequest,
   ) {
     return this.admin.revokeAllSessions(accountId, req.admin.id);
+  }
+
+  /**
+   * ウォレット紹介の可視化 (`docs/wallet-user-referral.md`)。
+   *
+   * このアカウントを紹介した人と、このアカウントが紹介した人を返す。成立しなかった
+   * 関係 (代理店紹介が優先された `EXCLUDED`・期限切れの `EXPIRED`) とその理由も
+   * 含める。「紹介したはずなのに数に入らない」という問い合わせに答えるため。
+   *
+   * アカウント詳細とは別エンドポイントにしている。詳細の応答をこれ以上重くせず、
+   * 取得に失敗してもアカウント詳細画面自体は表示を続けられるようにするため。
+   */
+  @Get("accounts/:accountId/wallet-user-referrals")
+  @UseGuards(AdminAuthGuard)
+  async accountWalletUserReferrals(@Param("accountId") accountId: string) {
+    return this.walletUserReferrals.forAccount(accountId);
   }
 
   /**

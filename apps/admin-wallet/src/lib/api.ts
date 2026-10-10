@@ -782,3 +782,24 @@ export const SUPPORT_STATUS_LABEL: Record<SupportInquiryStatus, string> = {
   ANSWERED: "返信済み",
   CLOSED: "完了",
 };
+
+/** ウォレット紹介の1行 (`docs/wallet-user-referral.md`)。 */
+export interface AdminWalletUserReferralRow {
+  id: string;
+  account_id: string | null;
+  account_code: string | null;
+  display_name: string | null;
+  status: string;
+  captured_at: string;
+  registered_at: string | null;
+  inherited_at: string | null;
+  /** 対象外になった理由 (`agency_referral_takes_precedence` 等)。 */
+  reason: string | null;
+}
+
+export interface AdminWalletUserReferralView {
+  referred_by: AdminWalletUserReferralRow | null;
+  /** 成立しなかった関係も含む。 */
+  referrals_made: AdminWalletUserReferralRow[];
+  established_count: number;
+}

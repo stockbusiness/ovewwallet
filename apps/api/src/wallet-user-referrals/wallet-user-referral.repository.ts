@@ -71,6 +71,31 @@ export class WalletUserReferralRepository {
     });
   }
 
+  /**
+   * 管理画面向け: このアカウントが紹介した関係を**状態で絞らずに**返す。
+   *
+   * 本人向けの`listByReferrer`はREGISTERED/INHERITEDだけを返すが、運用では
+   * 逆に`EXCLUDED`・`EXPIRED`こそ見たい (「紹介したはずなのに数に入らない」という
+   * 問い合わせの答えがそこにある)。登録前セッション (CAPTURED) は紹介リンクを
+   * 開かれた回数にすぎず、人として数えられないため除く。
+   */
+  async listByReferrerForAdmin(referrerAccountId: string, limit = 200) {
+    return this.db.walletUserReferral.findMany({
+      where: { referrerAccountId, status: { not: "CAPTURED" } },
+      orderBy: { capturedAt: "desc" },
+      take: limit,
+      include: { referred: { select: { id: true, accountCode: true, displayName: true } } },
+    });
+  }
+
+  /** 管理画面向け: このアカウントを紹介した関係 (最大1件)。 */
+  async findByReferredForAdmin(referredAccountId: string) {
+    return this.db.walletUserReferral.findUnique({
+      where: { referredAccountId },
+      include: { referrer: { select: { id: true, accountCode: true, displayName: true } } },
+    });
+  }
+
   /** 紹介コードからアカウントを引く。 */
   async findAccountByReferralCode(code: string, db: Db = this.db) {
     return db.oveAccount.findUnique({ where: { walletReferralCode: code } });

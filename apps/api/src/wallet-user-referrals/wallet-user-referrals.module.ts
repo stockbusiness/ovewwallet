@@ -15,6 +15,7 @@ import { WalletUserReferralsService } from "./wallet-user-referrals.service";
     AttachWalletUserReferralUseCase,
     WalletUserReferralsService,
   ],
-  exports: [WalletUserReferralsService],
+  // AdminModule の可視化画面から読み取りに使う。
+  exports: [WalletUserReferralsService, WalletUserReferralRepository],
 })
 export class WalletUserReferralsModule {}
