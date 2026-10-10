@@ -32,6 +32,7 @@ export default function WalletMenuPage() {
   const [referralStatus, setReferralStatus] = useState<ReferralStatus | null>(null);
   const [collectionEnabled, setCollectionEnabled] = useState(false);
   const [linkedServicesEnabled, setLinkedServicesEnabled] = useState(false);
+  const [referralEnabled, setReferralEnabled] = useState(false);
   /** 公開済みの法的文書だけをメニューに出す (docs/legal-documents.md)。 */
   const [legalSlugs, setLegalSlugs] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -65,9 +66,11 @@ export default function WalletMenuPage() {
         const flags = await apiFetch<MeFeatureFlags>("/api/v1/me/feature-flags");
         setCollectionEnabled(flags.digital_collection_enabled);
         setLinkedServicesEnabled(flags.linked_services_enabled);
+        setReferralEnabled(flags.wallet_user_referral_enabled);
       } catch {
         setCollectionEnabled(false);
         setLinkedServicesEnabled(false);
+        setReferralEnabled(false);
       }
       // 未公開の文書へのリンクを出さない。取得に失敗したときは何も出さず、
       // 「開いたら公開されていません」と言われる導線を作らない。
@@ -136,6 +139,7 @@ export default function WalletMenuPage() {
         <MenuLink href="/wallet/earn" label="ORIを貯める" />
         <MenuLink href="/wallet/use" label="ORIを使う" />
         {collectionEnabled && <MenuLink href="/wallet/collection" label="コレクション" />}
+        {referralEnabled && <MenuLink href="/wallet/referral" label="お友達を紹介" />}
         <MenuLink href="/wallet/profile" label="お客様情報" />
         <MenuLink href="/wallet/devices" label="ログイン中の端末" />
         <MenuLink href="/wallet/support" label="お問い合わせ" />

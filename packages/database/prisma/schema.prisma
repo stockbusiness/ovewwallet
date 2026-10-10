@@ -289,6 +289,10 @@ model OveAccount {
   /// 同4.2章。現在の顧客担当代理店のagent_code。`customer.assignment.changed`
   /// イベント受信のたびに更新される (運用上変更可能、変更履歴はAuditLogに残す)。
   assignedAgencyId             String?       @map("assigned_agency_id")
+  /// ウォレット利用者が他の人を紹介するときの共有コード (`/r/{code}`)。
+  /// 本人が紹介画面を開いた時点で発行する (全員に前もって振らない)。
+  /// アカウントコードは桁が連続していて推測できるため流用せず、不透明な値を使う。
+  walletReferralCode           String?       @unique @map("wallet_referral_code")
   createdAt                    DateTime      @default(now()) @map("created_at")
   updatedAt                    DateTime      @updatedAt @map("updated_at")
   closedAt                     DateTime?     @map("closed_at")
@@ -301,6 +305,10 @@ model OveAccount {
   wallet              Wallet?
   sessions            UserSession[]
   walletReferrals     WalletReferral[]
+  /// このアカウントがウォレット経由で紹介した関係。
+  referralsMade       WalletUserReferral[] @relation("WalletUserReferralReferrer")
+  /// このアカウントがウォレット経由で紹介された関係 (最大1件)。
+  referralReceived    WalletUserReferral?  @relation("WalletUserReferralReferred")
   noticeReads         NoticeRead[]
   /// 宛先がこのアカウントの個別通知 (全員向けのお知らせはここに含まれない)。
   notices             Notice[]
@@ -1185,6 +1193,75 @@ model WalletReferralBenefit {
   @@unique([benefitType, lineUserIdHash])
   @@index([walletUserId])
   @@map("wallet_referral_benefits")
+}
+
+enum WalletUserReferralStatus {
+  /// `/r/{code}` で受け付け、登録セッションCookieを発行した直後 (登録未完了)。
+  CAPTURED
+  /// 新規登録が完了し、紹介関係が成立した。代理店システムへはまだ伝えていない
+  /// (紹介者がまだ代理店資格を持っていないため、伝える相手が居ない)。
+  REGISTERED
+  /// 紹介者が代理店資格を取得したため、代理店システムへ継承を通知済み。
+  /// 成果として認めるかどうかの判定は代理店システム側が行う。
+  INHERITED
+  /// 代理店紹介が先に成立していた等の理由で対象外。
+  EXCLUDED
+  /// 登録に使われないままセッション有効期限が切れた。
+  EXPIRED
+}
+
+/// ウォレット利用者同士の紹介 (`docs/wallet-user-referral.md`)。
+///
+/// `WalletReferral` (代理店紹介) とは**別テーブルにしている**。あちらは
+/// 代理店システムのcapture/confirm APIと一対一で、`referral_token_encrypted`が
+/// 必須・状態機械も代理店前提のため、紹介元がウォレット利用者である関係を
+/// 混ぜると両方の不変条件が曖昧になる。排他 (同じ人が両方を持たない) は
+/// `AttachWalletUserReferralUseCase`がアプリ層で明示的に担保する。
+///
+/// `id`は**代理店システムへ送る外部公開ID** (先方が「紹介記録ID」として保存し、
+/// 承認結果で参照してくる)。採番し直し・行の削除はできない。
+model WalletUserReferral {
+  id String @id
+
+  /// 紹介した側。
+  referrerAccountId String  @map("referrer_account_id")
+  /// 紹介された側。登録完了までnull。
+  referredAccountId String? @map("referred_account_id")
+
+  /// `/r/{code}` のCookie発行に使う不透明トークンのハッシュ (このテーブル自体を
+  /// セッションストアとして使う)。SHA-256 (`sha256Hex`、`WalletReferral`と同じ方式)。
+  sessionTokenHash String @unique @map("session_token_hash")
+
+  status WalletUserReferralStatus @default(CAPTURED)
+
+  capturedAt   DateTime  @default(now()) @map("captured_at")
+  expiresAt    DateTime  @map("expires_at")
+  /// 登録に使われた日時 (このセッションはこれ以降再利用できない)。
+  usedAt       DateTime? @map("used_at")
+  registeredAt DateTime? @map("registered_at")
+  /// 代理店システムへ継承を通知した日時。昇格の同期が繰り返し届いても
+  /// 二重に通知しないための印。
+  inheritedAt  DateTime? @map("inherited_at")
+  /// EXCLUDEDにした理由 (運用者が後から追えるようにする)。
+  reason       String?
+
+  /// IP/UAは生値を保存せず、監査目的の一方向ハッシュのみ保存する (実装指示書16章)。
+  createdIpHash String? @map("created_ip_hash")
+  userAgentHash String? @map("user_agent_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  referrer OveAccount  @relation("WalletUserReferralReferrer", fields: [referrerAccountId], references: [id])
+  referred OveAccount? @relation("WalletUserReferralReferred", fields: [referredAccountId], references: [id])
+
+  // referredAccountIdがnullの行 (登録前セッション) は複数存在しうるが、登録完了後は
+  // 1アカウントにつき紹介元は1件のみ (`WalletReferral`の@@unique([walletUserId])と同じ理由)。
+  @@unique([referredAccountId])
+  @@index([referrerAccountId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("wallet_user_referrals")
 }
 
 /// ウォレットホーム画面「お知らせ」で表示するお知らせ (管理画面から作成・削除する)。

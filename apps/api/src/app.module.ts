@@ -27,6 +27,7 @@ import { RewardsModule } from "./rewards/rewards.module";
 import { SchedulerModule } from "./scheduler/scheduler.module";
 import { SupportModule } from "./support/support.module";
 import { TransactionsModule } from "./transactions/transactions.module";
+import { WalletUserReferralsModule } from "./wallet-user-referrals/wallet-user-referrals.module";
 import { WalletsModule } from "./wallets/wallets.module";
 
 @Module({
@@ -47,6 +48,7 @@ import { WalletsModule } from "./wallets/wallets.module";
     OutboxModule,
     AgencyModule,
     ReferralsModule,
+    WalletUserReferralsModule,
     ReportingModule,
     DailyBonusModule,
     CommonEventsModule,

@@ -74,6 +74,16 @@ export const FEATURE_FLAG_KEYS = [
    * 調整が済むまでコードだけ入れておけるよう、既定OFFにしてある。
    */
   "ENABLE_WALLET_MILESTONE_REWARDS",
+  /**
+   * ウォレット利用者同士の紹介 (`/r/{code}`・紹介画面) を有効化する
+   * (`docs/wallet-user-referral.md`)。
+   *
+   * 代理店システム側の「資格取得前の紹介を成果として認める条件・対象期間」が
+   * 未確定で、継承の通知先 (イベント名・項目) も仕様調整中のため、既定OFFで
+   * 入れておく。OFFの間は紹介コードを発行せず、`/r/{code}`も紹介を成立させずに
+   * ログイン画面へ戻すだけになる (登録自体は止めない)。
+   */
+  "ENABLE_WALLET_USER_REFERRAL",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

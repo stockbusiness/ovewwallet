@@ -17,7 +17,7 @@ import {
   type KeyValueStore,
   type LineAuthVerifier,
 } from "@ove/auth";
-import { generateId, type PrismaClient } from "@ove/database";
+import { generateId, type OveAccount, type Prisma, type PrismaClient } from "@ove/database";
 import { KV_STORE } from "../common/kv-store.module";
 import { PRISMA } from "../common/prisma.module";
 import { AccountsService } from "../accounts/accounts.service";
@@ -26,6 +26,7 @@ import { MailService, MailNotConfiguredError } from "../mail/mail.service";
 import { buildOtpMail } from "../mail/otp-mail";
 import { MailSendError } from "../mail/resend-mail-sender";
 import { ReferralsService } from "../referrals/referrals.service";
+import { WalletUserReferralsService } from "../wallet-user-referrals/wallet-user-referrals.service";
 import { EmailDomainPolicyService } from "./email-domain-policy.service";
 import { DISPOSABLE_EMAIL_ERROR_CODE } from "./email-error-codes";
 import { resolveEmailProviderSubject } from "./email-identity-subject";
@@ -55,6 +56,7 @@ export class AuthService {
     private readonly accounts: AccountsService,
     private readonly agencyService: AgencyService,
     private readonly referrals: ReferralsService,
+    private readonly walletUserReferrals: WalletUserReferralsService,
     private readonly mail: MailService,
     private readonly emailDomainPolicy: EmailDomainPolicyService,
   ) {
@@ -124,6 +126,7 @@ export class AuthService {
     termsAccepted?: boolean,
     sessionMeta?: SessionMeta,
     referralCookieToken?: string,
+    walletUserReferralCookieToken?: string,
   ) {
     let ok: boolean;
     try {
@@ -137,6 +140,7 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException("invalid verification code");
 
     const referral = await this.referrals.resolvePendingSession(referralCookieToken);
+    const walletReferral = await this.walletUserReferrals.resolvePendingSession(walletUserReferralCookieToken);
     const providerSubject = await resolveEmailProviderSubject(email, (provider, subject) =>
       this.accounts.hasIdentity(provider, subject),
     );
@@ -146,10 +150,8 @@ export class AuthService {
       providerSubject,
       email,
       termsAccepted,
-      onNewAccountCreated: referral
-        ? // LINEを経由していないので lineUserId は無い。代理店へは line_verified: false で送る。
-          (tx, newAccount) => this.referrals.attachToNewAccount(tx, referral, newAccount, null)
-        : undefined,
+      // LINEを経由していないので lineUserId は無い。代理店へは line_verified: false で送る。
+      onNewAccountCreated: this.buildReferralAttachHook(referral, walletReferral, null),
     });
     return this.createSessionForAccount(account.id, sessionMeta);
   }
@@ -165,20 +167,54 @@ export class AuthService {
     termsAccepted?: boolean,
     referralCookieToken?: string,
     sessionMeta?: SessionMeta,
+    walletUserReferralCookieToken?: string,
   ) {
     const claims = await this.verifyLineIdToken(idToken);
     const referral = await this.referrals.resolvePendingSession(referralCookieToken);
+    const walletReferral = await this.walletUserReferrals.resolvePendingSession(walletUserReferralCookieToken);
     const account = await this.accounts.findOrCreateByIdentity({
       identityType: "LINE",
       provider: "LINE",
       providerSubject: claims.lineUserId,
       email: claims.email,
       termsAccepted,
-      onNewAccountCreated: referral
-        ? (tx, newAccount) => this.referrals.attachToNewAccount(tx, referral, newAccount, claims.lineUserId)
-        : undefined,
+      onNewAccountCreated: this.buildReferralAttachHook(referral, walletReferral, claims.lineUserId),
     });
     return this.createSessionForAccount(account.id, sessionMeta);
+  }
+
+  /**
+   * 新規登録時にどちらの紹介を成立させるかを決める。
+   *
+   * **代理店紹介を優先し、ウォレット紹介で上書きしない。** 代理店紹介リンクと
+   * ウォレット紹介リンクを続けて開いた人は両方のCookieを持ちうるが、代理店の
+   * 成果をウォレット内の紹介が奪う形にはしない (`OveAccount`の
+   * `registrationReferrerAgencyId`が「一度設定したら上書きしない」ロックを
+   * 掛けているのと同じ方針)。
+   *
+   * 優先されなかったウォレット紹介セッションは`EXCLUDED`で閉じる。`CAPTURED`の
+   * まま残すと、次に別のアカウントが同じCookieでログインしたときに拾われてしまう。
+   *
+   * どちらも無ければ`undefined`を返し、紹介なしの通常登録になる。
+   */
+  private buildReferralAttachHook(
+    referral: Awaited<ReturnType<ReferralsService["resolvePendingSession"]>>,
+    walletReferral: Awaited<ReturnType<WalletUserReferralsService["resolvePendingSession"]>>,
+    lineUserId: string | null,
+  ) {
+    if (referral) {
+      return async (tx: Prisma.TransactionClient, newAccount: OveAccount) => {
+        await this.referrals.attachToNewAccount(tx, referral, newAccount, lineUserId);
+        if (walletReferral) {
+          await this.walletUserReferrals.excludeForAgencyReferral(tx, walletReferral);
+        }
+      };
+    }
+    if (walletReferral) {
+      return (tx: Prisma.TransactionClient, newAccount: OveAccount) =>
+        this.walletUserReferrals.attachToNewAccount(tx, walletReferral, newAccount);
+    }
+    return undefined;
   }
 
   /** 戦国パスポート側 (モック) がSSOコードを発行する。開発・テスト専用エンドポイントで使う。 */

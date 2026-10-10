@@ -2,6 +2,7 @@ import { Controller, Get, Query, Req, Res } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import type { Request, Response } from "express";
 import { sha256Hex } from "@ove/auth";
+import { appUrl } from "../common/app-url";
 import { referralCookieOptions } from "./referral-cookie";
 import { ReferralsService } from "./referrals.service";
 
@@ -35,7 +36,7 @@ export class ReferralsController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const loginUrl = `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/login`;
+    const loginUrl = appUrl("/login");
     const rawToken = firstNonEmpty(token, referralToken, rt);
 
     if (rawToken) {
