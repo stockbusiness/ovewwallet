@@ -13,6 +13,12 @@ export interface AdminWalletUserReferralRow {
   registered_at: string | null;
   inherited_at: string | null;
   reason: string | null;
+  /**
+   * 紹介された側に設定されている紹介代理店。継承申請を送ったあと、代理店システムが
+   * 承認して`customer.assignment.changed`を返したかどうかがここで分かる
+   * (申請の送信成功は承認を意味しないため、申請済みかどうかとは別に見る必要がある)。
+   */
+  referred_registration_referrer_agency_id: string | null;
 }
 
 export interface AdminWalletUserReferralView {
@@ -66,7 +72,9 @@ function toRow(
     inheritedAt: Date | null;
     reason: string | null;
   },
-  counterpart: { id: string; accountCode: string; displayName: string | null } | null,
+  counterpart:
+    | { id: string; accountCode: string; displayName: string | null; registrationReferrerAgencyId?: string | null }
+    | null,
 ): AdminWalletUserReferralRow {
   return {
     id: row.id,
@@ -78,5 +86,6 @@ function toRow(
     registered_at: row.registeredAt?.toISOString() ?? null,
     inherited_at: row.inheritedAt?.toISOString() ?? null,
     reason: row.reason,
+    referred_registration_referrer_agency_id: counterpart?.registrationReferrerAgencyId ?? null,
   };
 }

@@ -84,6 +84,18 @@ export const FEATURE_FLAG_KEYS = [
    * ログイン画面へ戻すだけになる (登録自体は止めない)。
    */
   "ENABLE_WALLET_USER_REFERRAL",
+  /**
+   * ウォレット発の紹介を代理店システムへ継承申請する
+   * (`wallet.referral.inheritance.requested`、`docs/wallet-user-referral.md`)。
+   *
+   * 代理店システム側の受信パスと本番受付の開始時期が未確定のため、記録側
+   * (`ENABLE_WALLET_USER_REFERRAL`) とは別のFlagにしてある。記録だけ先に始めて、
+   * 申請の送信は先方の受付開始に合わせて開けられるようにするため。
+   *
+   * このFlagだけでは送らない。`AGENCY_REFERRAL_INHERITANCE_PATH` (受信パス) も
+   * 設定されていないと申請を作らない。
+   */
+  "ENABLE_WALLET_USER_REFERRAL_INHERITANCE",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

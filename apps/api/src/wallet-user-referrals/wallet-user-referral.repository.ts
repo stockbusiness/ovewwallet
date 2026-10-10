@@ -84,7 +84,11 @@ export class WalletUserReferralRepository {
       where: { referrerAccountId, status: { not: "CAPTURED" } },
       orderBy: { capturedAt: "desc" },
       take: limit,
-      include: { referred: { select: { id: true, accountCode: true, displayName: true } } },
+      include: {
+        referred: {
+          select: { id: true, accountCode: true, displayName: true, registrationReferrerAgencyId: true },
+        },
+      },
     });
   }
 
@@ -93,6 +97,36 @@ export class WalletUserReferralRepository {
     return this.db.walletUserReferral.findUnique({
       where: { referredAccountId },
       include: { referrer: { select: { id: true, accountCode: true, displayName: true } } },
+    });
+  }
+
+  /**
+   * 継承申請の対象。紹介者が代理店資格を取得したときに拾う。
+   *
+   * 条件は「成立済み (`REGISTERED`) で、まだ申請を送っていない (`inheritedAt`が
+   * null) もの」。`INHERITED`は申請済みを表すため対象外。
+   */
+  async listPendingInheritance(referrerAccountId: string, limit = 500) {
+    return this.db.walletUserReferral.findMany({
+      where: { referrerAccountId, status: "REGISTERED", inheritedAt: null },
+      orderBy: { capturedAt: "asc" },
+      take: limit,
+      include: { referred: { select: { id: true, commonUserId: true } } },
+    });
+  }
+
+  /**
+   * 申請を送ったことを記録する。`inheritedAt`が入っている行は
+   * `listPendingInheritance`が拾わないため、同じ紹介を二重に申請しない。
+   */
+  async markInheritanceRequested(
+    tx: Prisma.TransactionClient,
+    id: string,
+    now: Date,
+  ): Promise<{ count: number }> {
+    return tx.walletUserReferral.updateMany({
+      where: { id, status: "REGISTERED", inheritedAt: null },
+      data: { status: "INHERITED", inheritedAt: now },
     });
   }
 

@@ -6,7 +6,7 @@ import { apiFetch, type AdminWalletUserReferralView, type AdminWalletUserReferra
 /** 状態の表示名。運用者が意味を読み取れる日本語にする。 */
 const STATUS_LABEL: Record<string, string> = {
   REGISTERED: "成立",
-  INHERITED: "代理店へ継承済み",
+  INHERITED: "代理店へ継承を申請済み",
   EXCLUDED: "対象外",
   EXPIRED: "期限切れ",
   CAPTURED: "登録前",
@@ -30,6 +30,10 @@ function statusClass(status: string): string {
  * 代理店紹介 (`/wallet-referrals`) とは別物。紹介した側がウォレット利用者である
  * 関係を出す。「紹介したはずなのに数に入らない」という問い合わせに答えるため、
  * **成立しなかった関係とその理由も表示する**。
+ *
+ * 継承は「申請済み」と「代理店システムが承認済み」を分けて出す。申請の送信成功は
+ * 承認を意味せず、認めるかどうかの判定は代理店システム側が行うため。承認されると
+ * 紹介された側に紹介代理店が設定されるので、それを承認の有無として見る。
  *
  * アカウント詳細とは別の取得にしている。取得に失敗してもアカウント詳細画面
  * 自体は表示を続けられるようにするため。
@@ -103,6 +107,13 @@ function ReferralRow({ row }: { row: AdminWalletUserReferralRow }) {
         <span className="text-sengoku-faint">{new Date(when).toLocaleDateString("ja-JP")}</span>
       </div>
       {reason && <p className="mt-0.5 text-sengoku-faint">{reason}</p>}
+      {row.status === "INHERITED" && (
+        <p className="mt-0.5 text-sengoku-faint">
+          {row.referred_registration_referrer_agency_id
+            ? `代理店システムが承認済み (紹介代理店: ${row.referred_registration_referrer_agency_id})`
+            : "代理店システムの承認待ち"}
+        </p>
+      )}
     </div>
   );
 }
