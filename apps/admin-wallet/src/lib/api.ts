@@ -795,6 +795,8 @@ export interface AdminWalletUserReferralRow {
   inherited_at: string | null;
   /** 対象外になった理由 (`agency_referral_takes_precedence` 等)。 */
   reason: string | null;
+  /** 紹介された側に設定されている紹介代理店。継承が承認されたかどうかが分かる。 */
+  referred_registration_referrer_agency_id: string | null;
 }
 
 export interface AdminWalletUserReferralView {

@@ -1,7 +1,8 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { AGENCY_DEACTIVATION_EVENT_TYPES, type AgencySyncRequest } from "@ove/shared-types";
 import { generateId, type PrismaClient, type Prisma } from "@ove/database";
 import { PRISMA } from "../common/prisma.module";
+import { RequestInheritanceUseCase } from "../wallet-user-referrals/request-inheritance.use-case";
 
 const DEACTIVATION_EVENT_TYPES = new Set<string>(AGENCY_DEACTIVATION_EVENT_TYPES);
 
@@ -26,7 +27,12 @@ interface AgencyLinkClaims {
  */
 @Injectable()
 export class AgencyService {
-  constructor(@Inject(PRISMA) private readonly db: PrismaClient) {}
+  private readonly logger = new Logger(AgencyService.name);
+
+  constructor(
+    @Inject(PRISMA) private readonly db: PrismaClient,
+    private readonly inheritance: RequestInheritanceUseCase,
+  ) {}
 
   /** ServiceCode.AGENCY_SYSTEM のServiceIntegration IDを取得する (未作成ならundefined)。 */
   async getServiceIntegrationId(): Promise<string | undefined> {
@@ -83,7 +89,43 @@ export class AgencyService {
       });
     }
 
+    // 代理店資格を取得した人が、それ以前にウォレット経由で紹介していた関係を
+    // 代理店システムへ継承申請する (`docs/wallet-user-referral.md` Phase 2)。
+    // 同期の本処理 (account_linkのupsert) はここまでで完了しており、申請は
+    // ベストエフォート。失敗しても同期自体を失敗させない (次の同期で拾われる)。
+    if (!isRevocation && body.common_user_id) {
+      await this.tryRequestWalletReferralInheritance(body.common_user_id);
+    }
+
     return { externalId, synced: true };
+  }
+
+  /**
+   * 同期で運ばれてきた`common_user_id`が既存のウォレットアカウントと一致したら、
+   * そのアカウントの未申請のウォレット紹介を継承申請する。
+   *
+   * 同期イベントには「初回の資格取得」を区別する種別がまだ無いため、情報更新の
+   * 同期でもここを通る。申請済みの紹介は`inherited_at`で除外されるので、何度
+   * 通っても二重に申請しない (区別用の通知が入ったら条件を絞るだけでよい)。
+   *
+   * 共通IDが2アカウントに紐づく異常時は、どちらの紹介実績か決められないため
+   * 何もしない (`CommonEventAccountResolver`と同じ方針)。
+   */
+  private async tryRequestWalletReferralInheritance(commonUserId: string): Promise<void> {
+    try {
+      const accounts = await this.db.oveAccount.findMany({
+        where: { commonUserId },
+        select: { id: true },
+        take: 2,
+      });
+      if (accounts.length !== 1) return;
+
+      await this.inheritance.requestForReferrer(accounts[0]!.id);
+    } catch (error) {
+      this.logger.warn(
+        `failed to request wallet referral inheritance: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

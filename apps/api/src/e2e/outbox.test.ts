@@ -268,6 +268,7 @@ describe("Feature Flags (開発ガイドライン13章)", () => {
       ENABLE_AGENCY_POINT_AWARD_INBOX: false,
       ENABLE_WALLET_MILESTONE_REWARDS: false,
       ENABLE_WALLET_USER_REFERRAL: false,
+      ENABLE_WALLET_USER_REFERRAL_INHERITANCE: false,
     });
   });
 

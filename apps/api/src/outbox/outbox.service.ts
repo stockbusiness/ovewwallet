@@ -39,11 +39,48 @@ const MAX_BACKOFF_SECONDS = 6 * 60 * 60; // 6時間
 export class OutboxService {
   private readonly logger = new Logger(OutboxService.name);
   private readonly destinations = new Map<string, OutboxDestinationHandler>();
+  /** `${destinationService}\u0000${eventType}` をキーにしたevent_type単位の送信実装。 */
+  private readonly eventHandlers = new Map<string, OutboxDestinationHandler>();
 
   constructor(private readonly repository: OutboxRepository) {}
 
+  /**
+   * 宛先サービス全体の既定の送信実装。
+   *
+   * 同じ宛先に2回登録すると、後から登録した側が黙って前の実装を置き換えて
+   * しまい、片方のイベントが送られなくなる (しかもモジュールの初期化順に依存
+   * するため再現しづらい)。同じ宛先で複数のevent_typeを扱う場合は
+   * `registerEventHandler`を使う。
+   */
   registerDestination(destinationService: string, handler: OutboxDestinationHandler): void {
+    const existing = this.destinations.get(destinationService);
+    if (existing && existing !== handler) {
+      throw new Error(
+        `a default outbox handler is already registered for "${destinationService}"; ` +
+          "use registerEventHandler() to add an event_type specific handler",
+      );
+    }
     this.destinations.set(destinationService, handler);
+  }
+
+  /**
+   * 同じ宛先サービスのうち、特定のevent_typeだけを扱う送信実装。
+   * 既定の実装 (`registerDestination`) より優先される。
+   */
+  registerEventHandler(
+    destinationService: string,
+    eventType: string,
+    handler: OutboxDestinationHandler,
+  ): void {
+    this.eventHandlers.set(eventHandlerKey(destinationService, eventType), handler);
+  }
+
+  /** event_type専用の実装があればそれを、無ければ宛先の既定実装を返す。 */
+  private resolveHandler(destinationService: string, eventType: string): OutboxDestinationHandler | undefined {
+    return (
+      this.eventHandlers.get(eventHandlerKey(destinationService, eventType)) ??
+      this.destinations.get(destinationService)
+    );
   }
 
   /**
@@ -78,7 +115,7 @@ export class OutboxService {
       const claimed = await this.repository.claim(event.id);
       if (!claimed) continue;
 
-      const handler = this.destinations.get(event.destinationService);
+      const handler = this.resolveHandler(event.destinationService, event.eventType);
       try {
         if (!handler) {
           throw new Error(`no destination handler registered for "${event.destinationService}"`);
@@ -124,4 +161,8 @@ export class OutboxService {
   async list(params: { status?: string; destinationService?: string; limit?: number }): Promise<unknown[]> {
     return this.repository.list(params);
   }
+}
+
+function eventHandlerKey(destinationService: string, eventType: string): string {
+  return `${destinationService}\u0000${eventType}`;
 }

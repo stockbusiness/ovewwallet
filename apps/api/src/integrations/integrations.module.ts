@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
-import { IntegrationHttpClient } from "./integration-http-client";
-import { IntegrationConfigProvider } from "./integration-config-provider";
-import { MarketClaimConfigService } from "./market-claim-config.service";
-import { CommonUserHubAdapter } from "./common-user-hub.adapter";
+import { AgencyReferralInheritanceAdapter } from "./agency-referral-inheritance.adapter";
 import { AgencyReferralAdapter } from "./agency-referral.adapter";
+import { CommonUserHubAdapter } from "./common-user-hub.adapter";
+import { IntegrationConfigProvider } from "./integration-config-provider";
+import { IntegrationHttpClient } from "./integration-http-client";
+import { MarketClaimConfigService } from "./market-claim-config.service";
 import { SengokuMarketClaimAdapter } from "./sengoku-market-claim.adapter";
 
 /**
@@ -18,6 +19,7 @@ import { SengokuMarketClaimAdapter } from "./sengoku-market-claim.adapter";
     MarketClaimConfigService,
     CommonUserHubAdapter,
     AgencyReferralAdapter,
+    AgencyReferralInheritanceAdapter,
     SengokuMarketClaimAdapter,
   ],
   exports: [
@@ -26,6 +28,7 @@ import { SengokuMarketClaimAdapter } from "./sengoku-market-claim.adapter";
     MarketClaimConfigService,
     CommonUserHubAdapter,
     AgencyReferralAdapter,
+    AgencyReferralInheritanceAdapter,
     SengokuMarketClaimAdapter,
   ],
 })

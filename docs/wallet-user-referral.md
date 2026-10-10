@@ -1,10 +1,15 @@
-# ウォレット利用者同士の紹介 (Phase 1: 記録まで)
+# ウォレット利用者同士の紹介
 
 ウォレット利用者が他の人を紹介し、紹介した側が**あとから代理店資格を取得したときに
-その紹介関係を代理店システムへ継承する**ための仕組み。この文書時点では **Phase 1
-(ウォレット内での記録・本人向け画面) のみ実装済み**で、継承の通知は未実装。
+その紹介関係を代理店システムへ継承する**ための仕組み。
 
-Feature Flag `ENABLE_WALLET_USER_REFERRAL` で出し分ける (既定OFF)。
+| | Feature Flag | 内容 |
+|---|---|---|
+| Phase 1 | `ENABLE_WALLET_USER_REFERRAL` | ウォレット内での記録・本人向け画面・管理画面 |
+| Phase 2 | `ENABLE_WALLET_USER_REFERRAL_INHERITANCE` | 代理店システムへの継承申請 |
+
+どちらも既定OFF。Phase 2は Phase 1 の記録が無いと対象が生まれないため、
+Phase 1 → Phase 2 の順で開ける。
 
 ## 代理店紹介との違い
 
@@ -62,7 +67,7 @@ Feature Flag `ENABLE_WALLET_USER_REFERRAL` で出し分ける (既定OFF)。
 |---|---|
 | `CAPTURED` | `/r/{code}` で受け付け、登録未完了 |
 | `REGISTERED` | 登録完了、紹介成立。代理店システムへはまだ伝えていない |
-| `INHERITED` | 紹介者の代理店資格取得に伴い、継承を通知済み (**Phase 2、未実装**) |
+| `INHERITED` | 紹介者の代理店資格取得に伴い、継承を**申請済み**。承認されたことを意味しない |
 | `EXCLUDED` | 代理店紹介が優先された・自己紹介 |
 | `EXPIRED` | 登録に使われないまま期限切れ |
 
@@ -72,39 +77,84 @@ Feature Flag `ENABLE_WALLET_USER_REFERRAL` で出し分ける (既定OFF)。
 (先方が「紹介記録ID」として保存し、承認結果で参照してくる)。採番し直し・行の削除は
 できない。
 
-## Phase 2 (継承、未実装)
+## Phase 2: 継承の申請
 
-代理店システムとの合意済みの方針:
+代理店システムと合意済みの方針:
 
 - 紹介顧客としての**紐付け**と、過去の登録・購入に対する**報酬の遡及付与**は分けて扱う
 - 成果として認める条件・対象期間は代理店システム側の運用ルールとして決まる
   (無期限の遡及は確約されていない)
-- 代理店同期 (`POST /api/v1/agency`) に、初回の代理店資格取得を情報更新・役職昇格と
-  区別できる通知を追加してもらう
-- ウォレット発の紹介には、既存の `referral_token` を前提としない専用イベントを定義する。
-  送る項目は紹介者・被紹介者の `common_user_id`、紹介日時、紹介記録ID
-- 承認結果のみを継承する。既存の紹介代理店は上書きしない
+- **申請の受付成功は承認を意味しない。** 承認された場合だけ結果が返る
+- 既存の紹介代理店は上書きしない
+- 継承処理自体ではポイント付与を行わない
 
-未確定 (先方から別途共有される): イベント名・受信項目の詳細・承認結果の通知形式。
+### 申請 (ウォレット → 代理店システム)
 
-### 実装済みの受け口
+イベント名 `wallet.referral.inheritance.requested`。
 
-承認結果は**既存の `customer.assignment.changed`** で受け取れる
-(`common_user_id` + `registration_referrer_agency_id`。`CustomerAssignmentChangedHandler`
-が初回のみ設定・既存値は上書きしないをトランザクション内で保証済み)。新しい受信形式を
-作る必要はない見込み。
+| 項目 | 値 |
+|---|---|
+| `event_id` | `wri_{紹介記録ID}`。**再送時も同じ値**になるよう、不変の紹介記録IDから決める |
+| `source_system_key` | `common_user_hub_config.systemKey` (本番は `orly-wallet`) |
+| `referrer_common_user_id` | 紹介した側の `common_user_id` |
+| `referred_common_user_id` | 紹介された側の `common_user_id` |
+| `referred_at` | `wallet_user_referrals.captured_at` (タイムゾーン付きISO 8601) |
+| `referral_record_id` | `wallet_user_referrals.id` (不変) |
+
+送信先ホスト・APIキー・`source_system_key` は既存の代理店連携設定
+(`common_user_hub_config`) をそのまま使う。`/api/referrals/capture` /
+`/confirm` と同じ `x-api-key` で送るため、新しい資格情報は要らない。
+**受信パスだけは `AGENCY_REFERRAL_INHERITANCE_PATH` で設定する** (既定値を置かない。
+推測したパスを既定にすると、誤ったURLへ404を再送し続け、設定し忘れと区別できなくなる)。
+
+重複は代理店システム側が `source_system_key` + `referral_record_id` で見る。
+ウォレット側も `inherited_at` で二重申請を防ぐので、二重に守られる。
+
+### 昇格の検知
+
+代理店同期 (`POST /api/v1/agency`) が運んでくる `common_user_id` が、既存の
+ウォレットアカウントと一致したときに申請する (`AgencyService.syncAgency`)。
+
+同期イベントには「初回の資格取得」を区別する種別が**まだ無い**ため、情報更新の
+同期でもこの判定を通る。申請済みの紹介は `inherited_at` で除外されるので、何度
+通っても二重に申請しない。区別用の通知が入ったら条件を絞るだけでよい。
+
+共通IDが2アカウントに紐づく異常時は、どちらの紹介実績か決められないため何もしない。
+
+### 承認結果 (代理店システム → ウォレット)
+
+**既存の `customer.assignment.changed` をそのまま使う。** 新しい受信形式は無い。
+
+| 項目 | 値 |
+|---|---|
+| `common_user_id` | 被紹介者 |
+| `registration_referrer_agency_id` | 承認した継承先の代理店識別子 |
+
+`assigned_agency_id` は送られない。受信側 (`CustomerAssignmentChangedHandler`) は
+`registration_referrer_agency_id` を「初回のみ設定し、既存値は上書きしない」で
+処理しており、先方の方針と一致する。**この経路に追加実装は不要。**
+
+管理画面では「申請済み」と「承認済み」を分けて表示する。承認されると紹介された側に
+紹介代理店が設定されるので、それを承認の有無として見る。
 
 ### 前提: 双方の common_user_id が解決済みであること
 
-継承イベントには紹介者・被紹介者**両方**の `common_user_id` が必要。共通顧客HUBの
-設定が揃っていない時期に登録したアカウントは `common_user_id` が null のまま固定
-されるため、管理画面の「共通IDを再解決」(`admin-common-user-resolve.service.ts`) で
-埋めておく必要がある。
+申請には紹介者・被紹介者**両方**の `common_user_id` が必要。共通顧客HUBの
+設定が揃っていない時期に登録したアカウントは null のまま固定されるため、
+管理画面の「共通IDを再解決」(`admin-common-user-resolve.service.ts`) で
+埋めておく必要がある。未解決の間は申請を作らず、解決後の次の同期で拾われる。
+
+### 未確定
+
+代理店システムの受信パス・認証方式 (同じAPIキーで受け付けられるかの確認待ち)、
+対象条件・期間 (代理店システム側の判定のため、ウォレットの実装には影響しない)。
 
 ## 環境変数
 
 | 変数 | 既定 | 用途 |
 |---|---|---|
-| `ENABLE_WALLET_USER_REFERRAL` | (未設定=OFF) | この機能全体の出し分け |
+| `ENABLE_WALLET_USER_REFERRAL` | (未設定=OFF) | 記録・画面の出し分け |
+| `ENABLE_WALLET_USER_REFERRAL_INHERITANCE` | (未設定=OFF) | 継承申請の送信 |
+| `AGENCY_REFERRAL_INHERITANCE_PATH` | (未設定) | 継承申請の受信パス。未設定なら申請を作らない |
 | `REFERRAL_SESSION_TTL_HOURS` | 24 | 紹介セッションCookieの寿命 (代理店紹介と共用) |
 | `APP_URL` | `http://localhost:3000` | 共有URL・リダイレクト先の組み立て元 |
