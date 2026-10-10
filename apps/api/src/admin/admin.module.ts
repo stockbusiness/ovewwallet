@@ -12,6 +12,7 @@ import { AdminAgencyConnectionTestService } from "./admin-agency-connection-test
 import { IntegrationsModule } from "../integrations/integrations.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { SupportModule } from "../support/support.module";
+import { WalletUserReferralsModule } from "../wallet-user-referrals/wallet-user-referrals.module";
 import { AdminApprovalService } from "./admin-approval.service";
 import { AdminApprovalsController } from "./admin-approvals.controller";
 import { AdminAuthController } from "./admin-auth.controller";
@@ -47,6 +48,7 @@ import { AdminSupportInquiriesController } from "./admin-support-inquiries.contr
 import { AdminSupportInquiriesService } from "./admin-support-inquiries.service";
 import { AdminUsersController } from "./admin-users.controller";
 import { AdminUsersService } from "./admin-users.service";
+import { AdminWalletUserReferralsService } from "./admin-wallet-user-referrals.service";
 import { AdminWalletsController } from "./admin-wallets.controller";
 import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
@@ -57,6 +59,7 @@ import { AdminService } from "./admin.service";
   // AuthModule は EmailDomainPolicyService (使い捨てドメイン判定のキャッシュ破棄) のため。
   imports: [
     AccountsModule,
+    WalletUserReferralsModule,
     AuthModule,
     CollectibleImagesModule,
     SupportModule,
@@ -101,6 +104,7 @@ import { AdminService } from "./admin.service";
     AdminNoticesService,
     AdminCommonUserHubService,
     AdminCommonUserResolveService,
+    AdminWalletUserReferralsService,
     AdminLegalService,
     AdminMailConfigService,
     AdminProfileConfigService,
